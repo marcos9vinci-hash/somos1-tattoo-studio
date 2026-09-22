@@ -52,23 +52,21 @@ export const Sidebar = ({
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed top-0 left-0 h-full w-full max-w-sm bg-zinc-950 text-zinc-100 border-r border-zinc-800 shadow-2xl z-50 flex flex-col overflow-hidden"
+            className="fixed top-0 left-0 h-full w-full max-w-sm bg-card text-card-foreground border-r border-border shadow-2xl z-50 flex flex-col overflow-hidden"
           >
             {/* Header da Sidebar */}
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-muted/40">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
+                <img src="/somos1-logo.png" alt="Somos 1" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border" />
                 <div>
-                  <h3 className="text-sm font-bold tracking-tight text-white">Menu & Navegação</h3>
-                  <p className="text-[10px] text-zinc-400 uppercase font-semibold">Galeria IA Studio</p>
+                  <h3 className="text-sm font-black tracking-tight text-foreground">Somos 1 Studio</h3>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Menu IA & Estratégia</p>
                 </div>
               </div>
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-8 w-8 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
                 onClick={onClose}
               >
                 <X className="w-4 h-4" />
@@ -93,20 +91,20 @@ export const Sidebar = ({
                         }}
                         className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all ${
                           isActive 
-                            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40 font-bold' 
-                            : 'hover:bg-zinc-900 text-zinc-300 hover:text-white border border-transparent'
+                            ? 'bg-foreground text-background font-black border border-foreground shadow-md' 
+                            : 'hover:bg-muted text-muted-foreground hover:text-foreground border border-transparent'
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`p-1.5 rounded-lg ${isActive ? 'bg-purple-500/30 text-purple-300' : 'bg-zinc-900 text-zinc-400'}`}>
+                          <div className={`p-1.5 rounded-lg ${isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground'}`}>
                             <Icon className="w-4 h-4" />
                           </div>
                           <div>
                             <div className="text-xs font-semibold">{item.label}</div>
-                            <div className="text-[10px] text-zinc-400 font-normal">{item.desc}</div>
+                            <div className="text-[10px] opacity-80 font-normal">{item.desc}</div>
                           </div>
                         </div>
-                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />}
+                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-background" />}
                       </button>
                     );
                   })}
@@ -114,21 +112,21 @@ export const Sidebar = ({
               </div>
 
               {/* Seção 2: Estúdio IA */}
-              <div className="p-3.5 bg-gradient-to-br from-purple-950/40 via-zinc-900 to-zinc-900/60 rounded-2xl border border-purple-500/30 shadow-xs relative overflow-hidden">
+              <div className="p-3.5 bg-muted/40 rounded-2xl border border-border shadow-xs relative overflow-hidden">
                 <div className="flex items-start gap-2.5">
-                  <div className="p-2 bg-purple-500/20 rounded-xl text-purple-300 mt-0.5 shrink-0">
+                  <div className="p-2 bg-muted rounded-xl text-foreground mt-0.5 shrink-0">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <h4 className="text-xs font-bold text-purple-200">
+                    <h4 className="text-xs font-black text-foreground uppercase tracking-wider">
                       Estúdio de Campanhas IA
                     </h4>
-                    <p className="text-[10px] text-zinc-400 leading-relaxed">
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
                       Planejamento e agendamento em lote com narrativa contínua e horários estratégicos.
                     </p>
                     <Button 
                       size="sm" 
-                      className="w-full h-8 mt-2 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white gap-1.5 rounded-xl shadow-md"
+                      className="w-full h-8 mt-2 text-xs font-black bw-invert-btn gap-1.5 rounded-xl shadow-md"
                       onClick={() => {
                         onClose();
                         setShowEstudioIA(true);

@@ -22,6 +22,7 @@ import TattooEngineModule from '../components/studio/TattooEngineModule';
 import GaleriaIA from './GaleriaIA';
 import ReferralTree from '../components/network/ReferralTree';
 import { buildReferralTree } from '../lib/referralUtils';
+import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
 
 // Error Boundary isolador por módulo
 class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: string }, { hasError: boolean; error: Error | null }> {
@@ -460,39 +461,41 @@ export default function Admin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070709] text-white flex flex-col md:flex-row pb-24 md:pb-0">
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row pb-24 md:pb-0">
       
       {/* DESKTOP SIDEBAR (Menu Lateral com Cascata & Hambúrguer) */}
       <aside className={cn(
-        "hidden md:flex flex-col bg-[#0d0d12] border-r border-white/5 transition-all duration-300 select-none z-30 shrink-0",
+        "hidden md:flex flex-col bg-card border-r border-border transition-all duration-300 select-none z-30 shrink-0",
         sidebarCollapsed ? "w-20" : "w-80"
       )}>
         {/* Header da Sidebar com Botão Hambúrguer de Recolher */}
-        <div className="p-5 border-b border-white/5 flex items-center justify-between">
+        <div className="p-4 border-b border-border flex items-center justify-between">
           {!sidebarCollapsed ? (
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed(true)}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all"
+                className="p-2 rounded-xl bg-muted hover:bg-muted/80 text-foreground transition-all"
                 title="Recolher Menu Lateral"
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-lg">🐉</span>
-                  <span className="font-headline font-black text-sm tracking-wider text-white">INDICAAI</span>
-                  <span className="text-[8px] bg-primary-fixed text-black font-black px-1.5 py-0.5 rounded font-headline">SUPER-APP</span>
+              <div className="flex items-center gap-2.5">
+                <img src="/somos1-logo.png" alt="Somos 1" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border" />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-headline font-black text-sm tracking-wider text-foreground">SOMOS 1</span>
+                    <span className="text-[8px] bg-foreground text-background font-black px-1.5 py-0.5 rounded font-headline">STUDIO</span>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground font-headline uppercase tracking-widest">Tattoo Studio</p>
                 </div>
-                <p className="text-[9px] text-zinc-500 font-headline uppercase tracking-widest">Somos 1 Tattoo Studio</p>
               </div>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => setSidebarCollapsed(false)}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-primary-fixed mx-auto transition-all"
+              className="p-2.5 rounded-xl bg-muted hover:bg-muted/80 text-foreground mx-auto transition-all"
               title="Expandir Menu Lateral"
             >
               <Menu className="w-5 h-5" />
@@ -874,70 +877,74 @@ export default function Admin() {
       {isMobileDrawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsMobileDrawerOpen(false)} />
-          <div className="relative w-80 max-w-[85%] bg-[#0d0d12] border-r border-white/10 p-5 flex flex-col h-full z-10 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🐉</span>
+          <div className="relative w-80 max-w-[85%] bg-card border-r border-border p-5 flex flex-col h-full z-10 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <img src="/somos1-logo.png" alt="Somos 1" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border" />
                 <div>
-                  <h3 className="font-headline font-black text-xs text-white">INDICAAI SUPER-APP</h3>
-                  <p className="text-[8px] text-zinc-500 uppercase font-headline">Somos 1 Tattoo Studio</p>
+                  <h3 className="font-headline font-black text-xs text-foreground">SOMOS 1 TATTOO</h3>
+                  <p className="text-[8px] text-muted-foreground uppercase font-headline tracking-wider">Studio Central</p>
                 </div>
               </div>
-              <button onClick={() => setIsMobileDrawerOpen(false)} className="p-2 text-zinc-400 hover:text-white">
+              <button onClick={() => setIsMobileDrawerOpen(false)} className="p-2 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            <div className="pt-1 pb-1">
+              <ThemeToggleButton className="w-full justify-center" />
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-3">
               {/* Agenda */}
-              <div className="border border-white/5 rounded-xl p-2 bg-white/[0.02]">
-                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-zinc-400 mb-1 px-1">1. Atendimentos</p>
-                <button onClick={() => { setCurrentModule('agenda'); setAgendaSubTab('calendar'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-zinc-300 flex items-center gap-2 hover:bg-white/5">
-                  <Calendar className="w-3.5 h-3.5 text-primary-fixed" /> Calendário
+              <div className="border border-border rounded-xl p-2 bg-muted/20">
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">1. Atendimentos</p>
+                <button onClick={() => { setCurrentModule('agenda'); setAgendaSubTab('calendar'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Calendar className="w-3.5 h-3.5 text-foreground" /> Calendário
                 </button>
-                <button onClick={() => { setCurrentModule('agenda'); setAgendaSubTab('members'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-zinc-300 flex items-center gap-2 hover:bg-white/5">
-                  <Users className="w-3.5 h-3.5 text-primary-fixed" /> Fichas de Clientes A-Z
+                <button onClick={() => { setCurrentModule('agenda'); setAgendaSubTab('members'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Users className="w-3.5 h-3.5 text-foreground" /> Fichas de Clientes A-Z
                 </button>
               </div>
 
               {/* IndicaAi */}
-              <div className="border border-white/5 rounded-xl p-2 bg-white/[0.02]">
-                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-primary-fixed mb-1 px-1">2. Rede IndicaAi</p>
-                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('dashboard'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-zinc-300 flex items-center gap-2 hover:bg-white/5">
-                  <BarChart3 className="w-3.5 h-3.5 text-primary-fixed" /> Métricas & Rede
+              <div className="border border-border rounded-xl p-2 bg-muted/20">
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">2. Rede & Fidelidade</p>
+                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('dashboard'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <BarChart3 className="w-3.5 h-3.5 text-foreground" /> Métricas & Rede
                 </button>
-                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('credits'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-zinc-300 flex items-center gap-2 hover:bg-white/5">
-                  <DollarSign className="w-3.5 h-3.5 text-primary-fixed" /> Saldo & Ajustes
+                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('credits'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <DollarSign className="w-3.5 h-3.5 text-foreground" /> Saldo & Ajustes
                 </button>
-                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('campaigns'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-zinc-300 flex items-center gap-2 hover:bg-white/5">
-                  <Gift className="w-3.5 h-3.5 text-primary-fixed" /> Campanhas
+                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('campaigns'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Gift className="w-3.5 h-3.5 text-foreground" /> Campanhas
                 </button>
-                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('invites'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-zinc-300 flex items-center gap-2 hover:bg-white/5">
-                  <Ticket className="w-3.5 h-3.5 text-primary-fixed" /> Convites VIP
+                <button onClick={() => { setCurrentModule('indicaai'); setIndicaSubTab('invites'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Ticket className="w-3.5 h-3.5 text-foreground" /> Convites VIP
                 </button>
               </div>
 
               {/* Tattoo Engine */}
-              <div className="border border-amber-500/20 rounded-xl p-2 bg-amber-500/[0.02]">
-                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-amber-400 mb-1 px-1">3. Creative Suite</p>
-                <button onClick={() => { setCurrentModule('studio'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-amber-300 flex items-center gap-2 hover:bg-white/5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Tattoo Engine Pro
+              <div className="border border-border rounded-xl p-2 bg-muted/20">
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">3. Creative Suite</p>
+                <button onClick={() => { setCurrentModule('studio'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Sparkles className="w-3.5 h-3.5 text-foreground" /> Tattoo Engine Pro
                 </button>
               </div>
 
               {/* Galeria IA */}
-              <div className="border border-pink-500/20 rounded-xl p-2 bg-pink-500/[0.02]">
-                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-pink-400 mb-1 px-1">4. Galeria IA</p>
-                <button onClick={() => { setCurrentModule('galeria'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-pink-300 flex items-center gap-2 hover:bg-white/5">
-                  <Camera className="w-3.5 h-3.5 text-pink-400" /> Estúdio de Postagem
+              <div className="border border-border rounded-xl p-2 bg-muted/20">
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">4. Galeria IA</p>
+                <button onClick={() => { setCurrentModule('galeria'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Camera className="w-3.5 h-3.5 text-foreground" /> Estúdio de Postagem
                 </button>
               </div>
 
               {/* Sistema */}
-              <div className="border border-white/5 rounded-xl p-2 bg-white/[0.02]">
-                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-zinc-400 mb-1 px-1">5. Infraestrutura</p>
-                <button onClick={() => { setCurrentModule('system'); setSystemSubTab('whatsapp'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-zinc-300 flex items-center gap-2 hover:bg-white/5">
-                  <MessageSquare className="w-3.5 h-3.5 text-primary-fixed" /> WhatsApp 24/7 & Logs
+              <div className="border border-border rounded-xl p-2 bg-muted/20">
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">5. Infraestrutura</p>
+                <button onClick={() => { setCurrentModule('system'); setSystemSubTab('whatsapp'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <MessageSquare className="w-3.5 h-3.5 text-foreground" /> WhatsApp 24/7 & Logs
                 </button>
               </div>
             </div>
@@ -949,12 +956,12 @@ export default function Admin() {
       <div className="flex-1 flex flex-col min-w-0">
         
         {/* TOP HEADER */}
-        <header className="sticky top-0 z-20 bg-[#0a0a0f]/90 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-20 bg-card/90 backdrop-blur-md border-b border-border px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button 
               type="button"
               onClick={() => setIsMobileDrawerOpen(true)}
-              className="md:hidden p-2 rounded-xl bg-zinc-900 border border-white/10 text-zinc-300"
+              className="md:hidden p-2 rounded-xl bg-muted border border-border text-foreground"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -963,36 +970,37 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden md:flex p-2 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white transition-all"
+              className="hidden md:flex p-2 rounded-xl bg-muted border border-border text-muted-foreground hover:text-foreground transition-all"
               title={sidebarCollapsed ? "Expandir Menu" : "Recolher Menu"}
             >
-              {sidebarCollapsed ? <PanelLeft className="w-4 h-4 text-primary-fixed" /> : <PanelLeftClose className="w-4 h-4" />}
+              {sidebarCollapsed ? <PanelLeft className="w-4 h-4 text-foreground" /> : <PanelLeftClose className="w-4 h-4" />}
             </button>
 
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-headline font-black text-sm uppercase tracking-wider text-white">
+                <h1 className="font-headline font-black text-sm uppercase tracking-wider text-foreground">
                   {currentModule === 'agenda' && '📅 ATENDIMENTOS & AGENDA'}
-                  {currentModule === 'indicaai' && '👑 PROGRAMA INDICA AI'}
+                  {currentModule === 'indicaai' && '👑 PROGRAMA DE INDICAÇÃO & VIP'}
                   {currentModule === 'studio' && '🎨 TATTOO ENGINE PRO'}
                   {currentModule === 'galeria' && '📸 GALERIA IA & SOCIAL STUDIO'}
                   {currentModule === 'system' && '🤖 SISTEMA & AUTOMAÇÃO'}
                 </h1>
-                <span className="hidden sm:inline-block text-[9px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full font-headline font-black">
+                <span className="hidden sm:inline-block text-[9px] bg-muted text-foreground border border-border px-2 py-0.5 rounded-full font-headline font-black">
                   Robô Nuvem 24/7 Ativo
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-500 font-headline uppercase tracking-widest mt-0.5">
+              <p className="text-[10px] text-muted-foreground font-headline uppercase tracking-widest mt-0.5">
                 Somos 1 Tattoo Studio • Painel Central
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <ThemeToggleButton />
             <button
               type="button"
               onClick={() => fetchData()}
-              className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-headline uppercase font-bold text-zinc-300 transition-all flex items-center gap-1.5"
+              className="px-3 py-2 bg-muted hover:bg-muted/80 border border-border rounded-xl text-[10px] font-headline uppercase font-bold text-foreground transition-all flex items-center gap-1.5"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Atualizar</span>
@@ -1002,7 +1010,7 @@ export default function Admin() {
 
         {/* SUB-TABS NAVIGATION (Pills no Topo para Módulos de Múltiplas Funções) */}
         {currentModule !== 'studio' && currentModule !== 'galeria' && (
-          <div className="px-6 pt-4 pb-2 border-b border-white/5 bg-[#08080c]">
+          <div className="px-6 pt-3 pb-2 border-b border-border bg-background">
             <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
               
               {/* Sub-abas de Agenda */}

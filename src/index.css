@@ -1,26 +1,95 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&family=Manrope:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* ==========================================================================
+   SOMOS 1 TATTOO STUDIO — MONOCHROME BLACK & WHITE DESIGN SYSTEM
+   ========================================================================== */
+
 :root {
-  --background: #0d0d12;
-  --foreground: #f4f4f6;
-  --card: #131318;
-  --card-foreground: #f4f4f6;
-  --popover: #131318;
-  --popover-foreground: #f4f4f6;
-  --primary: #c3f400;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #0c0c0e;
+  --card-foreground: #ffffff;
+  --popover: #0c0c0e;
+  --popover-foreground: #ffffff;
+  
+  --primary: #ffffff;
   --primary-foreground: #000000;
-  --secondary: #1f1f27;
-  --secondary-foreground: #f4f4f6;
-  --muted: #1f1f27;
-  --muted-foreground: #9ca3af;
-  --accent: #262630;
-  --accent-foreground: #f4f4f6;
+  
+  --secondary: #18181b;
+  --secondary-foreground: #ffffff;
+  
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  
+  --accent: #27272a;
+  --accent-foreground: #ffffff;
+  
   --destructive: #ef4444;
-  --border: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.12);
   --input: rgba(255, 255, 255, 0.15);
-  --ring: #c3f400;
-  --radius: 1rem;
+  --ring: #ffffff;
+  --radius: 0.75rem;
+
+  /* Monochromatic studio tokens */
+  --color-primary-fixed: #ffffff;
+  --color-primary-container: #18181b;
+  --color-on-primary-container: #ffffff;
+  --color-secondary-container: #27272a;
+  --color-surface-container: #09090b;
+  --color-surface-container-high: #141417;
+  --color-surface-container-highest: #222226;
+  --color-on-surface: #f4f4f5;
+  --color-on-surface-variant: #a1a1aa;
+  --color-outline: #52525b;
+  --color-outline-variant: #27272a;
+  --color-tertiary-fixed: #ffffff;
+  --color-tertiary-fixed-dim: #e4e4e7;
+  
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+/* ==========================================================================
+   ESQUEMA DE INVERSÃO (INVERTED / LIGHT MONOCHROME SCHEME)
+   ========================================================================== */
+html.inverted, body.inverted, [data-theme="inverted"] {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #f4f4f5;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  
+  --secondary: #e4e4e7;
+  --secondary-foreground: #000000;
+  
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  
+  --accent: #e4e4e7;
+  --accent-foreground: #000000;
+  
+  --border: rgba(0, 0, 0, 0.14);
+  --input: rgba(0, 0, 0, 0.12);
+  --ring: #000000;
+
+  --color-primary-fixed: #000000;
+  --color-primary-container: #e4e4e7;
+  --color-on-primary-container: #000000;
+  --color-secondary-container: #d4d4d8;
+  --color-surface-container: #fafafa;
+  --color-surface-container-high: #f4f4f5;
+  --color-surface-container-highest: #e4e4e7;
+  --color-on-surface: #09090b;
+  --color-on-surface-variant: #52525b;
+  --color-outline: #a1a1aa;
+  --color-outline-variant: #e4e4e7;
+  --color-tertiary-fixed: #000000;
+  --color-tertiary-fixed-dim: #27272a;
 }
 
 @theme {
@@ -46,19 +115,19 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-primary-fixed: #c3f400;
-  --color-primary-container: #c3f400;
-  --color-on-primary-container: #556d00;
-  --color-secondary-container: #7b00cb;
-  --color-surface-container: #201f1f;
-  --color-surface-container-high: #2a2a2a;
-  --color-surface-container-highest: #353534;
-  --color-on-surface: #e5e2e1;
-  --color-on-surface-variant: #c4c9ac;
-  --color-outline: #8e9379;
-  --color-outline-variant: #444933;
-  --color-tertiary-fixed: #ffe088;
-  --color-tertiary-fixed-dim: #e9c349;
+  --color-primary-fixed: var(--color-primary-fixed);
+  --color-primary-container: var(--color-primary-container);
+  --color-on-primary-container: var(--color-on-primary-container);
+  --color-secondary-container: var(--color-secondary-container);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-outline: var(--color-outline);
+  --color-outline-variant: var(--color-outline-variant);
+  --color-tertiary-fixed: var(--color-tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--color-tertiary-fixed-dim);
   
   --radius-lg: 16px;
   --radius-xl: 24px;
@@ -66,170 +135,107 @@
 
 @layer base {
   body {
-    background-color: #070709;
-    color: #e5e2e1;
+    background-color: var(--background);
+    color: var(--foreground);
     font-family: var(--font-sans);
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 }
 
+/* Glass & Card Monocromáticos */
 .glass-panel {
-  background-color: rgba(32, 31, 31, 0.6);
+  background-color: var(--card);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
 }
 
-.neon-glow {
-  box-shadow: 0 0 20px rgba(195, 244, 0, 0.2);
+.bw-card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+/* Monochromatic Glows */
+.bw-glow {
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.12);
+}
+
+html.inverted .bw-glow, body.inverted .bw-glow {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.12);
+}
+
+.neon-glow, .gold-glow {
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.12);
 }
 
 .neon-text-glow {
-  text-shadow: 0 0 8px rgba(195, 244, 0, 0.4);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
 }
 
-.gold-glow {
-  box-shadow: 0 0 15px rgba(233, 195, 73, 0.3);
+/* Efeito de Inversão Dinâmica nos Botões e Elementos */
+.bw-invert-btn {
+  background-color: var(--foreground);
+  color: var(--background);
+  border: 1px solid var(--foreground);
+  transition: all 0.2s ease;
 }
 
-/* Scrollbar Customization */
+.bw-invert-btn:hover {
+  background-color: var(--background);
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.bw-outline-btn {
+  background-color: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.bw-outline-btn:hover {
+  background-color: var(--foreground);
+  color: var(--background);
+  border-color: var(--foreground);
+}
+
+/* Auto-inversão do logo em modo claro/invertido se necessário */
+html.inverted .logo-auto-invert, body.inverted .logo-auto-invert {
+  filter: invert(1);
+}
+
+/* Scrollbars Monocromáticas */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0d0d12;
+  background: var(--background);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #353534;
+  background: var(--border);
   border-radius: 10px;
   transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #c3f40066;
+  background: var(--foreground);
 }
 
 .modern-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #353534 #0d0d12;
+  scrollbar-color: var(--border) var(--background);
 }
 
-/* ==========================================================================
-   TATTOO ENGINE PRO - SCOPED THEME & COMPONENT STYLES
-   ========================================================================== */
+/* Scoped Tattoo Engine B&W */
 .tattoo-engine-scope {
-  --bg-app: #0a0a0a;
-  --accent: #ff4e00;
-  --color-bg: #0a0a0a;
-  --color-card: #151619;
-  --color-accent: #ff4e00;
-  --color-border: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  --bg-app: var(--background);
+  --color-bg: var(--background);
+  --color-card: var(--card);
+  --color-accent: var(--foreground);
+  --color-border: var(--border);
+  color: var(--foreground);
 }
-
-.tattoo-engine-scope .bg-bg {
-  background-color: var(--color-bg, #0a0a0a) !important;
-}
-
-.tattoo-engine-scope .bg-card {
-  background-color: var(--color-card, #151619) !important;
-}
-
-.tattoo-engine-scope .text-accent {
-  color: var(--color-accent, #ff4e00) !important;
-}
-
-.tattoo-engine-scope .bg-accent {
-  background-color: var(--color-accent, #ff4e00) !important;
-}
-
-.tattoo-engine-scope .border-accent {
-  border-color: var(--color-accent, #ff4e00) !important;
-}
-
-.tattoo-engine-scope .accent-accent {
-  accent-color: var(--color-accent, #ff4e00) !important;
-}
-
-.tattoo-engine-scope .shadow-accent\/20 {
-  box-shadow: 0 10px 25px -5px rgba(255, 78, 0, 0.25) !important;
-}
-
-.tattoo-engine-scope .focus\:ring-accent:focus {
-  --tw-ring-color: #ff4e00 !important;
-}
-
-.tattoo-engine-scope .hover\:border-accent\/50:hover {
-  border-color: rgba(255, 78, 0, 0.5) !important;
-}
-
-.tattoo-engine-scope .hover\:text-accent:hover {
-  color: #ff4e00 !important;
-}
-
-.tattoo-engine-scope .hover\:bg-accent\/20:hover {
-  background-color: rgba(255, 78, 0, 0.2) !important;
-}
-
-.tattoo-engine-scope .glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.tattoo-engine-scope .btn-primary {
-  background-color: #ffffff;
-  color: #000000;
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.tattoo-engine-scope .btn-primary:hover {
-  background-color: rgba(255, 255, 255, 0.9);
-}
-
-.tattoo-engine-scope .btn-secondary {
-  background-color: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  font-weight: 500;
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.tattoo-engine-scope .btn-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-.tattoo-engine-scope .btn-accent {
-  background-color: #ff4e00;
-  color: #ffffff;
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.tattoo-engine-scope .btn-accent:hover {
-  background-color: rgba(255, 78, 0, 0.9);
-}
-
-.tattoo-engine-scope .no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.tattoo-engine-scope .no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-

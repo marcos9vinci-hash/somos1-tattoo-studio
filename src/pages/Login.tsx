@@ -4,6 +4,7 @@ import { ArrowRight, ShieldCheck, ChevronDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
 
 export default function Login() {
   const [phone, setPhone] = useState('');
@@ -66,24 +67,31 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-background text-on-surface font-sans min-h-screen flex flex-col items-center">
+    <div className="bg-background text-foreground font-sans min-h-screen flex flex-col items-center">
       <div id="recaptcha-container"></div>
       
-      <header className="w-full max-w-md px-6 py-6 flex items-center justify-between">
-        <div className="h-1 w-24 bg-surface-container-highest rounded-full overflow-hidden">
-          <div className="h-full w-1/2 bg-primary-fixed"></div>
+      <header className="w-full max-w-md px-6 py-6 flex items-center justify-between border-b border-border/40">
+        <div className="flex items-center gap-2">
+          <img src="/somos1-logo.png" alt="Somos 1" className="w-7 h-7 object-contain" />
+          <span className="font-headline font-black text-xs text-foreground tracking-wider uppercase">Somos 1 Tattoo</span>
         </div>
+        <ThemeToggleButton />
       </header>
 
-      <main className="flex-1 w-full max-w-md px-6 pt-12 pb-20 flex flex-col">
+      <main className="flex-1 w-full max-w-md px-6 pt-8 pb-20 flex flex-col">
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
+          className="mb-8 text-center"
         >
-          <h1 className="font-headline text-4xl text-primary mb-4 leading-tight">Informe seu telefone</h1>
-          <p className="text-lg text-on-surface-variant">
-            Enviaremos um código de verificação por SMS.
+          <img 
+            src="/somos1-logo-official.png" 
+            alt="Somos 1 Tattoo Studio" 
+            className="h-16 w-auto object-contain mx-auto mb-4" 
+          />
+          <h1 className="font-headline text-3xl font-black text-foreground mb-2 leading-tight">Informe seu telefone</h1>
+          <p className="text-sm text-muted-foreground">
+            Acesse sua conta do Somos 1 Tattoo Studio.
           </p>
           {error && <p className="text-red-500 mt-4 text-sm font-headline uppercase tracking-wider">{error}</p>}
         </motion.section>
