@@ -54,9 +54,15 @@ const STATUS_OPTIONS_LOCAL = [
   { value: "publicado", label: "Publicado", color: "bg-green-500" },
 ];
 
-export default function GaleriaIA() {
+export default function GaleriaIA({
+  embedded = false,
+  initialTab = 'calendario'
+}: {
+  embedded?: boolean;
+  initialTab?: string;
+}) {
   console.log("GaleriaIA component is being initialized");
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   
   const { 
     igConnected, setIgConnected, 
@@ -73,13 +79,23 @@ export default function GaleriaIA() {
   
   // --- Estados: UI / Modais ---
   // TODO: Move to useUI hook
-  const [activeTab, setActiveTab] = useState('calendario');
+  const [activeTab, setActiveTab] = useState(initialTab === 'estudio' ? 'calendario' : (initialTab || 'calendario'));
   const { showNotifs, setShowNotifs, dismissedNotifs, setDismissedNotifs } = useNotifications();
   const [showPlanoSemanal, setShowPlanoSemanal] = useState(false);
   const [showConfigWhatsapp, setShowConfigWhatsapp] = useState(false);
-  const [showEstudioIA, setShowEstudioIA] = useState(false);
+  const [showEstudioIA, setShowEstudioIA] = useState(initialTab === 'estudio');
   const [showNicheConfig, setShowNicheConfig] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+
+  useEffect(() => {
+    if (initialTab) {
+      if (initialTab === 'estudio') {
+        setShowEstudioIA(true);
+      } else {
+        setActiveTab(initialTab);
+      }
+    }
+  }, [initialTab]);
   
   // --- Estados: Editor / Calendário ---
   // TODO: Move to useCalendar/useEditor hooks
@@ -216,54 +232,39 @@ export default function GaleriaIA() {
 
   useEffect(() => {
     const loadPosts = async () => {
-        if (!user) return;
+        const currentUserId = user?.uid || (user as any)?.id || 'guest_admin';
         try {
-            const loadedPosts = await postRepository.getPosts(user.id);
-            
-            if (!loadedPosts || !loadedPosts.posts) {
-                console.error("Loaded posts is invalid:", loadedPosts);
-                return;
-            }
-
-            // If Firestore is empty, try loading from localStorage as a fallback
-            let finalPosts = loadedPosts.posts;
-            if (finalPosts.length === 0) {
-              const saved = localStorage.getItem('galeria_posts_v3');
-              if (saved) {
+            // 1. Tentar ler do localStorage imediatamente para render instantâneo
+            const saved = localStorage.getItem('galeria_posts_v3');
+            if (saved) {
+              try {
                 const localPosts = JSON.parse(saved).map((p: any) => ({
                   ...p,
                   date: new Date(p.date),
                   status: p.status || 'rascunho',
                 }));
                 if (localPosts.length > 0) {
-                  finalPosts = localPosts;
-                  // Sync to Firestore
-                  for (const post of localPosts) {
-                      await postRepository.addPost({
-                          ...post,
-                          userId: user.id,
-                          date: post.date instanceof Date ? post.date.toISOString() : post.date
-                      });
-                  }
+                  setPosts(localPosts);
                 }
-              }
+              } catch (parseErr) {}
             }
 
-            console.log("FINAL POSTS:", finalPosts);
-            setPosts(finalPosts.map((p: any) => ({ ...p, date: p.date instanceof Date ? p.date : new Date(p.date as any) })));
-            if (finalPosts.length > 0) {
-              syncWithServerScheduler(finalPosts);
+            // 2. Sincronizar com repositório em segundo plano se disponível
+            const loadedPosts = await postRepository.getPosts(currentUserId);
+            if (loadedPosts && loadedPosts.posts && loadedPosts.posts.length > 0) {
+              setPosts(loadedPosts.posts.map((p: any) => ({ ...p, date: p.date instanceof Date ? p.date : new Date(p.date as any) })));
+              syncWithServerScheduler(loadedPosts.posts);
             }
         } catch (e) {
-            console.error("Error loading posts from Firestore:", e);
+            console.warn("Notice loading posts from repository:", e);
         }
     };
 
-    if (user) {
-        loadPosts();
-    } else {
+    loadPosts();
+
+    if (!user) {
         ensureAnonymousAuth().catch(err => {
-            console.error("Error signing in anonymously", err);
+            console.warn("Silent anonymous auth notice:", err);
         });
     }
   }, [user]);
@@ -510,24 +511,78 @@ export default function GaleriaIA() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-hidden">
-      <AppHeader
-        title="Galeria IA"
-        description="Estúdio Criativo de Tatuagem"
-        activeTab={activeTab}
-        profileInfo={profileInfo}
-        igConnected={igConnected}
-        hasPublishPerm={hasPublishPerm}
-        isPlanning={isPlanning}
-        sidebarOpen={showSidebar}
-        onToggleSidebar={() => setShowSidebar(!showSidebar)}
-        onOpenIgModal={() => {
-          setModalInitialTab("instagram");
-          setShowIgModal(true);
-        }}
-        onOpenConfigWhatsapp={() => setShowConfigWhatsapp(true)}
-        onUpload={() => !isPlanning && fileInputRef.current?.click()}
-      />
+    <div className="flex flex-col h-full bg-background text-foreground overflow-hidden">
+      {embedded ? (
+        <div className="px-4 py-2.5 border-b border-border bg-card/60 backdrop-blur-md flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant={showSidebar ? "default" : "outline"} 
+              size="sm" 
+              className="h-8 rounded-xl px-3 gap-1.5 text-xs font-headline font-bold border-border"
+              onClick={() => setShowSidebar(!showSidebar)}
+            >
+              <Menu className="w-3.5 h-3.5" />
+              <span>Menu Estratégico IA</span>
+            </Button>
+            <InstagramStatusBadge 
+              connected={igConnected} 
+              profile={profileInfo} 
+              hasPublishPerm={hasPublishPerm}
+              onClick={() => {
+                setModalInitialTab("instagram");
+                setShowIgModal(true);
+              }} 
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 rounded-xl px-2.5 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setShowConfigWhatsapp(true)}
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </Button>
+            <Button 
+              size="sm" 
+              className={`h-8 rounded-xl px-4 bg-foreground text-background hover:opacity-90 font-headline font-bold text-xs gap-1.5 shadow-sm ${isPlanning ? 'opacity-50 cursor-not-allowed' : ''}`} 
+              onClick={() => !isPlanning && fileInputRef.current?.click()}
+              disabled={isPlanning}
+            >
+              {isPlanning ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 animate-pulse text-yellow-400" />
+                  <span>Planejando...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>+ Carregar Fotos</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <AppHeader
+          title="Galeria IA"
+          description="Estúdio Criativo de Tatuagem"
+          activeTab={activeTab}
+          profileInfo={profileInfo}
+          igConnected={igConnected}
+          hasPublishPerm={hasPublishPerm}
+          isPlanning={isPlanning}
+          sidebarOpen={showSidebar}
+          onToggleSidebar={() => setShowSidebar(!showSidebar)}
+          onOpenIgModal={() => {
+            setModalInitialTab("instagram");
+            setShowIgModal(true);
+          }}
+          onOpenConfigWhatsapp={() => setShowConfigWhatsapp(true)}
+          onUpload={() => !isPlanning && fileInputRef.current?.click()}
+        />
+      )}
       <input
         type="file"
         ref={fileInputRef}
@@ -574,76 +629,70 @@ export default function GaleriaIA() {
           )}
         </AnimatePresence>
 
-        {isAuthenticated === null ? (
-          <div className="flex h-screen items-center justify-center text-muted-foreground">Carregando autenticação...</div>
-        ) : isAuthenticated === false ? (
-          <div className="flex h-screen items-center justify-center text-destructive">Erro de autenticação. Tente novamente.</div>
-        ) : (
-          <div className="w-full">
-            {activeTab === 'calendario' && (
-              <CalendarView>
-                <Card className="border-none shadow-none bg-transparent">
-                  <CardContent className="p-0 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-900/60 p-2.5 rounded-2xl border border-zinc-800">
-                      <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-300 hover:text-white" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
-                        <h2 className="text-sm font-bold capitalize w-36 text-center text-white">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-300 hover:text-white" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 text-[10px] font-bold text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
-                          onClick={handleClearGallery}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> LIMPAR GALERIA
-                        </Button>
-                      </div>
+        <div className="w-full">
+          {activeTab === 'calendario' && (
+            <CalendarView>
+              <Card className="border-none shadow-none bg-transparent">
+                <CardContent className="p-0 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-card p-2.5 rounded-2xl border border-border">
+                    <div className="flex items-center gap-3">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground hover:bg-muted" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
+                      <h2 className="text-sm font-bold capitalize w-36 text-center text-foreground font-headline">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground hover:bg-muted" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
                     </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-[10px] font-bold text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
+                        onClick={handleClearGallery}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> LIMPAR GALERIA
+                      </Button>
+                    </div>
+                  </div>
 
-                    <Suspense fallback={<SkeletonList />}>
-                      <PostList 
-                        daysInMonth={daysInMonth}
-                        startingDay={startingDay}
-                        postsByDay={postsByDay}
-                        onDrop={handleDrop}
-                        setEditorState={setEditorState}
-                        draggedPostId={draggedPostId}
-                        getPostTimeFormatted={getPostTimeFormatted}
-                        statusOptions={STATUS_OPTIONS_LOCAL}
-                        onDragStart={handleDragStart}
-                      />
-                    </Suspense>
-                  </CardContent>
-                </Card>
-              </CalendarView>
-            )}
+                  <Suspense fallback={<SkeletonList />}>
+                    <PostList 
+                      daysInMonth={daysInMonth}
+                      startingDay={startingDay}
+                      postsByDay={postsByDay}
+                      onDrop={handleDrop}
+                      setEditorState={setEditorState}
+                      draggedPostId={draggedPostId}
+                      getPostTimeFormatted={getPostTimeFormatted}
+                      statusOptions={STATUS_OPTIONS_LOCAL}
+                      onDragStart={handleDragStart}
+                    />
+                  </Suspense>
+                </CardContent>
+              </Card>
+            </CalendarView>
+          )}
 
-            {activeTab === 'agendamentos' && (
-              <div className="max-w-2xl mx-auto">
-                <CalendarioAgendamentos 
-                  posts={posts} 
-                  bufferPosts={bufferPosts}
-                  loadingBuffer={loadingBuffer}
-                  onPostClick={(p: any) => {
-                      const dayPosts = posts.filter(pp => format(new Date(p.date), 'yyyy-MM-dd') === format(new Date(p.date), 'yyyy-MM-dd'));
-                      setEditorState({ posts: dayPosts.length ? dayPosts : [p], index: dayPosts.findIndex(pp => pp.id === p.id) || 0 });
-                  }} 
-                />
-              </div>
-            )}
+          {activeTab === 'agendamentos' && (
+            <div className="max-w-2xl mx-auto">
+              <CalendarioAgendamentos 
+                posts={posts} 
+                bufferPosts={bufferPosts}
+                loadingBuffer={loadingBuffer}
+                onPostClick={(p: any) => {
+                    const dayPosts = posts.filter(pp => format(new Date(p.date), 'yyyy-MM-dd') === format(new Date(p.date), 'yyyy-MM-dd'));
+                    setEditorState({ posts: dayPosts.length ? dayPosts : [p], index: dayPosts.findIndex(pp => pp.id === p.id) || 0 });
+                }} 
+              />
+            </div>
+          )}
 
-            {activeTab === 'insights' && (
-              <InstagramInsights igId={profileInfo?.igId} />
-            )}
+          {activeTab === 'insights' && (
+            <InstagramInsights igId={profileInfo?.igId} />
+          )}
 
-            {activeTab === 'trimestre' && (
-              <PlanejamentoTrimestral />
-            )}
-          </div>
-        )}
+          {activeTab === 'trimestre' && (
+            <PlanejamentoTrimestral />
+          )}
+        </div>
       </main>
 
       {/* Floating Action Button for Mobile */}

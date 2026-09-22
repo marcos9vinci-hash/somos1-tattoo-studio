@@ -55,40 +55,40 @@
    ========================================================================== */
 html.inverted, body.inverted, [data-theme="inverted"] {
   --background: #ffffff;
-  --foreground: #000000;
-  --card: #f4f4f5;
-  --card-foreground: #000000;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
   --popover: #ffffff;
-  --popover-foreground: #000000;
+  --popover-foreground: #09090b;
   
-  --primary: #000000;
+  --primary: #09090b;
   --primary-foreground: #ffffff;
   
-  --secondary: #e4e4e7;
-  --secondary-foreground: #000000;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #09090b;
   
   --muted: #f4f4f5;
-  --muted-foreground: #71717a;
+  --muted-foreground: #27272a;
   
-  --accent: #e4e4e7;
-  --accent-foreground: #000000;
+  --accent: #f4f4f5;
+  --accent-foreground: #09090b;
   
-  --border: rgba(0, 0, 0, 0.14);
-  --input: rgba(0, 0, 0, 0.12);
-  --ring: #000000;
+  --border: rgba(0, 0, 0, 0.16);
+  --input: rgba(0, 0, 0, 0.14);
+  --ring: #09090b;
 
-  --color-primary-fixed: #000000;
+  --color-primary-fixed: #09090b;
   --color-primary-container: #e4e4e7;
-  --color-on-primary-container: #000000;
+  --color-on-primary-container: #09090b;
   --color-secondary-container: #d4d4d8;
-  --color-surface-container: #fafafa;
+  --color-surface-container: #ffffff;
   --color-surface-container-high: #f4f4f5;
   --color-surface-container-highest: #e4e4e7;
   --color-on-surface: #09090b;
-  --color-on-surface-variant: #52525b;
-  --color-outline: #a1a1aa;
-  --color-outline-variant: #e4e4e7;
-  --color-tertiary-fixed: #000000;
+  --color-on-surface-variant: #27272a;
+  --color-outline: #52525b;
+  --color-outline-variant: #d4d4d8;
+  --color-tertiary-fixed: #09090b;
   --color-tertiary-fixed-dim: #27272a;
 }
 
@@ -239,3 +239,81 @@ html.inverted .logo-auto-invert, body.inverted .logo-auto-invert {
   --color-border: var(--border);
   color: var(--foreground);
 }
+
+/* ==========================================================================
+   REGRAS GLOBAIS DE ALTO CONTRASTE PARA O MODO INVERTIDO (BRANCO)
+   Elimina qualquer texto cinza desbotado ou fundo escuro não invertido
+   ========================================================================== */
+html.inverted, body.inverted {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+}
+
+/* Textos secundários e utilitários agora em carvão escuro/preto de alta legibilidade */
+html.inverted .text-zinc-500,
+html.inverted .text-zinc-400,
+html.inverted .text-zinc-600,
+html.inverted .text-muted-foreground {
+  color: #27272a !important;
+}
+
+html.inverted .text-zinc-300,
+html.inverted .text-zinc-200,
+html.inverted .text-zinc-100,
+html.inverted .text-white {
+  color: #09090b !important;
+}
+
+/* Títulos sempre em preto nítido */
+html.inverted h1,
+html.inverted h2,
+html.inverted h3,
+html.inverted h4,
+html.inverted h5,
+html.inverted h6 {
+  color: #09090b !important;
+}
+
+/* Backgrounds pretos fixos viram branco/card no modo invertido */
+html.inverted .bg-zinc-950,
+html.inverted .bg-black,
+html.inverted .bg-black\/40,
+html.inverted .bg-black\/50,
+html.inverted .bg-black\/60,
+html.inverted .bg-black\/80 {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+}
+
+html.inverted .bg-zinc-900,
+html.inverted .bg-zinc-900\/60,
+html.inverted .bg-zinc-900\/80,
+html.inverted .bg-zinc-800,
+html.inverted .bg-zinc-800\/60 {
+  background-color: #f4f4f5 !important;
+  border-color: #e4e4e7 !important;
+  color: #09090b !important;
+}
+
+html.inverted .bg-white\/\[0\.01\],
+html.inverted .bg-white\/5,
+html.inverted .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+html.inverted .border-zinc-800,
+html.inverted .border-zinc-700,
+html.inverted .border-zinc-600,
+html.inverted .border-white\/5,
+html.inverted .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.14) !important;
+}
+
+html.inverted .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.inverted .hover\:text-white:hover {
+  color: #000000 !important;
+}
+

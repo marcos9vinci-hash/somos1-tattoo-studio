@@ -9,7 +9,8 @@ import {
   Shield, Users, Calendar, Clock, Ban, DollarSign, Edit2, BarChart3, Ticket, ScrollText, 
   Trash2, ToggleLeft, ToggleRight, Plus, PlusCircle, Gift, Send, Settings, Terminal, Search,
   Menu, X, Sparkles, ChevronRight, MessageSquare, Layers, Wand2, CheckCircle2, ChevronDown, 
-  AlertCircle, RefreshCw, Camera, Share2, PanelLeftClose, PanelLeft, Globe, GitFork, Award, ExternalLink
+  AlertCircle, RefreshCw, Camera, Share2, PanelLeftClose, PanelLeft, Globe, GitFork, Award, ExternalLink,
+  BarChart2, Target
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import AdminDashboard from './AdminDashboard';
@@ -85,6 +86,7 @@ export default function Admin() {
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>('calendar');
   const [indicaSubTab, setIndicaSubTab] = useState<IndicaSubTab>('dashboard');
   const [systemSubTab, setSystemSubTab] = useState<SystemSubTab>('whatsapp');
+  const [galeriaSubTab, setGaleriaSubTab] = useState<'calendario' | 'agendamentos' | 'insights' | 'trimestre' | 'estudio'>('calendario');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -481,13 +483,13 @@ export default function Admin() {
                 <Menu className="w-5 h-5" />
               </button>
               <div className="flex items-center gap-2.5">
-                <img src="/somos1-logo.png" alt="Somos 1" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border" />
+                <img src="/somos1-logo-official.png" alt="Somos 1 Tattoo Studio" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border shadow-xs" />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-headline font-black text-sm tracking-wider text-foreground">SOMOS 1</span>
-                    <span className="text-[8px] bg-foreground text-background font-black px-1.5 py-0.5 rounded font-headline">STUDIO</span>
+                    <span className="text-[8px] bg-foreground text-background font-black px-1.5 py-0.5 rounded font-headline tracking-wider">STUDIO</span>
                   </div>
-                  <p className="text-[9px] text-muted-foreground font-headline uppercase tracking-widest">Tattoo Studio</p>
+                  <p className="text-[9px] text-muted-foreground font-headline font-bold uppercase tracking-widest">Tattoo Studio</p>
                 </div>
               </div>
             </div>
@@ -773,25 +775,72 @@ export default function Admin() {
               <div className="p-2 pt-0 space-y-1 animate-in slide-in-from-top-2 duration-200">
                 <button
                   type="button"
-                  onClick={() => setCurrentModule('galeria')}
+                  onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('calendario'); }}
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
-                    currentModule === 'galeria'
-                      ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md font-black"
+                    currentModule === 'galeria' && galeriaSubTab === 'calendario'
+                      ? "bg-foreground text-background shadow-md font-black"
                       : "text-zinc-400 hover:text-white hover:bg-white/5"
                   )}
                 >
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>Web App Ao Vivo (Cloudflare)</span>
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Galeria & Calendário</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setCurrentModule('galeria')}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left text-zinc-400 hover:text-white hover:bg-white/5"
+                  onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('agendamentos'); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
+                    currentModule === 'galeria' && galeriaSubTab === 'agendamentos'
+                      ? "bg-foreground text-background shadow-md font-black"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  )}
                 >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Buffer Planner & IA Studio</span>
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Agenda Buffer (Queue)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('insights'); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
+                    currentModule === 'galeria' && galeriaSubTab === 'insights'
+                      ? "bg-foreground text-background shadow-md font-black"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <BarChart2 className="w-3.5 h-3.5" />
+                  <span>Insights Instagram</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('trimestre'); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
+                    currentModule === 'galeria' && galeriaSubTab === 'trimestre'
+                      ? "bg-foreground text-background shadow-md font-black"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <Target className="w-3.5 h-3.5" />
+                  <span>Planejamento 90 Dias</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('estudio'); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
+                    currentModule === 'galeria' && galeriaSubTab === 'estudio'
+                      ? "bg-foreground text-background shadow-md font-black"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Estúdio Criativo IA</span>
                 </button>
               </div>
             )}
@@ -880,7 +929,7 @@ export default function Admin() {
           <div className="relative w-80 max-w-[85%] bg-card border-r border-border p-5 flex flex-col h-full z-10 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
-                <img src="/somos1-logo.png" alt="Somos 1" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border" />
+                <img src="/somos1-logo-official.png" alt="Somos 1" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border shadow-xs" />
                 <div>
                   <h3 className="font-headline font-black text-xs text-foreground">SOMOS 1 TATTOO</h3>
                   <p className="text-[8px] text-muted-foreground uppercase font-headline tracking-wider">Studio Central</p>
@@ -935,8 +984,20 @@ export default function Admin() {
               {/* Galeria IA */}
               <div className="border border-border rounded-xl p-2 bg-muted/20">
                 <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">4. Galeria IA</p>
-                <button onClick={() => { setCurrentModule('galeria'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
-                  <Camera className="w-3.5 h-3.5 text-foreground" /> Estúdio de Postagem
+                <button onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('calendario'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Calendar className="w-3.5 h-3.5 text-foreground" /> Galeria & Calendário
+                </button>
+                <button onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('agendamentos'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Clock className="w-3.5 h-3.5 text-foreground" /> Agenda Buffer (Queue)
+                </button>
+                <button onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('insights'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <BarChart2 className="w-3.5 h-3.5 text-foreground" /> Insights Instagram
+                </button>
+                <button onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('trimestre'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Target className="w-3.5 h-3.5 text-foreground" /> Planejamento 90 Dias
+                </button>
+                <button onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('estudio'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Sparkles className="w-3.5 h-3.5 text-foreground" /> Estúdio Criativo IA
                 </button>
               </div>
 
@@ -1009,9 +1070,65 @@ export default function Admin() {
         </header>
 
         {/* SUB-TABS NAVIGATION (Pills no Topo para Módulos de Múltiplas Funções) */}
-        {currentModule !== 'studio' && currentModule !== 'galeria' && (
+        {currentModule !== 'studio' && (
           <div className="px-6 pt-3 pb-2 border-b border-border bg-background">
             <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+              
+              {/* Sub-abas de Galeria IA */}
+              {currentModule === 'galeria' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setGaleriaSubTab('calendario')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      galeriaSubTab === 'calendario' ? "bg-foreground text-background border-foreground shadow-md" : "text-muted-foreground border-border bg-card hover:text-foreground"
+                    )}
+                  >
+                    <Calendar className="w-3.5 h-3.5 inline mr-1.5" /> 📅 Galeria Mensal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGaleriaSubTab('agendamentos')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      galeriaSubTab === 'agendamentos' ? "bg-foreground text-background border-foreground shadow-md" : "text-muted-foreground border-border bg-card hover:text-foreground"
+                    )}
+                  >
+                    <Clock className="w-3.5 h-3.5 inline mr-1.5" /> ⚡ Agenda Buffer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGaleriaSubTab('insights')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      galeriaSubTab === 'insights' ? "bg-foreground text-background border-foreground shadow-md" : "text-muted-foreground border-border bg-card hover:text-foreground"
+                    )}
+                  >
+                    <BarChart2 className="w-3.5 h-3.5 inline mr-1.5" /> 📊 Insights Instagram
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGaleriaSubTab('trimestre')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      galeriaSubTab === 'trimestre' ? "bg-foreground text-background border-foreground shadow-md" : "text-muted-foreground border-border bg-card hover:text-foreground"
+                    )}
+                  >
+                    <Target className="w-3.5 h-3.5 inline mr-1.5" /> 🎯 Trimestral (90d)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGaleriaSubTab('estudio')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      galeriaSubTab === 'estudio' ? "bg-foreground text-background border-foreground shadow-md" : "text-muted-foreground border-border bg-card hover:text-foreground"
+                    )}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 inline mr-1.5" /> ✨ Estúdio IA
+                  </button>
+                </>
+              )}
               
               {/* Sub-abas de Agenda */}
               {currentModule === 'agenda' && (
@@ -1533,7 +1650,7 @@ export default function Admin() {
               {currentModule === 'galeria' && (
                 <ModuleErrorBoundary moduleName="Galeria IA">
                   <div className="w-full">
-                    <GaleriaIA />
+                    <GaleriaIA embedded={true} initialTab={galeriaSubTab} />
                   </div>
                 </ModuleErrorBoundary>
               )}
