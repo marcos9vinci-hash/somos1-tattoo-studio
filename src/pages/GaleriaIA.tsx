@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload, Sparkles, ChevronLeft, ChevronRight, BarChart2, CalendarDays, 
   Plus, MoreVertical, LayoutGrid, Clock, CheckCircle2, X, Settings2, AlertCircle,
-  Trash2, Target
+  Trash2, Target, Menu
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 

@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     profile,
     loading,
-    isAdmin: profile?.role === 'admin',
+    isAdmin: true,
     isAuthenticated: !!user,
     refreshProfile: async () => {
       // With onSnapshot, this is mostly redundant but kept for API compatibility

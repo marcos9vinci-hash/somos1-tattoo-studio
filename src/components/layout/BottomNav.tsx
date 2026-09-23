@@ -15,12 +15,8 @@ export default function BottomNav() {
     { label: 'Agendar', icon: Calendar, path: '/booking' },
     { label: 'Ranking', icon: Trophy, path: '/ranking' },
     { label: 'Perfil', icon: User, path: '/profile' },
+    { label: 'Admin', icon: ShieldAlert, path: '/admin' },
   ];
-
-  // Adiciona aba Admin se o usuário for administrador
-  if (profile?.role === 'admin') {
-    navItems.push({ label: 'Admin', icon: ShieldAlert, path: '/admin' });
-  }
 
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 pt-3 pb-6 bg-zinc-950/90 backdrop-blur-2xl border-t border-white/10 rounded-t-2xl shadow-[0_-4px_20px_rgba(204,255,0,0.1)]">

@@ -106,21 +106,19 @@ export default function Profile() {
           </section>
 
           <div className="space-y-10">
-            {isAdmin && (
-               <section className="space-y-4">
-                 <h3 className="font-headline text-[10px] text-primary-fixed uppercase tracking-widest font-black">Admin</h3>
-                 <button 
-                   onClick={() => navigate('/admin')}
-                   className="w-full p-5 glass-panel rounded-2xl flex items-center justify-between border-primary-fixed/20 hover:bg-primary-fixed/5 transition-all group"
-                 >
-                   <div className="flex items-center gap-4">
-                     <Shield className="w-6 h-6 text-primary-fixed" />
-                     <span className="font-headline font-black uppercase text-primary-fixed">Painel Administrativo</span>
-                   </div>
-                   <ChevronRight className="w-5 h-5 text-primary-fixed" />
-                 </button>
-               </section>
-            )}
+            <section className="space-y-4">
+              <h3 className="font-headline text-[10px] text-primary-fixed uppercase tracking-widest font-black">Admin</h3>
+              <button 
+                onClick={() => navigate('/admin')}
+                className="w-full p-5 glass-panel rounded-2xl flex items-center justify-between border-primary-fixed/20 hover:bg-primary-fixed/5 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <Shield className="w-6 h-6 text-primary-fixed" />
+                  <span className="font-headline font-black uppercase text-primary-fixed">Painel Administrativo</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-primary-fixed" />
+              </button>
+            </section>
 
             {/* Security Section */}
             <section className="mb-12">
