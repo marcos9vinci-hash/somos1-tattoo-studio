@@ -543,8 +543,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'agenda' && agendaSubTab === 'calendar'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <Calendar className="w-3.5 h-3.5" />
@@ -557,8 +557,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'agenda' && agendaSubTab === 'members'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <Users className="w-3.5 h-3.5" />
@@ -571,8 +571,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'agenda' && agendaSubTab === 'hours'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <Clock className="w-3.5 h-3.5" />
@@ -617,8 +617,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'indicaai' && indicaSubTab === 'dashboard'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
@@ -631,8 +631,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'indicaai' && indicaSubTab === 'credits'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <DollarSign className="w-3.5 h-3.5" />
@@ -645,8 +645,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'indicaai' && indicaSubTab === 'tree'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <GitFork className="w-3.5 h-3.5" />
@@ -659,8 +659,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'indicaai' && indicaSubTab === 'campaigns'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <Gift className="w-3.5 h-3.5" />
@@ -673,8 +673,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'indicaai' && indicaSubTab === 'invites'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <Ticket className="w-3.5 h-3.5" />
@@ -687,8 +687,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'indicaai' && indicaSubTab === 'rules'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <ScrollText className="w-3.5 h-3.5" />
@@ -881,8 +881,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'system' && systemSubTab === 'whatsapp'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
@@ -895,8 +895,8 @@ export default function Admin() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
                     currentModule === 'system' && systemSubTab === 'logs'
-                      ? "bg-primary-fixed text-black shadow-md font-black"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <Terminal className="w-3.5 h-3.5" />
@@ -1138,7 +1138,7 @@ export default function Admin() {
                     onClick={() => setAgendaSubTab('calendar')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      agendaSubTab === 'calendar' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      agendaSubTab === 'calendar' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <Calendar className="w-3.5 h-3.5 inline mr-1.5" /> Calendário & Agenda
@@ -1148,7 +1148,7 @@ export default function Admin() {
                     onClick={() => setAgendaSubTab('members')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      agendaSubTab === 'members' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      agendaSubTab === 'members' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <Users className="w-3.5 h-3.5 inline mr-1.5" /> Fichas de Clientes (A-Z)
@@ -1158,7 +1158,7 @@ export default function Admin() {
                     onClick={() => setAgendaSubTab('hours')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      agendaSubTab === 'hours' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      agendaSubTab === 'hours' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <Clock className="w-3.5 h-3.5 inline mr-1.5" /> Horários & Bloqueios
@@ -1174,7 +1174,7 @@ export default function Admin() {
                     onClick={() => setIndicaSubTab('dashboard')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      indicaSubTab === 'dashboard' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      indicaSubTab === 'dashboard' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <BarChart3 className="w-3.5 h-3.5 inline mr-1.5" /> Métricas da Rede
@@ -1184,7 +1184,7 @@ export default function Admin() {
                     onClick={() => setIndicaSubTab('credits')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      indicaSubTab === 'credits' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      indicaSubTab === 'credits' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <DollarSign className="w-3.5 h-3.5 inline mr-1.5" /> Saldo & Ajustes
@@ -1194,7 +1194,7 @@ export default function Admin() {
                     onClick={() => setIndicaSubTab('tree')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      indicaSubTab === 'tree' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      indicaSubTab === 'tree' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <GitFork className="w-3.5 h-3.5 inline mr-1.5" /> Árvore & Auditoria
@@ -1204,7 +1204,7 @@ export default function Admin() {
                     onClick={() => setIndicaSubTab('campaigns')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      indicaSubTab === 'campaigns' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      indicaSubTab === 'campaigns' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <Gift className="w-3.5 h-3.5 inline mr-1.5" /> Campanhas VIP
@@ -1214,7 +1214,7 @@ export default function Admin() {
                     onClick={() => setIndicaSubTab('invites')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      indicaSubTab === 'invites' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      indicaSubTab === 'invites' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <Ticket className="w-3.5 h-3.5 inline mr-1.5" /> Convites
@@ -1224,7 +1224,7 @@ export default function Admin() {
                     onClick={() => setIndicaSubTab('rules')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      indicaSubTab === 'rules' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      indicaSubTab === 'rules' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <ScrollText className="w-3.5 h-3.5 inline mr-1.5" /> Regras de Pontuação
@@ -1240,7 +1240,7 @@ export default function Admin() {
                     onClick={() => setSystemSubTab('whatsapp')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      systemSubTab === 'whatsapp' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      systemSubTab === 'whatsapp' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Automação WhatsApp 24/7
@@ -1250,7 +1250,7 @@ export default function Admin() {
                     onClick={() => setSystemSubTab('logs')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      systemSubTab === 'logs' ? "bg-primary-fixed text-black border-primary-fixed shadow-md" : "text-zinc-500 border-white/5 bg-zinc-900/60 hover:text-white"
+                      systemSubTab === 'logs' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
                     <Terminal className="w-3.5 h-3.5 inline mr-1.5" /> Logs em Tempo Real

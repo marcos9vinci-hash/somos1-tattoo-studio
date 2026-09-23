@@ -280,7 +280,11 @@ html.inverted .bg-black,
 html.inverted .bg-black\/40,
 html.inverted .bg-black\/50,
 html.inverted .bg-black\/60,
-html.inverted .bg-black\/80 {
+html.inverted .bg-black\/80,
+html.inverted .bg-zinc-900\/50,
+html.inverted .bg-zinc-900\/40,
+html.inverted .bg-zinc-900\/30,
+html.inverted .bg-zinc-900\/20 {
   background-color: #ffffff !important;
   color: #09090b !important;
 }
@@ -316,4 +320,22 @@ html.inverted .hover\:bg-white\/5:hover {
 html.inverted .hover\:text-white:hover {
   color: #000000 !important;
 }
+
+/* Salvaguarda Crítica: botões primários e pills ativas em modo invertido */
+/* O fundo fica preto (#09090b) e o texto/ícones são OBRIGATORIAMENTE branco puro (#ffffff) */
+html.inverted .bg-primary-fixed,
+html.inverted [class*="bg-primary-fixed"],
+html.inverted .bg-foreground,
+html.inverted [class*="bg-foreground"] {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+}
+
+html.inverted .bg-primary-fixed *,
+html.inverted [class*="bg-primary-fixed"] *,
+html.inverted .bg-foreground *,
+html.inverted [class*="bg-foreground"] * {
+  color: #ffffff !important;
+}
+
 
