@@ -46,6 +46,7 @@ import ConfigWhatsApp from "@/components/galeria/ConfigWhatsApp";
 import EstudioIAWorkflow from "@/components/galeria/EstudioIAWorkflow";
 import InstagramInsights from "@/components/galeria/InstagramInsights";
 import NicheConfig from "@/components/galeria/NicheConfig";
+import RoboSocialInstagram from "@/components/galeria/RoboSocialInstagram";
 
 const STATUS_OPTIONS_LOCAL = [
   { value: "rascunho", label: "Rascunho", color: "bg-yellow-500" },
@@ -691,6 +692,10 @@ export default function GaleriaIA({
 
           {activeTab === 'trimestre' && (
             <PlanejamentoTrimestral />
+          )}
+
+          {activeTab === 'automacao' && (
+            <RoboSocialInstagram />
           )}
         </div>
       </main>

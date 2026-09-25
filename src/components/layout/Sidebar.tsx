@@ -10,7 +10,8 @@ import {
   LayoutGrid, 
   CalendarCheck2, 
   BarChart3, 
-  Layers 
+  Layers,
+  Bot
 } from "lucide-react";
 import SugerirEspacos from "../galeria/SugerirEspacos";
 
@@ -31,6 +32,7 @@ export const Sidebar = ({
     { id: 'agendamentos', label: 'Agenda Buffer', icon: CalendarCheck2, desc: 'Posts agendados na fila' },
     { id: 'insights', label: 'Insights Instagram', icon: BarChart3, desc: 'Alcance e métricas reais' },
     { id: 'trimestre', label: 'Planejamento Trimestral', icon: Layers, desc: 'Visão de 90 dias' },
+    { id: 'automacao', label: 'Robô Social', icon: Bot, desc: 'Comentários, Stories & DMs' },
   ];
 
   return (

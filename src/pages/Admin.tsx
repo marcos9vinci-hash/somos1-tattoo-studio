@@ -10,7 +10,7 @@ import {
   Trash2, ToggleLeft, ToggleRight, Plus, PlusCircle, Gift, Send, Settings, Terminal, Search,
   Menu, X, Sparkles, ChevronRight, MessageSquare, Layers, Wand2, CheckCircle2, ChevronDown, 
   AlertCircle, RefreshCw, Camera, Share2, PanelLeftClose, PanelLeft, Globe, GitFork, Award, ExternalLink,
-  BarChart2, Target
+  BarChart2, Target, Bot
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import AdminDashboard from './AdminDashboard';
@@ -86,7 +86,7 @@ export default function Admin() {
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>('calendar');
   const [indicaSubTab, setIndicaSubTab] = useState<IndicaSubTab>('dashboard');
   const [systemSubTab, setSystemSubTab] = useState<SystemSubTab>('whatsapp');
-  const [galeriaSubTab, setGaleriaSubTab] = useState<'calendario' | 'agendamentos' | 'insights' | 'trimestre' | 'estudio'>('calendario');
+  const [galeriaSubTab, setGaleriaSubTab] = useState<'calendario' | 'agendamentos' | 'insights' | 'trimestre' | 'estudio' | 'automacao'>('calendario');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -842,6 +842,20 @@ export default function Admin() {
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Estúdio Criativo IA</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setCurrentModule('galeria'); setGaleriaSubTab('automacao'); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
+                    currentModule === 'galeria' && galeriaSubTab === 'automacao'
+                      ? "bg-foreground text-background shadow-md font-black"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>Robô Social (Comentários & DM)</span>
+                </button>
               </div>
             )}
           </div>
@@ -1126,6 +1140,16 @@ export default function Admin() {
                     )}
                   >
                     <Sparkles className="w-3.5 h-3.5 inline mr-1.5" /> ✨ Estúdio IA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGaleriaSubTab('automacao')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      galeriaSubTab === 'automacao' ? "bg-foreground text-background border-foreground shadow-md" : "text-muted-foreground border-border bg-card hover:text-foreground"
+                    )}
+                  >
+                    <Bot className="w-3.5 h-3.5 inline mr-1.5" /> ⚡ Robô Social (DMs & Comentários)
                   </button>
                 </>
               )}
