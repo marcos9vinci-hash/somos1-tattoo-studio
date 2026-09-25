@@ -4,12 +4,42 @@ export const base44 = {
   integrations: {
     Core: {
       UploadFile: async ({ file }: { file: File }): Promise<{ file_url: string }> => {
-        // In AI Studio, we'd normally upload to a server or handle locally.
-        // For this preview, we'll return a data URL as the "uploaded url"
         return new Promise((resolve) => {
           const reader = new FileReader();
-          reader.onloadend = () => {
-            resolve({ file_url: reader.result as string });
+          reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            // Check if we are in browser environment with Image and Canvas
+            if (typeof window !== 'undefined' && window.Image && window.document) {
+              const img = new Image();
+              img.onload = () => {
+                const maxDim = 1200;
+                let width = img.width;
+                let height = img.height;
+                if (width > maxDim || height > maxDim) {
+                  if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                  } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                  }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.drawImage(img, 0, 0, width, height);
+                  resolve({ file_url: canvas.toDataURL('image/jpeg', 0.82) });
+                  return;
+                }
+                resolve({ file_url: dataUrl });
+              };
+              img.onerror = () => resolve({ file_url: dataUrl });
+              img.src = dataUrl;
+            } else {
+              resolve({ file_url: dataUrl });
+            }
           };
           reader.readAsDataURL(file);
         });

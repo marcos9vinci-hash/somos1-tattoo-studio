@@ -235,6 +235,7 @@ export default function GaleriaIA({
     const loadPosts = async () => {
         const currentUserId = user?.uid || (user as any)?.id || 'guest_admin';
         try {
+            let finalPosts = [];
             // 1. Tentar ler do localStorage imediatamente para render instantâneo
             const saved = localStorage.getItem('galeria_posts_v3');
             if (saved) {
@@ -245,6 +246,7 @@ export default function GaleriaIA({
                   status: p.status || 'rascunho',
                 }));
                 if (localPosts.length > 0) {
+                  finalPosts = localPosts;
                   setPosts(localPosts);
                 }
               } catch (parseErr) {}
@@ -253,8 +255,57 @@ export default function GaleriaIA({
             // 2. Sincronizar com repositório em segundo plano se disponível
             const loadedPosts = await postRepository.getPosts(currentUserId);
             if (loadedPosts && loadedPosts.posts && loadedPosts.posts.length > 0) {
-              setPosts(loadedPosts.posts.map((p: any) => ({ ...p, date: p.date instanceof Date ? p.date : new Date(p.date as any) })));
+              const remotePosts = loadedPosts.posts.map((p: any) => ({ ...p, date: p.date instanceof Date ? p.date : new Date(p.date as any) }));
+              finalPosts = remotePosts;
+              setPosts(remotePosts);
               syncWithServerScheduler(loadedPosts.posts);
+            }
+
+            // 3. Fallback inicial com fotos de portfólio de tattoo
+            if (finalPosts.length === 0) {
+              const demoPosts = [
+                {
+                  id: 'sample-1',
+                  date: new Date(new Date().setDate(new Date().getDate() - 2)),
+                  image: 'https://images.unsplash.com/photo-1598371839696-5c5bb00bdc28?w=800&auto=format&fit=crop&q=80',
+                  type: 'feed',
+                  status: 'publicado',
+                  caption: 'Tatuagem autoral em fineline botânica feita para nossa cliente especial ✨ Agendamentos abertos!',
+                  hashtags: ['#somos1tattoo', '#fineline', '#tatuagemautoral', '#botanica'],
+                  cta: 'Link na bio para orçamentos'
+                },
+                {
+                  id: 'sample-2',
+                  date: new Date(),
+                  image: 'https://images.unsplash.com/photo-1562962230-16e4623d36e6?w=800&auto=format&fit=crop&q=80',
+                  type: 'reels',
+                  status: 'agendado',
+                  caption: 'Processo de cicatrização e cuidados pós-sessão. Salve este post para não esquecer! 🖤',
+                  hashtags: ['#cuidadoscomatattoo', '#somos1', '#tattoocare'],
+                  cta: 'Comente CUIDADOS para receber o guia no direct'
+                },
+                {
+                  id: 'sample-3',
+                  date: new Date(new Date().setDate(new Date().getDate() + 2)),
+                  image: 'https://images.unsplash.com/photo-1611501275019-9b5cda994e8d?w=800&auto=format&fit=crop&q=80',
+                  type: 'story',
+                  status: 'pronto',
+                  caption: 'Disponíveis para tatuar nesta sexta! Flash autoral exclusivo.',
+                  hashtags: ['#flashtattoo', '#somos1tattoo'],
+                  cta: 'Responda este story para reservar'
+                },
+                {
+                  id: 'sample-4',
+                  date: new Date(new Date().setDate(new Date().getDate() + 4)),
+                  image: 'https://images.unsplash.com/photo-1590246814883-57833075b6a3?w=800&auto=format&fit=crop&q=80',
+                  type: 'feed',
+                  status: 'rascunho',
+                  caption: 'Fechamento de antebraço blackwork geométrico em andamento ⚡',
+                  hashtags: ['#blackwork', '#somos1tattoo', '#inked'],
+                  cta: 'Orçamentos via direct'
+                }
+              ];
+              setPosts(demoPosts);
             }
         } catch (e) {
             console.warn("Notice loading posts from repository:", e);
@@ -377,8 +428,8 @@ export default function GaleriaIA({
       }
 
       // Fetch Available Slots
-      if (!user) throw new Error("Erro de autenticação.");
-      const availableSlots = await postService.getAvailableSlots(user.id);
+      const currentUserId = user?.uid || (user as any)?.id || 'guest_admin';
+      const availableSlots = await postService.getAvailableSlots(currentUserId);
 
       // 3. Call AI Strategy Orchestrator
       const strategyResp = await fetch("https://galeria-ia-cloudflare.vercel.app/api/studio/plan-strategy", {

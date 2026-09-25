@@ -32,7 +32,7 @@ export const instagramService = {
           igId: "17841402955619871",
           name: "Somos 1 Tattoo Studio",
           username: "somos1tattoo",
-          profile_picture_url: "https://scontent-iad3-2.xx.fbcdn.net/v/t51.82787-15/771309586_18488921773098521_6647233719924979619_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=7d201b&_nc_eui2=AeFwMg2WAA674B4ATPbE7-KWoyF8RamnUEOjIXxFqadQQxbzOStUlg_yHeihH5IA2mSlABh1Z42eg7qij06kCmkv&_nc_ohc=pc771JYVJRgQ7kNvwGhS3yf&_nc_oc=AdrZjekdnOlV-0cBFcPi1dhnIeWgqHDYM-E6aDrZsvvitnUdPu4V5Ou3ejbi4IceOYA&_nc_zt=23&_nc_ht=scontent-iad3-2.xx&edm=AL-3X8kEAAAA&_nc_gid=u7gGhc2J8Uo0Rqw2-g32vg&oh=00_AQKRvVZfXVQId8bagIy0VzzMBiPHgDVODxcCvibymTqGCA&oe=6AB76F09",
+          profile_picture_url: "/somos1-logo-official.png",
           followers_count: 2532,
           media_count: 9
         }
