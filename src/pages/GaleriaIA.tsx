@@ -148,7 +148,10 @@ export default function GaleriaIA({
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const resp = await fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/me");
+        const storedIgToken = localStorage.getItem('instagram_access_token') || '';
+        const resp = await fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/me", {
+          headers: { 'x-meta-token': storedIgToken }
+        });
         if (resp.ok) {
           const data = await resp.json();
           if (data.accounts?.length > 0) {
@@ -192,6 +195,114 @@ export default function GaleriaIA({
       window.removeEventListener('message', handleAuthSuccess);
     };
   }, []);
+
+  // Auto-Publisher Engine: Checks scheduled posts every 30s and publishes when due
+  const publishingPostIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const checkAndPublishDuePosts = async () => {
+      if (!posts || posts.length === 0) return;
+
+      const now = Date.now();
+      const duePosts = posts.filter(p => {
+        if (p.status !== 'agendado') return false;
+        const timeRef = p.scheduledTime || p.scheduledAt || p.date || p.scheduledDate;
+        if (!timeRef) return false;
+        const targetTime = new Date(timeRef).getTime();
+        return !isNaN(targetTime) && targetTime <= now;
+      });
+
+      if (duePosts.length === 0) return;
+
+      const storedIgToken = localStorage.getItem('instagram_access_token') || '';
+      const storedBufferToken = localStorage.getItem('buffer_access_token') || '';
+
+      for (const duePost of duePosts) {
+        const postId = String(duePost.id || duePost.image);
+        if (publishingPostIdsRef.current.has(postId)) continue;
+        publishingPostIdsRef.current.add(postId);
+
+        try {
+          console.log(`[Auto-Publisher] Processando post agendado vencido:`, duePost);
+          let success = false;
+          let serviceName = '';
+
+          // 1. Tentar Instagram se houver token Meta
+          if (storedIgToken && duePost.image) {
+            serviceName = 'Instagram';
+            const igId = duePost.igId || profileInfo?.igId || '17841402955619871';
+            const fullCaption = [duePost.caption, duePost.cta, Array.isArray(duePost.hashtags) ? duePost.hashtags.join(' ') : duePost.hashtags].filter(Boolean).join('\n\n');
+
+            const res = await fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/publish", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-meta-token": storedIgToken
+              },
+              body: JSON.stringify({
+                igId,
+                imageUrl: duePost.image,
+                caption: fullCaption
+              })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              success = true;
+            } else {
+              console.warn("[Auto-Publisher] Instagram publish falhou:", data);
+            }
+          }
+
+          // 2. Se não publicou no Instagram, tentar Buffer se houver token Buffer
+          if (!success && storedBufferToken && duePost.image) {
+            serviceName = 'Buffer';
+            const fullCaption = [duePost.caption, duePost.cta, Array.isArray(duePost.hashtags) ? duePost.hashtags.join(' ') : duePost.hashtags].filter(Boolean).join('\n\n');
+
+            const res = await fetch("https://galeria-ia-cloudflare.vercel.app/api/buffer/schedule-update", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-buffer-token": storedBufferToken
+              },
+              body: JSON.stringify({
+                profileId: duePost.bufferProfileId || 'buffer_somos1',
+                imageUrl: duePost.image,
+                text: fullCaption,
+                publishMode: 'now'
+              })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              success = true;
+            }
+          }
+
+          if (success) {
+            console.log(`[Auto-Publisher] Post ${postId} publicado automaticamente via ${serviceName}!`);
+            const updated = posts.map(p => {
+              if ((p.id && p.id === duePost.id) || p.image === duePost.image) {
+                return { ...p, status: 'publicado', publishedAt: new Date().toISOString() };
+              }
+              return p;
+            });
+            setPosts(updated);
+            savePosts({ ...duePost, status: 'publicado', publishedAt: new Date().toISOString() });
+          } else {
+            console.warn(`[Auto-Publisher] Post ${postId} não pôde ser publicado. Certifique-se de configurar o token no painel.`);
+          }
+        } catch (postErr) {
+          console.error(`[Auto-Publisher] Erro ao publicar post ${postId}:`, postErr);
+        } finally {
+          publishingPostIdsRef.current.delete(postId);
+        }
+      }
+    };
+
+    const interval = setInterval(checkAndPublishDuePosts, 30000);
+    checkAndPublishDuePosts();
+
+    return () => clearInterval(interval);
+  }, [posts, profileInfo]);
 
   const syncWithServerScheduler = async (currentPosts: any[]) => {
     try {

@@ -169,9 +169,16 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
 
   const fetchIntegrations = async () => {
     try {
+      const storedBufferToken = localStorage.getItem('buffer_access_token') || '';
+      const storedIgToken = localStorage.getItem('instagram_access_token') || '';
+
       const [igResp, bufferResp] = await Promise.all([
-        fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/me"),
-        fetch("https://galeria-ia-cloudflare.vercel.app/api/buffer/profiles")
+        fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/me", {
+          headers: { 'x-meta-token': storedIgToken }
+        }),
+        fetch("https://galeria-ia-cloudflare.vercel.app/api/buffer/profiles", {
+          headers: { 'x-buffer-token': storedBufferToken }
+        })
       ]);
       
       if (igResp.ok) {
@@ -185,34 +192,28 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
         if (profiles.length === 0) {
           profiles = [
             {
+              id: 'buffer_somos1',
+              name: 'Somos 1 Tattoo Studio',
+              service: 'instagram',
+              avatar: '/somos1-logo-official.png'
+            },
+            {
               id: '66e175f850f18c6f37624647',
               name: 'A Flor da Pele Tattoo',
               service: 'instagram',
               avatar: 'https://images.unsplash.com/photo-1598371839696-5c5bb00bdc28?w=100'
-            },
-            {
-              id: 'buffer_somos1',
-              name: 'Somos 1 Tattoo Studio',
-              service: 'instagram',
-              avatar: 'https://images.unsplash.com/photo-1562962230-16e4623d36e6?w=100'
             }
           ];
         }
         setBufferProfiles(profiles);
         
-        // Pre-select aflordapele_tattoo or matching ID
-        const aflor = profiles.find((p: any) => 
-          p.name.toLowerCase().includes('aflordapele') || 
-          p.id === '66e175f850f18c6f37624647'
-        );
-        if (aflor) {
-          setSelectedBufferProfile(aflor.id);
-        } else if (profiles.length > 0 && !selectedBufferProfile) {
+        // Pre-select first profile
+        if (profiles.length > 0 && !selectedBufferProfile) {
           setSelectedBufferProfile(profiles[0].id);
         }
       }
     } catch (err) {
-      console.error("Integrations check failed", err);
+      console.error("Failed to fetch integrations", err);
     }
   };
 
@@ -236,17 +237,21 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
   }, []);
 
   const handleRealPublish = async (isScheduled = false) => {
-    if (igAccounts.length === 0) return;
+    const storedIgToken = localStorage.getItem('instagram_access_token') || '';
     setIsPublishing(true);
     setPublishSuccess(null);
     try {
-      const scheduledAt = isScheduled ? activePost.scheduledAt : null;
+      const scheduledAt = isScheduled ? (activePost.scheduledAt || scheduledDate) : null;
+      const targetIgId = igAccounts[0]?.igId || '17841402955619871';
       
       const response = await fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/publish", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-meta-token": storedIgToken
+        },
         body: JSON.stringify({
-          igId: igAccounts[0].igId,
+          igId: targetIgId,
           imageUrl: activePost.image,
           caption: `${caption}\n\n${cta}\n\n${hashtags.join(' ')}`,
           scheduledAt
@@ -258,27 +263,31 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
       try {
         result = JSON.parse(resText);
       } catch (e) {
-        result = { message: resText };
+        result = { error: resText };
       }
 
-      if (response.ok) {
+      if (response.ok && result.success) {
         const newStatus = isScheduled ? 'agendado' : 'publicado';
-        setPublishSuccess(isScheduled ? "Agendado no Servidor!" : "Postado com sucesso!");
+        setPublishSuccess(isScheduled ? "Agendado no Instagram!" : "Publicado no Instagram com sucesso!");
         setPostStatus(newStatus);
         
-        // Update the actual post object in the parent state
         onUpdatePost({ 
           ...activePost, 
           status: newStatus,
           updatedAt: new Date().toISOString()
         });
       } else {
-        throw new Error(result.error || "Erro ao processar");
+        const errMsg = result.error || "Erro ao publicar no Instagram";
+        if (result.isExpired || result.needsMetaAuth || errMsg.includes('expirou') || errMsg.includes('sessão')) {
+          alert(`⚠️ ${errMsg}\n\nAbra o painel "Integrar Instagram" no topo para colar ou renovar o token da Meta.`);
+          window.dispatchEvent(new CustomEvent('OPEN_IG_MODAL'));
+        } else {
+          alert(`Erro Instagram API: ${errMsg}`);
+        }
       }
     } catch (err: any) {
       console.error("Meta publish error:", err);
-      const msg = typeof err.message === 'string' ? err.message : JSON.stringify(err);
-      alert("Operação Meta: " + msg);
+      alert("Operação Meta: " + (err.message || String(err)));
     } finally {
       setIsPublishing(false);
     }
@@ -298,10 +307,8 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
         const localDate = new Date(`${scheduledDate}T${scheduledTime}`);
         const now = new Date();
         
-        // Buffer requires future dates. If it's too close or in the past, push it slightly forward
-        if (localDate.getTime() <= now.getTime() + 30000) { // 30 seconds safety
-          localDate.setTime(now.getTime() + 120000); // Set to 2 mins from now
-          // Update UI state so user sees what happened
+        if (localDate.getTime() <= now.getTime() + 30000) {
+          localDate.setTime(now.getTime() + 120000);
           const pad = (n: number) => n.toString().padStart(2, '0');
           setScheduledTime(`${pad(localDate.getHours())}:${pad(localDate.getMinutes())}`);
         }
@@ -309,10 +316,14 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
       }
 
       const selectedProfile = bufferProfiles.find(p => p.id === selectedBufferProfile);
+      const storedBufferToken = localStorage.getItem('buffer_access_token') || '';
 
       const response = await fetch("https://galeria-ia-cloudflare.vercel.app/api/buffer/schedule-update", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-buffer-token": storedBufferToken
+        },
         body: JSON.stringify({
           profileId: selectedBufferProfile,
           service: selectedProfile?.service,
@@ -324,21 +335,28 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
       });
 
       const result = await response.json();
-      if (response.ok && !result.errors) {
-        const modeLabel = publishMode === 'now' ? 'Publicado agora' : publishMode === 'queue' ? 'Adicionado à fila' : 'Agendado';
+      if (response.ok && result.success) {
+        const modeLabel = publishMode === 'now' ? 'Publicado agora' : publishMode === 'queue' ? 'Adicionado à fila do Buffer' : 'Agendado no Buffer';
         setPublishSuccess(`${modeLabel} com sucesso!`);
-        setPostStatus('publicado');
+        setPostStatus(publishMode === 'now' ? 'publicado' : 'agendado');
         onUpdatePost({ 
           ...activePost, 
-          status: 'publicado',
+          status: publishMode === 'now' ? 'publicado' : 'agendado',
           scheduledTime: scheduledIso || activePost.scheduledTime 
         });
         if (onBufferUpdate) onBufferUpdate();
       } else {
-        const errorData = result.errors?.[0] || result.error;
-        console.error("[Buffer Debug]", errorData);
-        const errorMsg = errorData?.message || (typeof errorData === 'string' ? errorData : JSON.stringify(errorData)) || "Erro desconhecido no Buffer";
-        throw new Error(errorMsg);
+        const errorMsg = result.error || "Erro desconhecido no Buffer";
+        if (result.needsBufferAuth || errorMsg.includes('Token do Buffer')) {
+          const tokenInput = prompt(`⚠️ ${errorMsg}\n\nCole o seu Buffer Access Token aqui para salvar e conectar:`);
+          if (tokenInput && tokenInput.trim()) {
+            localStorage.setItem('buffer_access_token', tokenInput.trim());
+            alert('Token do Buffer salvo! Clique novamente em "Confirmar Agendamento no Buffer" para enviar.');
+            fetchIntegrations();
+          }
+        } else {
+          alert(`Buffer: ${errorMsg}`);
+        }
       }
     } catch (err: any) {
       console.error("Buffer error:", err);
@@ -1128,37 +1146,35 @@ export default function PostEditor({ posts, initialIndex = 0, onClose, onDeleteP
                            {publishMode === 'now' ? 'Publicar no Buffer Agora' : publishMode === 'queue' ? 'Mandar para Fila do Buffer' : 'Confirmar Agendamento no Buffer'}
                          </Button>
 
-                         {igAccounts.length > 0 ? (
-                           <>
-                             <Button 
-                               className="w-full h-12 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 gap-2 shadow-lg" 
-                               onClick={() => handleRealPublish(false)}
-                               disabled={isPublishing}
-                             >
-                               {isPublishing && !publishSuccess ? <Loader2 className="w-4 h-4 animate-spin" /> : <Instagram className="w-4 h-4" />}
-                               {publishSuccess && postStatus === 'publicado' ? "Publicado!" : "Postar Agora no Instagram"}
-                             </Button>
-                             
-                             {activePost.scheduledAt && (
-                               <Button 
-                                 variant="outline"
-                                 className="w-full h-12 gap-2 border-pink-200 text-pink-600 hover:bg-pink-50" 
-                                 onClick={() => handleRealPublish(true)}
-                                 disabled={isPublishing}
-                               >
-                                 <CalendarDays className="w-4 h-4" /> 
-                                 {postStatus === 'agendado' ? "Já Agendado no Servidor" : "Confirmar Agendamento Automático"}
+                         <div className="space-y-2 pt-2 border-t border-border/50">
+                           <Button 
+                             className="w-full h-12 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 gap-2 shadow-lg text-white font-bold" 
+                             onClick={() => handleRealPublish(false)}
+                             disabled={isPublishing}
+                           >
+                             {isPublishing && !publishSuccess ? <Loader2 className="w-4 h-4 animate-spin" /> : <Instagram className="w-4 h-4" />}
+                             {publishSuccess && postStatus === 'publicado' ? "Publicado no Instagram!" : "Postar Agora no Instagram"}
+                           </Button>
+                           
+                           <Button 
+                             variant="outline"
+                             className="w-full h-12 gap-2 border-pink-500/30 text-pink-400 hover:bg-pink-500/10 font-bold" 
+                             onClick={() => handleRealPublish(true)}
+                             disabled={isPublishing}
+                           >
+                             <CalendarDays className="w-4 h-4" /> 
+                             {postStatus === 'agendado' ? "Já Agendado no Servidor" : "Confirmar Agendamento no Instagram"}
+                           </Button>
+
+                           {igAccounts.length === 0 && (
+                             <div className="p-2.5 bg-muted/60 rounded-xl border border-dashed border-border/80 flex items-center justify-between gap-2">
+                               <span className="text-[11px] text-muted-foreground text-left leading-tight">Instagram desconectado ou sessão expirada:</span>
+                               <Button variant="outline" size="sm" className="h-7 text-[10px] shrink-0 font-bold text-pink-400 border-pink-400/40 hover:bg-pink-400/10" onClick={() => window.dispatchEvent(new CustomEvent('OPEN_IG_MODAL'))}>
+                                 Integrar Instagram
                                </Button>
-                             )}
-                           </>
-                         ) : (
-                           <div className="p-3 bg-muted rounded-xl border border-dashed border-border text-center">
-                              <p className="text-[10px] text-muted-foreground mb-2">Conecte seu Instagram para postar direto daqui</p>
-                              <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => window.dispatchEvent(new CustomEvent('OPEN_IG_MODAL'))}>
-                                Integrar Instagram
-                              </Button>
-                           </div>
-                         )}
+                             </div>
+                           )}
+                         </div>
                          <Button variant="ghost" className="w-full h-10 gap-2 text-muted-foreground" onClick={() => { setActiveTab('schedule'); }}>
                             <Clock className="w-4 h-4" /> Alterar Horário
                          </Button>

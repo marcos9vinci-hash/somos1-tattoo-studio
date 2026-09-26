@@ -57,21 +57,32 @@ export default function InstagramIntegracaoModal({ open, onClose, initialTab = "
   const [manualIgSuccess, setManualIgSuccess] = React.useState<string | null>(null);
 
   const handleSaveManualInstagramToken = async () => {
-    if (!manualIgToken) return;
+    if (!manualIgToken.trim()) return;
     setSavingManualIg(true);
     setManualIgSuccess(null);
     setError(null);
     try {
+      const cleanToken = manualIgToken.trim();
+      localStorage.setItem('instagram_access_token', cleanToken);
       const response = await fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/login-manual", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: manualIgToken })
+        headers: { 
+          "Content-Type": "application/json",
+          "x-meta-token": cleanToken
+        },
+        body: JSON.stringify({ token: cleanToken })
       });
       const data = await response.json();
       if (response.ok && data.success) {
-        setManualIgSuccess("Token do Instagram atualizado com sucesso!");
+        setManualIgSuccess("Token do Instagram atualizado e validado com sucesso!");
+        if (data.accounts && data.accounts.length > 0) {
+          setAccounts(data.accounts);
+          setConnected(true);
+          setHasPublishPerm(true);
+        } else {
+          await fetchAccounts();
+        }
         setManualIgToken("");
-        fetchAccounts(); // reload accounts
       } else {
         setError(data.error || "Erro ao salvar token");
       }
@@ -101,6 +112,10 @@ export default function InstagramIntegracaoModal({ open, onClose, initialTab = "
   React.useEffect(() => {
     if (open) {
       fetchAccounts();
+      const savedToken = localStorage.getItem('instagram_access_token');
+      if (savedToken && !manualIgToken) {
+        setManualIgToken(savedToken);
+      }
     }
 
     const handleMessage = (event: MessageEvent) => {
@@ -329,6 +344,54 @@ export default function InstagramIntegracaoModal({ open, onClose, initialTab = "
                          description="Certifique-se de que você é Administrador da página no business.facebook.com."
                        />
                     </div>
+                  </div>
+
+                  {/* Conexão Direta via Token Manual Meta */}
+                  <div className="p-4 bg-muted/30 border border-border/60 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Instagram className="w-4 h-4 text-pink-500" />
+                        <h6 className="text-xs font-bold text-foreground">Conexão Direta via Token Meta (Recomendado)</h6>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-wider text-pink-600 bg-pink-500/10 border-pink-200">
+                        API Direta
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Cole seu <b>Meta User/Page Access Token</b> para postagens imediatas sem depender de popups ou se a sessão OAuth expirou.
+                      Gere ou renove seu token no{" "}
+                      <a 
+                        href="https://developers.facebook.com/tools/explorer/" 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="text-pink-600 underline font-semibold hover:text-pink-700"
+                      >
+                        Meta Graph API Explorer
+                      </a>.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder="Cole seu token Meta (EAA...)"
+                        value={manualIgToken}
+                        onChange={(e) => setManualIgToken(e.target.value)}
+                        className="text-xs h-10 bg-background font-mono"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-10 px-4 bg-pink-600 hover:bg-pink-700 text-white shrink-0 font-medium"
+                        onClick={handleSaveManualInstagramToken}
+                        disabled={savingManualIg || !manualIgToken.trim()}
+                      >
+                        {savingManualIg ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar Token"}
+                      </Button>
+                    </div>
+                    {manualIgSuccess && (
+                      <p className="text-[11px] text-green-600 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        {manualIgSuccess}
+                      </p>
+                    )}
                   </div>
 
                   {error && (

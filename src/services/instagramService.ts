@@ -2,14 +2,20 @@ export const instagramService = {
   async getAccountInfo() {
     try {
       let data = null;
+      const metaToken = typeof window !== 'undefined' ? localStorage.getItem('instagram_access_token') : null;
+      const headers: Record<string, string> = {};
+      if (metaToken) headers['x-meta-token'] = metaToken;
+
       try {
-        const resp = await fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/me");
+        const resp = await fetch("https://galeria-ia-cloudflare.vercel.app/api/instagram/me", {
+          headers
+        });
         if (resp.ok) data = await resp.json();
       } catch (e) {}
 
       if (!data?.accounts?.length) {
         try {
-          const resp = await fetch("/api/instagram/me");
+          const resp = await fetch("/api/instagram/me", { headers });
           if (resp.ok) data = await resp.json();
         } catch (e) {}
       }

@@ -33,14 +33,20 @@ export default function BufferScheduleManager() {
     setSavingManualBuffer(true);
     setManualBufferSuccess(null);
     try {
+      const trimmed = manualBufferToken.trim();
+      localStorage.setItem('buffer_access_token', trimmed);
+
       const response = await fetch("https://galeria-ia-cloudflare.vercel.app/api/auth/buffer/manual-token", {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: manualBufferToken })
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-buffer-token': trimmed
+        },
+        body: JSON.stringify({ token: trimmed })
       });
       const data = await response.json();
       if (data.success) {
-        setManualBufferSuccess('Token do Buffer atualizado com sucesso!');
+        setManualBufferSuccess('Token do Buffer atualizado e validado com sucesso!');
         setManualBufferToken('');
         setError(null);
         fetchProfiles(); // reload profiles
@@ -56,7 +62,10 @@ export default function BufferScheduleManager() {
 
   const fetchProfiles = async () => {
     try {
-      const response = await fetch("https://galeria-ia-cloudflare.vercel.app/api/buffer/profiles");
+      const storedToken = localStorage.getItem('buffer_access_token') || '';
+      const response = await fetch("https://galeria-ia-cloudflare.vercel.app/api/buffer/profiles", {
+        headers: { 'x-buffer-token': storedToken }
+      });
       const data = await response.json();
       const channels = data.data?.profiles || data.data?.account?.organizations?.flatMap((org: any) => org.channels || []) || [];
       setProfiles(channels);
