@@ -325,29 +325,8 @@ export default function InstagramIntegracaoModal({ open, onClose, initialTab = "
                     </div>
                   )}
 
-                  <div className="space-y-4">
-                    <h5 className="text-xs font-bold uppercase text-muted-foreground tracking-widest pl-1">Guia Passo a Passo</h5>
-                    <div className="space-y-2">
-                       <StepItem 
-                         number="1" 
-                         title="Mude para Conta Profissional" 
-                         description="No seu Instagram, vá em Configurações > Tipo de conta > Mudar para conta profissional (Creator ou Business)."
-                       />
-                       <StepItem 
-                         number="2" 
-                         title="Vincule ao Facebook" 
-                         description="Vá em Editar Perfil > Página > Escolha ou Crie uma Página do Facebook. Isso é OBRIGATÓRIO pela Meta."
-                       />
-                       <StepItem 
-                         number="3" 
-                         title="Acesse o Meta Business" 
-                         description="Certifique-se de que você é Administrador da página no business.facebook.com."
-                       />
-                    </div>
-                  </div>
-
                   {/* Conexão Direta via Token Manual Meta */}
-                  <div className="p-4 bg-muted/30 border border-border/60 rounded-2xl space-y-3">
+                  <div className="p-4 bg-muted/30 border border-pink-500/20 bg-pink-500/5 rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Instagram className="w-4 h-4 text-pink-500" />
@@ -392,6 +371,27 @@ export default function InstagramIntegracaoModal({ open, onClose, initialTab = "
                         {manualIgSuccess}
                       </p>
                     )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h5 className="text-xs font-bold uppercase text-muted-foreground tracking-widest pl-1">Guia Passo a Passo Alternativo</h5>
+                    <div className="space-y-2">
+                       <StepItem 
+                         number="1" 
+                         title="Mude para Conta Profissional" 
+                         description="No seu Instagram, vá em Configurações > Tipo de conta > Mudar para conta profissional (Creator ou Business)."
+                       />
+                       <StepItem 
+                         number="2" 
+                         title="Vincule ao Facebook" 
+                         description="Vá em Editar Perfil > Página > Escolha ou Crie uma Página do Facebook. Isso é OBRIGATÓRIO pela Meta."
+                       />
+                       <StepItem 
+                         number="3" 
+                         title="Acesse o Meta Business" 
+                         description="Certifique-se de que você é Administrador da página no business.facebook.com."
+                       />
+                    </div>
                   </div>
 
                   {error && (
