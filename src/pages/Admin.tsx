@@ -18,7 +18,6 @@ import { creditService } from '../lib/creditService';
 import UnifiedCalendar from '../components/admin/UnifiedCalendar';
 import { AdminSettings } from '../components/admin/AdminSettings';
 import { whatsappService } from '../lib/whatsappService';
-import { cloudBotService } from '../lib/cloudBotService';
 import TattooEngineModule from '../components/studio/TattooEngineModule';
 import GaleriaIA from './GaleriaIA';
 import ReferralTree from '../components/network/ReferralTree';
@@ -156,8 +155,7 @@ export default function Admin() {
   }, [users, searchQuery]);
 
   const runAutomationSync = async (currentBookings: Booking[]) => {
-    if (!settings.automation?.enabled) return;
-    cloudBotService.triggerBot();
+    // Automação em lote desativada por segurança
   };
 
   const fetchData = async (isSilent = false) => {
@@ -266,7 +264,6 @@ export default function Admin() {
         }, settings);
       }
 
-      cloudBotService.triggerBot();
       fetchData(true);
       setSelectedBooking(null);
     } catch (err) { console.error(err); }

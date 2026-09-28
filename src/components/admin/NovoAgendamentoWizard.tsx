@@ -5,7 +5,6 @@ import { db } from '../../lib/firebase';
 import { collection, addDoc, getDocs, serverTimestamp, query, where } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
 import { BookingStatus } from '../../types';
-import { cloudBotService } from '../../lib/cloudBotService';
 import { whatsappService } from '../../lib/whatsappService';
 
 interface NovoAgendamentoWizardProps {
@@ -211,18 +210,6 @@ export default function NovoAgendamentoWizard({
           console.warn("Aviso no disparo do ciclo de automação:", err);
         });
       }
-
-      // 2. Backup do Disparo em Nuvem (se houver rota API disponível)
-      try {
-        fetch('/api/automation/trigger', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bookingId: docRef.id })
-        }).catch(err => console.warn("Trigger warning:", err));
-      } catch (e) {}
-
-      // 3. Backup Robô Nuvem
-      cloudBotService.triggerBot();
 
       onSuccess();
     } catch (error) {

@@ -30,6 +30,12 @@ function parseBookingDateTime(dateStr?: string, timeStr?: string): Date {
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
+function isValidPhone(phone: string): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 14;
+}
+
 export const whatsappService = {
   async sendViaN8n(payload: {
     to: string;
@@ -40,6 +46,11 @@ export const whatsappService = {
     delayUnit?: string;
     instance?: string;
   }) {
+    if (!payload.to || !isValidPhone(payload.to)) {
+      console.warn("🔒 [WhatsApp Service] Disparo bloqueado: telefone inválido ou ausente.");
+      return false;
+    }
+
     const rawPhone = payload.to.replace(/\D/g, '');
     const formattedPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
@@ -198,7 +209,14 @@ export const whatsappService = {
         const bookingDate = parseBookingDateTime(booking.date, booking.time);
         const reminderLeadMs = unitToMilliseconds(settings.automation.reminderValue || 2, settings.automation.reminderUnit || 'minutes');
         const triggerTime = bookingDate.getTime() - reminderLeadMs;
-        calculatedDelaySec = Math.max(1, Math.round((triggerTime - Date.now()) / 1000));
+        const diffMs = triggerTime - Date.now();
+        
+        // Se o horário de disparo do lembrete já expirou, NÃO dispara
+        if (diffMs < -60000) {
+          console.log("🔒 [WhatsApp Service] Lembrete ignorado: horário do lembrete já passou.");
+          return false;
+        }
+        calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
       }
 
       console.log(`🔔 [WhatsApp Service] Disparando Campainha de Lembrete: delay = ${calculatedDelaySec}s`);
@@ -231,7 +249,14 @@ export const whatsappService = {
         const bookingDate = parseBookingDateTime(booking.date, booking.time);
         const followUpDelayMs = unitToMilliseconds(settings.automation.followUpValue || 2, settings.automation.followUpUnit || 'minutes');
         const triggerTime = bookingDate.getTime() + followUpDelayMs;
-        calculatedDelaySec = Math.max(1, Math.round((triggerTime - Date.now()) / 1000));
+        const diffMs = triggerTime - Date.now();
+        
+        // Se o agendamento já passou há mais de 30 dias, NÃO envia
+        if (diffMs < -30 * 86400000) {
+          console.log("🔒 [WhatsApp Service] Follow-up ignorado: agendamento muito antigo.");
+          return false;
+        }
+        calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
       }
 
       console.log(`💬 [WhatsApp Service] Disparando Campainha de Follow-up: delay = ${calculatedDelaySec}s`);
@@ -256,6 +281,24 @@ export const whatsappService = {
   async triggerBookingLifecycle(booking: Booking, isReschedule: boolean = false, customSettings?: StudioSettings) {
     const settings = await this.getSettings(customSettings);
     if (!settings?.automation?.enabled) return { scheduled: false, reason: 'Automation disabled' };
+
+    // GUARDRAIL 1: Validar se telefone do cliente é válido
+    const targetPhone = booking.userPhone || (booking as any).clientPhone || '';
+    if (!isValidPhone(targetPhone)) {
+      console.warn("🔒 [WhatsApp Service] Disparo abortado: telefone de destino inválido ou vazio.");
+      return { scheduled: false, reason: 'Invalid phone' };
+    }
+
+    // GUARDRAIL 2: Validar se data/hora é futura ou presente (NUNCA disparar para agendamentos do passado)
+    if (booking.date) {
+      const apptDate = parseBookingDateTime(booking.date, booking.time);
+      const now = Date.now();
+      // Se não é reagendamento e o agendamento já ocorreu há mais de 10 minutos, ABORTA!
+      if (!isReschedule && apptDate.getTime() < (now - 10 * 60 * 1000)) {
+        console.warn("🔒 [WhatsApp Service] Disparo abortado: agendamento pertence ao passado.");
+        return { scheduled: false, reason: 'Past booking rejected' };
+      }
+    }
 
     // Imediato: Confirmação ou Reagendamento
     if (isReschedule) {

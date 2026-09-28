@@ -24,7 +24,6 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft } from 'lucide-react';
-import { cloudBotService } from '../lib/cloudBotService';
 import { whatsappService } from '../lib/whatsappService';
 
 type Size = 'Pequena' | 'Média' | 'Grande';
@@ -150,9 +149,6 @@ export default function Booking() {
         time: selectedTime,
         descricao_servico: `Tatuagem (${size})`
       }, settings || undefined);
-
-      // 2. DISPARO EM NUVEM (Backup)
-      cloudBotService.triggerBot();
 
       navigate('/');
     } catch (err) {
