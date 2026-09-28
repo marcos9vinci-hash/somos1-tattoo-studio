@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
   Clock, ToggleLeft, ToggleRight, Ban, Trash2, Send, Settings, Minus, Plus,
   CheckCircle2, XCircle, AlertCircle, RefreshCw, QrCode, Sparkles, CalendarClock, Cake,
-  UserCheck, RotateCcw, Bell, UserX, Eye, Smartphone
+  UserCheck, RotateCcw, Bell, UserX, Eye, Smartphone, Power, LogOut, Check
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { whatsappService } from '../../lib/whatsappService';
@@ -35,7 +35,23 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [isLoadingQr, setIsLoadingQr] = useState(false);
+  const [isAlreadyConnected, setIsAlreadyConnected] = useState(false);
+  const [connectedInfo, setConnectedInfo] = useState<{ number?: string; profile?: string } | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [previewTemplateKey, setPreviewTemplateKey] = useState<string | null>(null);
+
+  // Modelos com texto pré-escrito completo profissional padrão
+  const DEFAULT_PREWRITTEN_TEMPLATES: Record<string, string> = {
+    confirmacao: "✅ Olá, {cliente}! Tudo bem? Confirmamos o seu agendamento no Somos 1 Tattoo Studio para o dia {data} às {horario} com {profissional} ({servico}). Se precisar de qualquer orientação prévia, estamos à disposição!",
+    reagendamento: "🗓️ Olá, {cliente}! Informamos que seu agendamento foi REAGENDADO com sucesso para a nova data: {data} às {horario} com {profissional} ({servico}). Nos vemos em breve!",
+    cancelamento: "❌ Olá, {cliente}. Confirmamos o cancelamento da sua sessão do dia {data} às {horario}. Se desejar reagendar para outra data futura, estamos à total disposição!",
+    lembrete: "⏰ Olá, {cliente}! Passando para lembrar da nossa sessão amanhã dia {data} às {horario} ({servico}). Venha descansado(a) e bem alimentado(a). Nos vemos em breve no estúdio!",
+    followup: "✨ Olá, {cliente}! Passando para acompanhar a cicatrização da sua arte realizada dia {data}. Está tudo correndo bem com os cuidados e hidratação? Se precisar de qualquer orientação, conte conosco!",
+    aniversario: "🎂 Parabéns, {cliente}! O Somos 1 Tattoo Studio te deseja um feliz aniversário! Preparamos um presente especial: use o cupom {cupom} e ganhe um desconto exclusivo na sua próxima tattoo ou piercing!",
+    reativacao: "🔥 Fala, {primeiro_nome}! Faz um tempinho que você não passa aqui no Somos 1 Tattoo Studio. Que tal tirar aquele novo projeto do papel? Respondendo a essa mensagem você garante uma condição especial e prioridade na agenda!",
+    retorno: "🌿 Oi, {primeiro_nome}! Passando para acompanhar o resultado da sua arte e verificar se já está na hora daquele retoque ou sessão de acompanhamento para deixar sua tattoo perfeita. Vamos agendar seu retorno?",
+    lista_espera: "⚡ Olá, {primeiro_nome}! Uma vaga acabou de abrir na agenda para o dia {data} às {horario} com {profissional}. Como você estava na nossa lista de espera, tem prioridade para garantir esse horário. Deseja confirmar?"
+  };
 
   const templateConfigs = [
     {
@@ -46,7 +62,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-emerald-400',
       border: 'border-emerald-500/20',
       bgBadge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-      placeholder: 'Olá {cliente}, seu agendamento no Somos 1 Tattoo Studio está confirmado para o dia {data} às {horario} com {profissional} ({servico})! Se precisar reagendar, nos avise.',
       hint: 'Disparado na hora em que o agendamento é salvo ou aprovado.'
     },
     {
@@ -57,7 +72,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-amber-400',
       border: 'border-amber-500/20',
       bgBadge: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-      placeholder: 'Olá {cliente}, informamos que seu agendamento foi REAGENDADO com sucesso para {data} às {horario} com {profissional} ({servico})!',
       hint: 'Disparado automaticamente quando a data ou horário for alterado.'
     },
     {
@@ -68,7 +82,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-red-400',
       border: 'border-red-500/20',
       bgBadge: 'bg-red-500/10 text-red-400 border-red-500/30',
-      placeholder: 'Olá {cliente}, confirmamos o cancelamento do seu agendamento do dia {data} às {horario}. Caso queira escolher outra data futura, estamos à disposição!',
       hint: 'Disparado quando uma sessão é desmarcada ou cancelada.'
     },
     {
@@ -79,7 +92,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-cyan-400',
       border: 'border-cyan-500/20',
       bgBadge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
-      placeholder: 'Oi {cliente}, passando para lembrar da nossa sessão de {servico} marcada para {data} às {horario}! Venha descansado(a) e alimentado(a). Nos vemos em breve!',
       hint: 'Disparado automaticamente com o tempo configurado antes da sessão.'
     },
     {
@@ -90,8 +102,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-purple-400',
       border: 'border-purple-500/20',
       bgBadge: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-      placeholder: 'Olá {cliente}, passando para acompanhar a cicatrização da sua arte realizada dia {data}! Lembre-se de seguir as orientações de hidratação. Como está a cicatrização?',
-      hint: 'Disparado após a sessão para acompanhar o cliente e garantir satisfação.'
+      hint: 'Disparado após a sessão para acompanhar o cliente e cicatrização.'
     },
     {
       key: 'aniversario',
@@ -101,8 +112,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-pink-400',
       border: 'border-pink-500/20',
       bgBadge: 'bg-pink-500/10 text-pink-400 border-pink-500/30',
-      placeholder: '🎂 Parabéns {cliente}! O Somos 1 Tattoo Studio te deseja um dia incrível! Preparamos um presente especial: use o cupom {cupom} para garantir um desconto exclusivo na sua próxima tattoo.',
-      hint: 'Disparado no dia do aniversário do cliente com cupom exclusivo.'
+      hint: 'Disparado no dia do aniversário do cliente com cupom de presente.'
     },
     {
       key: 'reativacao',
@@ -112,7 +122,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-orange-400',
       border: 'border-orange-500/20',
       bgBadge: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
-      placeholder: 'Fala {primeiro_nome}, tudo bem? Notamos que faz um tempinho que você não passa no estúdio! Que tal tirar aquele novo projeto do papel? Respondendo essa mensagem você ganha um bônus especial na agenda!',
       hint: 'Disparado para clientes sem agendamento há mais de X dias.'
     },
     {
@@ -123,8 +132,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-emerald-300',
       border: 'border-emerald-400/20',
       bgBadge: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30',
-      placeholder: 'Oi {primeiro_nome}! Passando para acompanhar seu procedimento e verificar se está na hora daquele retoque ou sessão de acompanhamento. Vamos agendar para deixar sua arte perfeita?',
-      hint: 'Disparado X dias após o procedimento para revisão ou retoque.'
+      hint: 'Disparado X dias após o procedimento para revisão ou retoque da arte.'
     },
     {
       key: 'lista_espera',
@@ -134,7 +142,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       color: 'text-yellow-400',
       border: 'border-yellow-500/20',
       bgBadge: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-      placeholder: '⚡ Olá {primeiro_nome}! Uma vaga acabou de abrir na agenda para {data} às {horario} com {profissional}. Como você estava na lista de espera, tem prioridade para confirmar agora!',
       hint: 'Disparado para contatos em espera quando há desistência de horário.'
     }
   ];
@@ -151,7 +158,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   ];
 
   const insertTagIntoTemplate = (key: string, tag: string) => {
-    const current = settings.whatsappTemplates?.[key] || "";
+    const current = settings.whatsappTemplates?.[key] !== undefined 
+      ? settings.whatsappTemplates[key] 
+      : (DEFAULT_PREWRITTEN_TEMPLATES[key] || "");
     setSettings({
       ...settings,
       whatsappTemplates: {
@@ -189,13 +198,24 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const handleOpenQrModal = async () => {
     setShowQrModal(true);
     setIsLoadingQr(true);
+    setQrCodeData(null);
+    setPairingCode(null);
+    setIsAlreadyConnected(false);
     try {
       const res = await whatsappService.fetchInstanceQrCode(settings);
-      if (res.base64) {
-        setQrCodeData(res.base64);
-      }
-      if (res.pairingCode) {
-        setPairingCode(res.pairingCode);
+      if (res.alreadyConnected) {
+        setIsAlreadyConnected(true);
+        setConnectedInfo({
+          number: res.connectedNumber,
+          profile: res.profileName
+        });
+      } else {
+        if (res.qrCodeBase64 || res.base64) {
+          setQrCodeData(res.qrCodeBase64 || res.base64);
+        }
+        if (res.pairingCode) {
+          setPairingCode(res.pairingCode);
+        }
       }
     } catch (err: any) {
       console.error("Erro ao buscar QR code:", err);
@@ -204,18 +224,36 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!confirm("Deseja realmente desconectar o WhatsApp desta instância para conectar um novo aparelho?")) return;
+    setIsDisconnecting(true);
+    try {
+      await whatsappService.logoutInstance(settings);
+      setIsAlreadyConnected(false);
+      setConnectedInfo(null);
+      await handleOpenQrModal();
+    } catch (err) {
+      console.error("Erro ao desconectar:", err);
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   return (
     <div className="space-y-12">
-      {/* 1. MODELOS DE MENSAGEM (WHATSAPP) */}
-      <div className="space-y-6 pt-4">
+      
+      {/* =========================================================================
+          SEÇÃO 1: MODELOS DE MENSAGEM (WHATSAPP) COM TEXTOS PRÉ-ESCRITOS
+         ========================================================================= */}
+      <div className="space-y-6 pt-2">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h3 className="font-headline text-lg text-white uppercase flex items-center gap-2">
+            <h3 className="font-headline text-lg text-white uppercase flex items-center gap-2 font-bold">
               <Send className="w-5 h-5 text-emerald-400" />
               Modelos de Mensagem (WhatsApp)
             </h3>
             <p className="text-xs text-zinc-400 mt-1">
-              Personalize o texto exato disparado em cada etapa do ciclo de atendimento e CRM do estúdio.
+              Todos os modelos vêm pré-escritos para uso imediato. Edite o texto como desejar e clique em salvar.
             </p>
           </div>
 
@@ -234,22 +272,25 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
           </div>
         </div>
 
-        {/* Templates Responsive Grid */}
+        {/* Grade Responsiva com os 9 Modelos */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {templateConfigs.map((tpl) => {
             const Icon = tpl.icon;
-            const currentVal = settings.whatsappTemplates?.[tpl.key] ?? "";
+            // Usa o valor personalizado ou o texto padrão pré-escrito
+            const currentVal = settings.whatsappTemplates?.[tpl.key] !== undefined
+              ? settings.whatsappTemplates[tpl.key]
+              : (DEFAULT_PREWRITTEN_TEMPLATES[tpl.key] || "");
             const isPreviewing = previewTemplateKey === tpl.key;
 
             return (
               <div 
                 key={tpl.key} 
                 className={cn(
-                  "bg-black/50 border rounded-2xl p-5 flex flex-col justify-between space-y-4 transition-all duration-200 hover:border-white/20",
+                  "bg-black/50 border rounded-2xl p-5 flex flex-col justify-between space-y-4 transition-all duration-200 hover:border-white/20 shadow-lg",
                   tpl.border
                 )}
               >
-                {/* Header */}
+                {/* Header do Card */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -262,17 +303,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                       {tpl.badge}
                     </span>
                   </div>
-                  <p className="text-[10px] text-zinc-500 leading-relaxed">
+                  <p className="text-[10px] text-zinc-400 leading-relaxed">
                     {tpl.hint}
                   </p>
                 </div>
 
-                {/* Textarea or Preview */}
+                {/* Textarea com Conteúdo Pré-Escrito ou Simulador */}
                 <div className="space-y-2">
                   {isPreviewing ? (
                     <div className="bg-[#121b22] border border-[#233138] rounded-xl p-3 min-h-[140px] flex flex-col justify-between relative shadow-inner">
                       <div className="bg-[#005c4b] text-white text-xs p-2.5 rounded-lg rounded-tl-none font-sans leading-relaxed whitespace-pre-wrap">
-                        {renderPreviewText(currentVal || tpl.placeholder)}
+                        {renderPreviewText(currentVal)}
                         <div className="flex items-center justify-end gap-1 text-[9px] text-zinc-300 mt-1 font-mono">
                           <span>10:30</span>
                           <span className="text-[#53bdeb] font-bold">✓✓</span>
@@ -292,13 +333,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                           [tpl.key]: e.target.value
                         }
                       })}
-                      placeholder={tpl.placeholder}
-                      className="w-full bg-black/70 border border-white/10 rounded-xl p-3 text-white text-xs h-36 focus:outline-none focus:border-primary-fixed leading-relaxed font-sans placeholder:text-zinc-600 resize-none transition-all"
+                      className="w-full bg-black/70 border border-white/10 rounded-xl p-3 text-white text-xs h-36 focus:outline-none focus:border-primary-fixed leading-relaxed font-sans placeholder:text-zinc-600 resize-none transition-all shadow-inner"
                     />
                   )}
                 </div>
 
-                {/* Footer Controls: Tag Injectors & Preview Toggle */}
+                {/* Controles de Tag e Prévia */}
                 <div className="space-y-2 pt-2 border-t border-white/5">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-wrap gap-1">
@@ -354,22 +394,21 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
             );
           })}
         </div>
-
-        <p className="text-[10px] text-zinc-500 italic text-center font-headline uppercase tracking-wider">
-          Variáveis disponíveis em todos os modelos: {'{cliente}'}, {'{primeiro_nome}'}, {'{data}'}, {'{horario}'}, {'{servico}'}, {'{profissional}'}, {'{cupom}'}, {'{dias_sem_vir}'}
-        </p>
       </div>
 
-      {/* 2. AUTOMAÇÃO EVOLUTION API */}
+
+      {/* =========================================================================
+          SEÇÃO 2: AUTOMAÇÃO EVOLUTION API COM BOTÕES DE ATIVAÇÃO ON/OFF E TEMPOS
+         ========================================================================= */}
       <div className="space-y-6 pt-8 border-t border-white/10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h3 className="font-headline text-lg text-white uppercase flex items-center gap-2">
+            <h3 className="font-headline text-lg text-white uppercase flex items-center gap-2 font-bold">
               <Settings className="w-5 h-5 text-blue-500" />
               Automação Evolution API
             </h3>
             <p className="text-xs text-zinc-400 mt-1">
-              Defina os intervalos e tempos de disparo automático para cada gatilho de atendimento e retenção.
+              Ligue ou desligue cada envio com os botões de ativação e ajuste o tempo exato de cada gatilho.
             </p>
           </div>
 
@@ -392,7 +431,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
               className="px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-headline text-[10px] uppercase font-bold hover:bg-emerald-500/20 transition-all flex items-center gap-1.5"
             >
               <QrCode className="w-3.5 h-3.5" />
-              Conectar QR Code
+              Conectar WhatsApp
             </button>
 
             {/* Test Send Button */}
@@ -419,7 +458,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   : "bg-zinc-800 border-white/5 text-zinc-500"
               )}
             >
-              {settings.automation?.enabled !== false ? "ROBÔ ATIVO" : "ROBÔ DESATIVADO"}
+              <Power className="w-3.5 h-3.5" />
+              {settings.automation?.enabled !== false ? "ROBÔ GERAL LIGADO" : "ROBÔ GERAL DESLIGADO"}
             </button>
           </div>
         </div>
@@ -491,8 +531,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
           </div>
         </div>
 
-        {/* Automation Triggers & Timers Grid */}
+        {/* Grade com os 7 Gatilhos & Tempos com Botões de Ativação Claros */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
           {/* 1. Confirmação Automática */}
           <div className="space-y-4 bg-white/5 p-5 rounded-2xl border border-white/5 flex flex-col justify-between">
             <div className="flex justify-between items-center">
@@ -506,15 +547,18 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   automation: { ...settings.automation, confirmationEnabled: !settings.automation?.confirmationEnabled }
                 })}
                 className={cn(
-                  "px-3 py-1 rounded-lg text-[9px] font-black uppercase border transition-all",
-                  settings.automation?.confirmationEnabled ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-800 border-white/5 text-zinc-500"
+                  "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border transition-all flex items-center gap-1.5 shadow-sm",
+                  settings.automation?.confirmationEnabled 
+                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 font-bold" 
+                    : "bg-zinc-800 border-white/10 text-zinc-400 hover:text-white"
                 )}
               >
+                <span className={cn("w-2 h-2 rounded-full", settings.automation?.confirmationEnabled ? "bg-emerald-400" : "bg-zinc-600")} />
                 {settings.automation?.confirmationEnabled ? "ATIVADO" : "DESATIVADO"}
               </button>
             </div>
             <p className="text-[10px] text-zinc-400 italic">
-              Envia a confirmação no WhatsApp na hora em que o agendamento é salvo.
+              Dispara a confirmação no WhatsApp na hora em que o agendamento é salvo ou aprovado.
             </p>
           </div>
 
@@ -532,13 +576,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     automation: { ...settings.automation, reminderEnabled: !settings.automation?.reminderEnabled }
                   })}
                   className={cn(
-                    "mt-1 px-2 py-0.5 rounded text-[8px] font-black uppercase border w-fit transition-all",
-                    settings.automation?.reminderEnabled ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-800 border-white/5 text-zinc-500"
+                    "mt-1 px-2.5 py-1 rounded-lg text-[8px] font-black uppercase border w-fit transition-all flex items-center gap-1",
+                    settings.automation?.reminderEnabled 
+                      ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" 
+                      : "bg-zinc-800 border-white/10 text-zinc-400"
                   )}
                 >
-                  {settings.automation?.reminderEnabled ? "AUTO-ENVIO ATIVO" : "AUTO-ENVIO INATIVO"}
+                  <span className={cn("w-1.5 h-1.5 rounded-full", settings.automation?.reminderEnabled ? "bg-emerald-400" : "bg-zinc-600")} />
+                  {settings.automation?.reminderEnabled ? "ATIVADO" : "DESATIVADO"}
                 </button>
               </div>
+
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-black border border-white/10 rounded-xl overflow-hidden h-10">
                   <button
@@ -598,13 +646,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     automation: { ...settings.automation, followUpEnabled: !settings.automation?.followUpEnabled }
                   })}
                   className={cn(
-                    "mt-1 px-2 py-0.5 rounded text-[8px] font-black uppercase border w-fit transition-all",
-                    settings.automation?.followUpEnabled ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-800 border-white/5 text-zinc-500"
+                    "mt-1 px-2.5 py-1 rounded-lg text-[8px] font-black uppercase border w-fit transition-all flex items-center gap-1",
+                    settings.automation?.followUpEnabled 
+                      ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" 
+                      : "bg-zinc-800 border-white/10 text-zinc-400"
                   )}
                 >
-                  {settings.automation?.followUpEnabled ? "AUTO-ENVIO ATIVO" : "AUTO-ENVIO INATIVO"}
+                  <span className={cn("w-1.5 h-1.5 rounded-full", settings.automation?.followUpEnabled ? "bg-emerald-400" : "bg-zinc-600")} />
+                  {settings.automation?.followUpEnabled ? "ATIVADO" : "DESATIVADO"}
                 </button>
               </div>
+
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-black border border-white/10 rounded-xl overflow-hidden h-10">
                   <button
@@ -664,13 +716,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     automation: { ...settings.automation, reactivationEnabled: !settings.automation?.reactivationEnabled }
                   })}
                   className={cn(
-                    "mt-1 px-2 py-0.5 rounded text-[8px] font-black uppercase border w-fit transition-all",
-                    settings.automation?.reactivationEnabled ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-800 border-white/5 text-zinc-500"
+                    "mt-1 px-2.5 py-1 rounded-lg text-[8px] font-black uppercase border w-fit transition-all flex items-center gap-1",
+                    settings.automation?.reactivationEnabled 
+                      ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" 
+                      : "bg-zinc-800 border-white/10 text-zinc-400"
                   )}
                 >
-                  {settings.automation?.reactivationEnabled ? "AUTO-ENVIO ATIVO" : "AUTO-ENVIO INATIVO"}
+                  <span className={cn("w-1.5 h-1.5 rounded-full", settings.automation?.reactivationEnabled ? "bg-emerald-400" : "bg-zinc-600")} />
+                  {settings.automation?.reactivationEnabled ? "ATIVADO" : "DESATIVADO"}
                 </button>
               </div>
+
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-black border border-white/10 rounded-xl overflow-hidden h-10">
                   <button
@@ -737,13 +793,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     automation: { ...settings.automation, returningEnabled: !settings.automation?.returningEnabled }
                   })}
                   className={cn(
-                    "mt-1 px-2 py-0.5 rounded text-[8px] font-black uppercase border w-fit transition-all",
-                    settings.automation?.returningEnabled ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-800 border-white/5 text-zinc-500"
+                    "mt-1 px-2.5 py-1 rounded-lg text-[8px] font-black uppercase border w-fit transition-all flex items-center gap-1",
+                    settings.automation?.returningEnabled 
+                      ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" 
+                      : "bg-zinc-800 border-white/10 text-zinc-400"
                   )}
                 >
-                  {settings.automation?.returningEnabled ? "AUTO-ENVIO ATIVO" : "AUTO-ENVIO INATIVO"}
+                  <span className={cn("w-1.5 h-1.5 rounded-full", settings.automation?.returningEnabled ? "bg-emerald-400" : "bg-zinc-600")} />
+                  {settings.automation?.returningEnabled ? "ATIVADO" : "DESATIVADO"}
                 </button>
               </div>
+
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-black border border-white/10 rounded-xl overflow-hidden h-10">
                   <button
@@ -809,15 +869,18 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   automation: { ...settings.automation, birthdayEnabled: !settings.automation?.birthdayEnabled }
                 })}
                 className={cn(
-                  "px-3 py-1 rounded-lg text-[9px] font-black uppercase border transition-all",
-                  settings.automation?.birthdayEnabled ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-800 border-white/5 text-zinc-500"
+                  "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border transition-all flex items-center gap-1.5 shadow-sm",
+                  settings.automation?.birthdayEnabled 
+                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 font-bold" 
+                    : "bg-zinc-800 border-white/10 text-zinc-400 hover:text-white"
                 )}
               >
-                {settings.automation?.birthdayEnabled ? "AUTO-ENVIO ATIVO" : "AUTO-ENVIO INATIVO"}
+                <span className={cn("w-2 h-2 rounded-full", settings.automation?.birthdayEnabled ? "bg-emerald-400" : "bg-zinc-600")} />
+                {settings.automation?.birthdayEnabled ? "ATIVADO" : "DESATIVADO"}
               </button>
             </div>
             <p className="text-[10px] text-zinc-400 italic">
-              Dispara no dia do aniversário do cliente às 09:00 com cupom promocional.
+              Dispara no dia do aniversário do cliente às 09:00 com cupom de presente no estúdio.
             </p>
           </div>
 
@@ -834,10 +897,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   automation: { ...settings.automation, waitingListEnabled: !settings.automation?.waitingListEnabled }
                 })}
                 className={cn(
-                  "px-3 py-1 rounded-lg text-[9px] font-black uppercase border transition-all",
-                  settings.automation?.waitingListEnabled ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-800 border-white/5 text-zinc-500"
+                  "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border transition-all flex items-center gap-1.5 shadow-sm",
+                  settings.automation?.waitingListEnabled 
+                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 font-bold" 
+                    : "bg-zinc-800 border-white/10 text-zinc-400 hover:text-white"
                 )}
               >
+                <span className={cn("w-2 h-2 rounded-full", settings.automation?.waitingListEnabled ? "bg-emerald-400" : "bg-zinc-600")} />
                 {settings.automation?.waitingListEnabled ? "ATIVADO" : "DESATIVADO"}
               </button>
             </div>
@@ -845,100 +911,294 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
               Avisa contatos em espera caso ocorra cancelamento ou liberação de horário na agenda.
             </p>
           </div>
+
         </div>
       </div>
 
-      {/* 3. BLOQUEIOS DE HORÁRIO */}
+
+      {/* =========================================================================
+          SEÇÃO 3: DURAÇÃO PADRÃO DOS TRABALHOS (MINUTOS)
+         ========================================================================= */}
       <div className="space-y-4 pt-8 border-t border-white/10">
-        <h3 className="font-headline text-lg text-white uppercase flex items-center gap-2">
-          <Ban className="w-5 h-5 text-red-500" />
-          Bloqueios Fixos de Horário
+        <h3 className="font-headline text-lg text-white uppercase flex items-center gap-2 font-bold">
+          <Clock className="w-5 h-5 text-primary-fixed" />
+          Duração Padrão dos Trabalhos (Minutos)
         </h3>
         <p className="text-xs text-zinc-400">
-          Horários em que a agenda externa e online fica totalmente indisponível para novos agendamentos.
+          Define o tempo de duração reservado na agenda para cada porte de procedimento ou tattoo.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-          <input
-            type="date"
-            value={newBlock.date}
-            onChange={(e) => setNewBlock({ ...newBlock, date: e.target.value })}
-            className="bg-black border border-white/10 rounded-xl p-3 text-white text-xs"
-          />
-          <input
-            type="time"
-            value={newBlock.start}
-            onChange={(e) => setNewBlock({ ...newBlock, start: e.target.value })}
-            className="bg-black border border-white/10 rounded-xl p-3 text-white text-xs"
-          />
-          <input
-            type="time"
-            value={newBlock.end}
-            onChange={(e) => setNewBlock({ ...newBlock, end: e.target.value })}
-            className="bg-black border border-white/10 rounded-xl p-3 text-white text-xs"
-          />
-          <button
-            type="button"
-            onClick={handleAddBlock}
-            className="bg-primary-fixed text-black font-headline font-black uppercase text-xs rounded-xl py-3 hover:scale-[0.98] transition-all"
-          >
-            Adicionar Bloqueio
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {(['Pequena', 'Média', 'Grande'] as const).map(size => {
+            const currentDuration = settings.durations?.[size] ?? (size === 'Pequena' ? 60 : size === 'Média' ? 120 : 240);
+            return (
+              <div key={size} className="bg-white/5 p-4 rounded-2xl border border-white/5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs uppercase font-headline font-bold text-white tracking-wider">
+                    Tattoo {size}
+                  </label>
+                  <span className="text-[10px] text-zinc-500 uppercase font-mono">
+                    {Math.floor(currentDuration / 60)}h {currentDuration % 60 > 0 ? `${currentDuration % 60}m` : ''}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center bg-black border border-white/10 rounded-xl overflow-hidden h-11 w-full">
+                    <button
+                      type="button"
+                      onClick={() => setSettings({
+                        ...settings,
+                        durations: {
+                          ...settings.durations,
+                          [size]: Math.max(15, currentDuration - 15)
+                        }
+                      })}
+                      className="px-3 hover:bg-white/5 text-zinc-400"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <input 
+                      type="number"
+                      value={currentDuration}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        durations: {
+                          ...settings.durations,
+                          [size]: parseInt(e.target.value) || 30
+                        }
+                      })}
+                      className="w-full bg-transparent text-center text-primary-fixed font-black text-sm focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSettings({
+                        ...settings,
+                        durations: {
+                          ...settings.durations,
+                          [size]: currentDuration + 15
+                        }
+                      })}
+                      className="px-3 hover:bg-white/5 text-zinc-400"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <span className="text-xs text-zinc-500 uppercase font-headline font-bold pr-2">min</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+
+      {/* =========================================================================
+          SEÇÃO 4: BLOQUEIOS DE HORÁRIOS DA AGENDA (UNIFICADO)
+         ========================================================================= */}
+      <div className="space-y-4 pt-8 border-t border-white/10">
+        <h3 className="font-headline text-lg text-white uppercase flex items-center gap-2 font-bold">
+          <Ban className="w-5 h-5 text-red-500" />
+          Bloqueios de Horários da Agenda
+        </h3>
+        <p className="text-xs text-zinc-400">
+          Bloqueie dias ou faixas de horários para folgas, almoço ou manutenção. Clique nos campos de data e hora para abrir o seletor completo.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white/5 p-5 rounded-2xl border border-white/5">
+          <div className="space-y-1">
+            <label className="text-[10px] text-zinc-400 uppercase font-headline tracking-wider">Data do Bloqueio</label>
+            <input
+              type="date"
+              value={newBlock.date}
+              onClick={(e) => { try { e.currentTarget.showPicker(); } catch {} }}
+              onChange={(e) => setNewBlock({ ...newBlock, date: e.target.value })}
+              className="w-full bg-black border border-white/10 rounded-xl p-3 text-white text-xs cursor-pointer hover:border-white/30 transition-all font-mono"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] text-zinc-400 uppercase font-headline tracking-wider">Hora Início</label>
+            <input
+              type="time"
+              value={newBlock.start}
+              onClick={(e) => { try { e.currentTarget.showPicker(); } catch {} }}
+              onChange={(e) => setNewBlock({ ...newBlock, start: e.target.value })}
+              className="w-full bg-black border border-white/10 rounded-xl p-3 text-white text-xs cursor-pointer hover:border-white/30 transition-all font-mono"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] text-zinc-400 uppercase font-headline tracking-wider">Hora Fim</label>
+            <input
+              type="time"
+              value={newBlock.end}
+              onClick={(e) => { try { e.currentTarget.showPicker(); } catch {} }}
+              onChange={(e) => setNewBlock({ ...newBlock, end: e.target.value })}
+              className="w-full bg-black border border-white/10 rounded-xl p-3 text-white text-xs cursor-pointer hover:border-white/30 transition-all font-mono"
+            />
+          </div>
+
+          <div className="space-y-1 flex flex-col justify-end">
+            <button
+              type="button"
+              onClick={handleAddBlock}
+              className="w-full bg-primary-fixed text-black font-headline font-black uppercase text-xs rounded-xl py-3.5 hover:scale-[0.98] transition-all shadow-md"
+            >
+              Adicionar Bloqueio
+            </button>
+          </div>
         </div>
 
         {/* Lista de bloqueios existentes */}
-        {settings.blockedTimes && settings.blockedTimes.length > 0 && (
+        {((settings.blockedIntervals && settings.blockedIntervals.length > 0) || (settings.blockedTimes && settings.blockedTimes.length > 0)) && (
           <div className="space-y-2 mt-4">
-            {settings.blockedTimes.map((block: any, idx: number) => (
-              <div key={idx} className="flex items-center justify-between bg-black/40 border border-white/5 p-3 rounded-xl">
-                <span className="text-xs text-zinc-300 font-mono">
-                  {block.date} das {block.start} às {block.end}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveBlock(idx)}
-                  className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-all"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+            <label className="text-[10px] uppercase font-headline text-zinc-500 tracking-wider">Bloqueios Cadastrados</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {(settings.blockedIntervals || settings.blockedTimes || []).map((block: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between bg-black/50 border border-white/10 p-3.5 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Ban className="w-3.5 h-3.5 text-red-400" />
+                    <span className="text-xs text-zinc-200 font-mono">
+                      {block.date} • {block.start} às {block.end}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBlock(idx)}
+                    className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-all"
+                    title="Excluir Bloqueio"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Botão de Salvar Geral */}
+
+      {/* =========================================================================
+          BOTÃO GERAL: SALVAR TODAS AS CONFIGURAÇÕES
+         ========================================================================= */}
       <div className="pt-8 border-t border-white/10">
         <button 
           type="button"
           onClick={handleUpdateSettings}
-          className="w-full bg-primary-fixed text-black h-16 rounded-2xl font-headline font-black uppercase tracking-widest shadow-xl shadow-primary-fixed/20 hover:scale-[0.99] transition-all text-sm"
+          className="w-full bg-primary-fixed text-black h-16 rounded-2xl font-headline font-black uppercase tracking-widest shadow-xl shadow-primary-fixed/20 hover:scale-[0.99] transition-all text-sm flex items-center justify-center gap-2"
         >
+          <Check className="w-5 h-5" />
           Salvar Todas as Configurações
         </button>
       </div>
 
-      {/* QR Code Modal */}
+
+      {/* =========================================================================
+          MODAL DE CONEXÃO WHATSAPP / QR CODE
+         ========================================================================= */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-white/10 rounded-3xl p-6 max-w-sm w-full space-y-4 text-center">
-            <h4 className="font-headline font-black text-white text-base uppercase">Conectar WhatsApp</h4>
-            <p className="text-xs text-zinc-400">Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar Aparelho</p>
+          <div className="bg-zinc-950 border border-white/15 rounded-3xl p-6 max-w-sm w-full space-y-4 text-center shadow-2xl relative">
+            <h4 className="font-headline font-black text-white text-base uppercase">Conexão WhatsApp</h4>
             
-            <div className="bg-white p-4 rounded-2xl inline-block mx-auto min-w-[200px] min-h-[200px] flex items-center justify-center">
-              {isLoadingQr ? (
-                <RefreshCw className="w-8 h-8 text-black animate-spin" />
-              ) : qrCodeData ? (
-                <img src={qrCodeData.startsWith('data:') ? qrCodeData : `data:image/png;base64,${qrCodeData}`} alt="QR Code" className="w-48 h-48" />
-              ) : (
-                <p className="text-black text-xs font-headline">Aguardando geração do QR Code...</p>
-              )}
-            </div>
+            {isLoadingQr ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3">
+                <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+                <p className="text-xs text-zinc-400 font-headline">Verificando status da instância...</p>
+              </div>
+            ) : isAlreadyConnected ? (
+              /* Estado: Já Conectado com Sucesso */
+              <div className="space-y-4 py-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <div>
+                  <h5 className="font-headline font-bold text-white text-sm">WhatsApp Já Conectado!</h5>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Esta instância está online e pronta para disparar mensagens autônomas.
+                  </p>
+                </div>
+                
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-left space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-500">Instância:</span>
+                    <span className="text-white font-mono font-bold">{settings.automation?.evolutionInstance || 'wats'}</span>
+                  </div>
+                  {connectedInfo?.profile && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-500">Perfil:</span>
+                      <span className="text-white font-headline">{connectedInfo.profile}</span>
+                    </div>
+                  )}
+                  {connectedInfo?.number && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-500">Número:</span>
+                      <span className="text-emerald-400 font-mono font-bold">+{connectedInfo.number}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-500">Status:</span>
+                    <span className="text-emerald-400 font-bold uppercase text-[10px]">🟢 Online (Baileys)</span>
+                  </div>
+                </div>
 
-            {pairingCode && (
-              <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                <span className="text-[10px] text-zinc-400 uppercase block">Código de Pareamento:</span>
-                <span className="text-sm font-mono font-bold text-primary-fixed">{pairingCode}</span>
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDisconnect}
+                    disabled={isDisconnecting}
+                    className="w-full py-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl font-headline text-xs uppercase font-bold hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {isDisconnecting ? "Desconectando..." : "Desconectar para Conectar Outro"}
+                  </button>
+                </div>
+              </div>
+            ) : qrCodeData ? (
+              /* Estado: QR Code para Escanear */
+              <div className="space-y-4">
+                <p className="text-xs text-zinc-400">
+                  Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar Aparelho e aponte para o código:
+                </p>
+                
+                <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-xl">
+                  <img 
+                    src={qrCodeData.startsWith('data:') ? qrCodeData : `data:image/png;base64,${qrCodeData}`} 
+                    alt="WhatsApp QR Code" 
+                    className="w-48 h-48 object-contain" 
+                  />
+                </div>
+
+                {pairingCode && (
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                    <span className="text-[10px] text-zinc-400 uppercase block">Código de Pareamento:</span>
+                    <span className="text-sm font-mono font-bold text-primary-fixed">{pairingCode}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleOpenQrModal}
+                  className="w-full py-2.5 bg-white/5 border border-white/10 text-zinc-300 rounded-xl font-headline text-xs uppercase font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                  Atualizar QR Code
+                </button>
+              </div>
+            ) : (
+              /* Falha ao carregar */
+              <div className="py-6 space-y-3">
+                <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
+                <p className="text-xs text-zinc-400">
+                  Não foi possível obter o QR Code da Evolution API. Verifique a URL e a API Key digitadas.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenQrModal}
+                  className="px-4 py-2 bg-white/10 text-white rounded-xl text-xs uppercase font-bold hover:bg-white/20"
+                >
+                  Tentar Novamente
+                </button>
               </div>
             )}
 
@@ -947,11 +1207,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
               onClick={() => setShowQrModal(false)}
               className="w-full py-3 bg-white/10 text-white rounded-xl font-headline text-xs uppercase font-bold hover:bg-white/20 transition-all"
             >
-              Fechar
+              Fechar Janela
             </button>
           </div>
         </div>
       )}
+
     </div>
   );
 };

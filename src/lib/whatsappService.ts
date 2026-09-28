@@ -445,7 +445,16 @@ export const whatsappService = {
   },
 
   // 12. Obter QR Code da Evolution API
-  async fetchInstanceQrCode(customSettings?: StudioSettings): Promise<{ success: boolean; qrCodeBase64?: string; pairingCode?: string; message?: string }> {
+  async fetchInstanceQrCode(customSettings?: StudioSettings): Promise<{ 
+    success: boolean; 
+    alreadyConnected?: boolean;
+    connectedNumber?: string;
+    profileName?: string;
+    qrCodeBase64?: string; 
+    base64?: string;
+    pairingCode?: string; 
+    message?: string 
+  }> {
     try {
       const settings = await this.getSettings(customSettings);
       if (!settings?.automation?.evolutionBaseUrl || !settings.automation.evolutionInstance) {
@@ -455,6 +464,28 @@ export const whatsappService = {
       const baseUrl = settings.automation.evolutionBaseUrl.replace(/\/$/, '');
       const instance = settings.automation.evolutionInstance;
       const apiKey = settings.automation.evolutionApiKey;
+
+      // Primeiro verifica se já está conectado na Evolution API
+      try {
+        const infoRes = await fetch(`${baseUrl}/instance/fetchInstances?instanceName=${instance}`, {
+          headers: { 'apikey': apiKey || '' }
+        });
+        if (infoRes.ok) {
+          const instances = await infoRes.json();
+          const current = Array.isArray(instances) ? instances.find((i: any) => i.name === instance) : instances;
+          if (current?.connectionStatus === 'open' || current?.instance?.state === 'open') {
+            return {
+              success: true,
+              alreadyConnected: true,
+              connectedNumber: current?.ownerJid ? current.ownerJid.replace('@s.whatsapp.net', '') : undefined,
+              profileName: current?.profileName || undefined,
+              message: 'Esta instância já está conectada e operando no WhatsApp!'
+            };
+          }
+        }
+      } catch (e) {
+        // Prossegue para tentar connect diretamente
+      }
 
       const url = `${baseUrl}/instance/connect/${instance}`;
       const res = await fetch(url, {
@@ -468,12 +499,51 @@ export const whatsappService = {
       }
 
       const data = await res.json();
+
+      // Se a resposta direta indicar que o estado é open
+      if (data?.instance?.state === 'open' || data?.state === 'open') {
+        return {
+          success: true,
+          alreadyConnected: true,
+          message: 'Esta instância já está conectada e ativa no WhatsApp!'
+        };
+      }
+
       const base64 = data?.base64 || data?.qrcode?.base64 || null;
       const pairingCode = data?.pairingCode || null;
 
-      return { success: true, qrCodeBase64: base64, pairingCode };
+      return { 
+        success: true, 
+        alreadyConnected: false,
+        qrCodeBase64: base64, 
+        base64, 
+        pairingCode 
+      };
     } catch (err: any) {
       return { success: false, message: err.message || 'Erro ao conectar à API' };
+    }
+  },
+
+  // 13. Desconectar Instância da Evolution API (Logout)
+  async logoutInstance(customSettings?: StudioSettings): Promise<{ success: boolean; message?: string }> {
+    try {
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.evolutionBaseUrl || !settings.automation.evolutionInstance) {
+        return { success: false, message: 'Configurações incompletas.' };
+      }
+
+      const baseUrl = settings.automation.evolutionBaseUrl.replace(/\/$/, '');
+      const instance = settings.automation.evolutionInstance;
+      const apiKey = settings.automation.evolutionApiKey;
+
+      const res = await fetch(`${baseUrl}/instance/logout/${instance}`, {
+        method: 'DELETE',
+        headers: { 'apikey': apiKey || '' }
+      });
+
+      return { success: res.ok, message: res.ok ? 'Instância desconectada com sucesso.' : `Erro HTTP ${res.status}` };
+    } catch (err: any) {
+      return { success: false, message: err.message };
     }
   }
 };

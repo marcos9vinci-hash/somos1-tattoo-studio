@@ -464,7 +464,8 @@ export default function NovoAgendamentoWizard({
               <label className="text-sm font-semibold text-zinc-300">Data *</label>
               <input 
                 type="date" 
-                className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-fixed"
+                onClick={(e) => { try { e.currentTarget.showPicker(); } catch {} }}
+                className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-fixed cursor-pointer font-mono"
                 value={dataParte} 
                 onChange={e => handleDataChange(e.target.value)} 
                 required 
@@ -474,7 +475,8 @@ export default function NovoAgendamentoWizard({
               <label className="text-sm font-semibold text-zinc-300">Hora *</label>
               <input 
                 type="time" 
-                className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-fixed"
+                onClick={(e) => { try { e.currentTarget.showPicker(); } catch {} }}
+                className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-fixed cursor-pointer font-mono"
                 value={horaParte} 
                 onChange={e => handleHoraChange(e.target.value)} 
                 required 

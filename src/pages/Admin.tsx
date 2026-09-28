@@ -1407,15 +1407,6 @@ export default function Admin() {
                   {agendaSubTab === 'hours' && (
                     <ModuleErrorBoundary moduleName="Configuração de Horários">
                       <div className="space-y-6">
-                        <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-4">
-                          <h3 className="font-headline text-sm uppercase tracking-widest text-primary-fixed">Bloqueio Rápido de Horários</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <input type="date" value={newBlock.date} onChange={e => setNewBlock({...newBlock, date: e.target.value})} className="bg-black/50 border border-white/10 rounded-xl p-3 text-xs" />
-                            <input type="time" value={newBlock.start} onChange={e => setNewBlock({...newBlock, start: e.target.value})} className="bg-black/50 border border-white/10 rounded-xl p-3 text-xs" />
-                            <input type="time" value={newBlock.end} onChange={e => setNewBlock({...newBlock, end: e.target.value})} className="bg-black/50 border border-white/10 rounded-xl p-3 text-xs" />
-                            <button onClick={handleAddBlock} className="bg-primary-fixed text-black rounded-xl font-headline font-black uppercase text-xs py-3">Adicionar Bloqueio</button>
-                          </div>
-                        </div>
                         <AdminSettings settings={settings} setSettings={setSettings} handleUpdateSettings={handleUpdateSettings} newBlock={newBlock} setNewBlock={setNewBlock} handleAddBlock={handleAddBlock} handleRemoveBlock={handleRemoveBlock} onTestWhatsApp={handleTestWhatsApp} />
                       </div>
                     </ModuleErrorBoundary>
