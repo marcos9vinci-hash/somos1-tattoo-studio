@@ -1,29 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Somos 1 Tattoo Studio</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="icon" type="image/png" href="/somos1-logo.png" />
-    <link rel="apple-touch-icon" href="/somos1-logo-official.png" />
-    <meta name="description" content="Somos 1 Tattoo Studio - Super App Oficial de Gestão, Agenda e Galeria IA" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/somos1-icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/somos1-icon-512.png" />
+    <link rel="apple-touch-icon" href="/somos1-icon-512.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Somos 1 Tattoo Studio - Super App Oficial de Gestão, Agenda e Galeria IA" />
     <link rel="manifest" href="/manifest.json" />
   </head>
-  <body>
+  <body style="background-color: #000000; margin: 0; padding: 0;">
     <div id="root">
-      <div style="background-color: #000000; min-height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; z-index: 9999;">
-        <img src="/somos1-logo-official.png" alt="Somos 1 Tattoo Studio" style="width: 290px; max-width: 85vw; height: auto; filter: drop-shadow(0 0 30px rgba(255, 255, 255, 0.2)); animation: pulseLogo 2s infinite ease-in-out;" />
+      <div style="background-color: #000000; min-height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; z-index: 9999;">
+        <img 
+          src="/somos1-logo-official.png" 
+          alt="Somos 1 Tattoo Studio" 
+          style="width: 85vw; max-width: 440px; height: auto; object-fit: contain; filter: drop-shadow(0 0 40px rgba(255, 255, 255, 0.25)); animation: pulseLogo 2s infinite ease-in-out;" 
+        />
       </div>
       <style>
         @keyframes pulseLogo {
-          0%, 100% { opacity: 0.88; transform: scale(0.98); }
-          50% { opacity: 1; transform: scale(1.02); }
+          0%, 100% { opacity: 0.9; transform: scale(0.98); }
+          50% { opacity: 1; transform: scale(1.01); }
         }
       </style>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

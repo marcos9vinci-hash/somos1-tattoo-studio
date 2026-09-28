@@ -82,13 +82,15 @@ export default function Login() {
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 text-center"
+          className="mb-6 text-center"
         >
-          <img 
-            src="/somos1-logo-official.png" 
-            alt="Somos 1 Tattoo Studio" 
-            className="w-56 sm:w-64 max-w-[80vw] h-auto object-contain mx-auto mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]" 
-          />
+          <div className="relative mx-auto mb-6 flex justify-center">
+            <img 
+              src="/somos1-logo-official.png" 
+              alt="Somos 1 Tattoo Studio" 
+              className="w-64 sm:w-72 max-w-[85vw] h-auto object-contain mx-auto drop-shadow-[0_0_35px_rgba(255,255,255,0.25)]" 
+            />
+          </div>
           <h1 className="font-headline text-3xl font-black text-foreground mb-2 leading-tight">Informe seu telefone</h1>
           <p className="text-sm text-muted-foreground">
             Acesse sua conta do Somos 1 Tattoo Studio.

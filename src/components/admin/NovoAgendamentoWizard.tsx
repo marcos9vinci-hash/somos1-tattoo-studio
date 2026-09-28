@@ -231,8 +231,13 @@ export default function NovoAgendamentoWizard({
         >
           <X className="w-5 h-5" />
         </button>
-        
-        <h2 className="text-xl font-bold text-white mb-6 uppercase font-headline tracking-wide">Novo Agendamento</h2>
+        <div className="flex items-center gap-3.5 mb-6">
+          <img src="/somos1-logo-official.png" alt="Somos 1" className="w-12 h-12 object-contain rounded-xl bg-black p-1 border border-white/10 shadow-md drop-shadow-[0_0_10px_rgba(255,255,255,0.15)]" />
+          <div>
+            <h2 className="text-xl font-bold text-white uppercase font-headline tracking-wide leading-none">Novo Agendamento</h2>
+            <p className="text-[10px] text-primary-fixed font-headline font-bold uppercase tracking-widest mt-1">Somos 1 Tattoo Studio</p>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Cliente */}

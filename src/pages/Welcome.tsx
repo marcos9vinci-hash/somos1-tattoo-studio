@@ -145,7 +145,7 @@ export default function Welcome() {
             <img 
               src="/somos1-logo-official.png" 
               alt="Somos 1 Tattoo Studio" 
-              className="relative w-48 sm:w-56 h-auto object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.25)]" 
+              className="relative w-64 sm:w-72 max-w-[85vw] h-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.25)]" 
             />
           </div>
         </div>
