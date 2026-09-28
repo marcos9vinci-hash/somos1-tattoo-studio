@@ -53,3 +53,12 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// Registro do Service Worker para suporte de instalação PWA oficial
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.log('[PWA] Service Worker registration skipped:', err);
+    });
+  });
+}
