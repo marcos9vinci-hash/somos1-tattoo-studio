@@ -130,22 +130,23 @@ export default function Welcome() {
     <div className="bg-background text-on-background font-sans min-h-screen">
       <header className="bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 w-full px-6 py-4 sticky top-0 z-50 flex justify-between items-center shadow-[0_0_20px_rgba(204,255,0,0.05)]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden border border-primary-fixed/30">
-            <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-               <UserPlus className="text-primary-fixed w-5 h-5" />
-            </div>
+          <img src="/somos1-logo-official.png" alt="Somos 1 Tattoo Studio" className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+          <div className="flex flex-col">
+            <span className="text-base font-black text-white tracking-wider font-headline uppercase leading-none">SOMOS 1</span>
+            <span className="text-[9px] font-bold text-primary-fixed uppercase tracking-widest leading-tight">Tattoo Studio</span>
           </div>
-          <div className="text-xl font-bold font-headline tracking-widest text-primary-fixed">INK CIRCLE</div>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-6 pt-12 pb-32">
-        <div className="flex flex-col items-center mb-10">
+      <main className="max-w-md mx-auto px-6 pt-10 pb-32">
+        <div className="flex flex-col items-center mb-8">
           <div className="relative">
-            <div className="absolute inset-0 bg-primary-fixed/20 blur-3xl rounded-full"></div>
-            <div className="relative w-24 h-24 flex items-center justify-center glass-panel rounded-full border-primary-fixed/40">
-              <Star className="text-primary-fixed w-12 h-12 fill-primary-fixed" />
-            </div>
+            <div className="absolute inset-0 bg-white/5 blur-3xl rounded-full"></div>
+            <img 
+              src="/somos1-logo-official.png" 
+              alt="Somos 1 Tattoo Studio" 
+              className="relative w-48 sm:w-56 h-auto object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.25)]" 
+            />
           </div>
         </div>
 

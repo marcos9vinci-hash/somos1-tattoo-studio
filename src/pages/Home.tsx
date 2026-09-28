@@ -70,28 +70,37 @@ export default function Home() {
     <div className="bg-background text-on-surface font-sans min-h-screen pb-32">
       <header className="fixed top-0 z-50 w-full flex justify-between items-center px-6 py-4 bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 shadow-[0_0_20px_rgba(204,255,0,0.05)]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary-fixed overflow-hidden bg-zinc-800 flex items-center justify-center">
+          <img src="/somos1-logo-official.png" alt="Somos 1 Tattoo Studio" className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+          <div className="flex flex-col">
+            <span className="text-base font-black text-white tracking-wider font-headline uppercase leading-none">SOMOS 1</span>
+            <span className="text-[9px] font-bold text-primary-fixed uppercase tracking-widest leading-tight">Tattoo Studio</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div 
+            onClick={() => navigate('/profile')} 
+            className="w-9 h-9 rounded-full border border-white/20 overflow-hidden bg-zinc-800 flex items-center justify-center cursor-pointer hover:border-primary-fixed transition-colors"
+          >
             {profile?.avatar ? (
               <img alt="Profile" className="w-full h-full object-cover" src={profile.avatar} />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-primary-fixed font-bold font-headline">
+              <div className="w-full h-full flex items-center justify-center text-primary-fixed font-bold font-headline text-xs">
                 {profile?.name?.charAt(0) || 'U'}
               </div>
             )}
           </div>
-          <span className="text-xl font-black text-white tracking-widest font-headline uppercase">INK VIP</span>
+          <button 
+            onClick={() => navigate('/notifications')}
+            className="relative text-primary-fixed hover:bg-white/5 p-2 rounded-full transition-colors"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full border-2 border-zinc-950 flex items-center justify-center text-[8px] font-black text-white scale-110">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
         </div>
-        <button 
-          onClick={() => navigate('/notifications')}
-          className="relative text-primary-fixed hover:bg-white/5 p-2 rounded-full transition-colors"
-        >
-          <Bell className="w-6 h-6" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full border-2 border-zinc-950 flex items-center justify-center text-[8px] font-black text-white scale-110">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </button>
       </header>
 
       <main className="pt-24 px-6 max-w-7xl mx-auto space-y-6">

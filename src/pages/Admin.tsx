@@ -23,6 +23,7 @@ import GaleriaIA from './GaleriaIA';
 import ReferralTree from '../components/network/ReferralTree';
 import { buildReferralTree } from '../lib/referralUtils';
 import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
+import SplashScreen from '../components/layout/SplashScreen';
 
 // Error Boundary isolador por módulo
 class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: string }, { hasError: boolean; error: Error | null }> {
@@ -485,8 +486,8 @@ export default function Admin() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <div className="flex items-center gap-2.5">
-                <img src="/somos1-logo-official.png" alt="Somos 1 Tattoo Studio" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border shadow-xs" />
+              <div className="flex items-center gap-3">
+                <img src="/somos1-logo-official.png" alt="Somos 1 Tattoo Studio" className="w-10 h-10 rounded-xl object-contain bg-black p-1 border border-white/10 shadow-md drop-shadow-[0_0_8px_rgba(255,255,255,0.15)]" />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-headline font-black text-sm tracking-wider text-foreground">SOMOS 1</span>
@@ -945,8 +946,8 @@ export default function Admin() {
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsMobileDrawerOpen(false)} />
           <div className="relative w-80 max-w-[85%] bg-card border-r border-border p-5 flex flex-col h-full z-10 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2.5">
-                <img src="/somos1-logo-official.png" alt="Somos 1" className="w-8 h-8 rounded-lg object-contain bg-background p-0.5 border border-border shadow-xs" />
+              <div className="flex items-center gap-3">
+                <img src="/somos1-logo-official.png" alt="Somos 1" className="w-10 h-10 rounded-xl object-contain bg-black p-1 border border-white/10 shadow-md drop-shadow-[0_0_8px_rgba(255,255,255,0.15)]" />
                 <div>
                   <h3 className="font-headline font-black text-xs text-foreground">SOMOS 1 TATTOO</h3>
                   <p className="text-[8px] text-muted-foreground uppercase font-headline tracking-wider">Studio Central</p>
@@ -1292,9 +1293,7 @@ export default function Admin() {
         {/* VIEWPORT BODY */}
         <main className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
           {loading ? (
-            <div className="text-center py-20 text-zinc-500 font-headline uppercase tracking-widest animate-pulse">
-              Carregando Módulos do Super-App...
-            </div>
+            <SplashScreen message="Carregando Somos 1 Super-App..." />
           ) : (
             <div>
               

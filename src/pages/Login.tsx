@@ -72,13 +72,13 @@ export default function Login() {
       
       <header className="w-full max-w-md px-6 py-6 flex items-center justify-between border-b border-border/40">
         <div className="flex items-center gap-2">
-          <img src="/somos1-logo.png" alt="Somos 1" className="w-7 h-7 object-contain" />
+          <img src="/somos1-logo-official.png" alt="Somos 1" className="w-8 h-8 object-contain" />
           <span className="font-headline font-black text-xs text-foreground tracking-wider uppercase">Somos 1 Tattoo</span>
         </div>
         <ThemeToggleButton />
       </header>
 
-      <main className="flex-1 w-full max-w-md px-6 pt-8 pb-20 flex flex-col">
+      <main className="flex-1 w-full max-w-md px-6 pt-6 pb-20 flex flex-col">
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -87,7 +87,7 @@ export default function Login() {
           <img 
             src="/somos1-logo-official.png" 
             alt="Somos 1 Tattoo Studio" 
-            className="h-16 w-auto object-contain mx-auto mb-4" 
+            className="w-56 sm:w-64 max-w-[80vw] h-auto object-contain mx-auto mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]" 
           />
           <h1 className="font-headline text-3xl font-black text-foreground mb-2 leading-tight">Informe seu telefone</h1>
           <p className="text-sm text-muted-foreground">

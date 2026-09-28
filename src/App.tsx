@@ -19,11 +19,12 @@ import BottomNav from './components/layout/BottomNav';
 import TestCRM from './pages/TestCRM';
 import GaleriaIA from './pages/GaleriaIA';
 import TattooEngineModule from './components/studio/TattooEngineModule';
+import SplashScreen from './components/layout/SplashScreen';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, profile } = useAuth();
   
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background text-primary">Carregando...</div>;
+  if (loading) return <SplashScreen message="Carregando Somos 1..." />;
   if (!user) return <Navigate to="/login" />;
   if (!profile) return <Navigate to="/welcome" />;
   
