@@ -16,7 +16,9 @@ import { cn } from '../lib/utils';
 import AdminDashboard from './AdminDashboard';
 import { creditService } from '../lib/creditService';
 import UnifiedCalendar from '../components/admin/UnifiedCalendar';
-import { AdminSettings } from '../components/admin/AdminSettings';
+import { AgendaScheduleSettings } from '../components/admin/AgendaScheduleSettings';
+import { WhatsAppAutomationModule } from '../components/admin/WhatsAppAutomationModule';
+import { WhatsAppTemplatesModule } from '../components/admin/WhatsAppTemplatesModule';
 import { whatsappService } from '../lib/whatsappService';
 import TattooEngineModule from '../components/studio/TattooEngineModule';
 import GaleriaIA from './GaleriaIA';
@@ -68,7 +70,7 @@ class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: s
 type MainModule = 'agenda' | 'indicaai' | 'studio' | 'galeria' | 'system';
 type AgendaSubTab = 'calendar' | 'members' | 'hours';
 type IndicaSubTab = 'dashboard' | 'credits' | 'campaigns' | 'invites' | 'rules' | 'tree';
-type SystemSubTab = 'whatsapp' | 'logs';
+type SystemSubTab = 'automation' | 'templates' | 'logs';
 
 export default function Admin() {
   const { isAdmin, user } = useAuth();
@@ -85,7 +87,7 @@ export default function Admin() {
   const [currentModule, setCurrentModule] = useState<MainModule>('agenda');
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>('calendar');
   const [indicaSubTab, setIndicaSubTab] = useState<IndicaSubTab>('dashboard');
-  const [systemSubTab, setSystemSubTab] = useState<SystemSubTab>('whatsapp');
+  const [systemSubTab, setSystemSubTab] = useState<SystemSubTab>('automation');
   const [galeriaSubTab, setGaleriaSubTab] = useState<'calendario' | 'agendamentos' | 'insights' | 'trimestre' | 'estudio' | 'automacao'>('calendario');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -230,11 +232,13 @@ export default function Admin() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(whatsappService.formatMessage(template, booking))}`, '_blank');
   };
 
-  const handleUpdateSettings = async () => {
+  const handleUpdateSettings = async (e?: React.FormEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
     try {
       const finalSettings = {
         ...settings,
         durations: settings.durations || { Pequena: 60, Média: 120, Grande: 240 },
+        blockedDates: settings.blockedDates || [],
         blockedIntervals: settings.blockedIntervals || [],
         allowIndicatorBooking: settings.allowIndicatorBooking ?? true,
         allowArtistBooking: settings.allowArtistBooking ?? true,
@@ -446,12 +450,15 @@ export default function Admin() {
     setNewBlock({ date: '', start: '', end: '', label: '' });
   };
   const handleRemoveBlock = (idx: number) => { setSettings({ ...settings, blockedIntervals: settings.blockedIntervals.filter((_, i) => i !== idx) }); };
-  const handleTestWhatsApp = async () => {
-    const ph = prompt("Número com DDD (Ex: 11999998888):");
-    if (!ph) return;
-    alert("Iniciando teste...");
-    if (await whatsappService.sendMessage(ph, "🚀 Teste de Automação do IndicaAi!", settings)) alert("✅ Enviado!");
-    else alert("❌ Falha no envio.");
+  const handleTestWhatsApp = async (targetPhone?: string, testMsg?: string): Promise<boolean> => {
+    let ph = targetPhone;
+    if (!ph) {
+      ph = prompt("Número com DDD (Ex: 11999998888):") || '';
+    }
+    if (!ph) return false;
+    const msg = testMsg || "🚀 Teste de Automação do Somos 1 Tattoo Studio!";
+    const ok = await whatsappService.sendMessage(ph, msg, settings);
+    return ok;
   };
 
   const getStatusColor = (s: BookingStatus) => {
@@ -895,16 +902,30 @@ export default function Admin() {
               <div className="p-2 pt-0 space-y-1 animate-in slide-in-from-top-2 duration-200">
                 <button
                   type="button"
-                  onClick={() => { setCurrentModule('system'); setSystemSubTab('whatsapp'); }}
+                  onClick={() => { setCurrentModule('system'); setSystemSubTab('automation'); }}
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
-                    currentModule === 'system' && systemSubTab === 'whatsapp'
+                    currentModule === 'system' && systemSubTab === 'automation'
+                      ? "bg-foreground text-background shadow-xs font-black"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>Automação Evolution API</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setCurrentModule('system'); setSystemSubTab('templates'); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
+                    currentModule === 'system' && systemSubTab === 'templates'
                       ? "bg-foreground text-background shadow-xs font-black"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Robô WhatsApp 24/7</span>
+                  <span>Modelos de Mensagem</span>
                 </button>
 
                 <button
@@ -1020,10 +1041,16 @@ export default function Admin() {
               </div>
 
               {/* Sistema */}
-              <div className="border border-border rounded-xl p-2 bg-muted/20">
-                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">5. Infraestrutura</p>
-                <button onClick={() => { setCurrentModule('system'); setSystemSubTab('whatsapp'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
-                  <MessageSquare className="w-3.5 h-3.5 text-foreground" /> WhatsApp 24/7 & Logs
+              <div className="border border-border rounded-xl p-2 bg-muted/20 space-y-1">
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">5. Infraestrutura & WhatsApp</p>
+                <button onClick={() => { setCurrentModule('system'); setSystemSubTab('automation'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Bot className="w-3.5 h-3.5 text-foreground" /> Automação Evolution API
+                </button>
+                <button onClick={() => { setCurrentModule('system'); setSystemSubTab('templates'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <MessageSquare className="w-3.5 h-3.5 text-foreground" /> Modelos de Mensagem
+                </button>
+                <button onClick={() => { setCurrentModule('system'); setSystemSubTab('logs'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <Terminal className="w-3.5 h-3.5 text-foreground" /> Logs do Robô
                 </button>
               </div>
             </div>
@@ -1265,13 +1292,23 @@ export default function Admin() {
                 <>
                   <button
                     type="button"
-                    onClick={() => setSystemSubTab('whatsapp')}
+                    onClick={() => setSystemSubTab('automation')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
-                      systemSubTab === 'whatsapp' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
+                      systemSubTab === 'automation' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
                     )}
                   >
-                    <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Automação WhatsApp 24/7
+                    <Bot className="w-3.5 h-3.5 inline mr-1.5" /> Automação Evolution API
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSystemSubTab('templates')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      systemSubTab === 'templates' ? "bg-foreground text-background border-foreground shadow-xs" : "text-muted-foreground border-border bg-card hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Modelos de Mensagem
                   </button>
                   <button
                     type="button"
@@ -1405,9 +1442,13 @@ export default function Admin() {
                   )}
 
                   {agendaSubTab === 'hours' && (
-                    <ModuleErrorBoundary moduleName="Configuração de Horários">
+                    <ModuleErrorBoundary moduleName="Configuração de Horários & Bloqueios">
                       <div className="space-y-6">
-                        <AdminSettings settings={settings} setSettings={setSettings} handleUpdateSettings={handleUpdateSettings} newBlock={newBlock} setNewBlock={setNewBlock} handleAddBlock={handleAddBlock} handleRemoveBlock={handleRemoveBlock} onTestWhatsApp={handleTestWhatsApp} />
+                        <AgendaScheduleSettings 
+                          settings={settings} 
+                          setSettings={setSettings} 
+                          handleUpdateSettings={handleUpdateSettings} 
+                        />
                       </div>
                     </ModuleErrorBoundary>
                   )}
@@ -1675,9 +1716,24 @@ export default function Admin() {
               {/* ==================== MÓDULO 5: SISTEMA & WHATSAPP ==================== */}
               {currentModule === 'system' && (
                 <div className="space-y-6">
-                  {systemSubTab === 'whatsapp' && (
-                    <ModuleErrorBoundary moduleName="Automação WhatsApp">
-                      <AdminSettings settings={settings} setSettings={setSettings} handleUpdateSettings={handleUpdateSettings} newBlock={newBlock} setNewBlock={setNewBlock} handleAddBlock={handleAddBlock} handleRemoveBlock={handleRemoveBlock} onTestWhatsApp={handleTestWhatsApp} />
+                  {systemSubTab === 'automation' && (
+                    <ModuleErrorBoundary moduleName="Automação Evolution API">
+                      <WhatsAppAutomationModule 
+                        settings={settings} 
+                        setSettings={setSettings} 
+                        handleUpdateSettings={handleUpdateSettings} 
+                        onTestWhatsApp={handleTestWhatsApp} 
+                      />
+                    </ModuleErrorBoundary>
+                  )}
+
+                  {systemSubTab === 'templates' && (
+                    <ModuleErrorBoundary moduleName="Modelos de Mensagem WhatsApp">
+                      <WhatsAppTemplatesModule 
+                        settings={settings} 
+                        setSettings={setSettings} 
+                        handleUpdateSettings={handleUpdateSettings} 
+                      />
                     </ModuleErrorBoundary>
                   )}
 
