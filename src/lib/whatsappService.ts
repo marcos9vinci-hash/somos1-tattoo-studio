@@ -30,22 +30,6 @@ function parseBookingDateTime(dateStr?: string, timeStr?: string): Date {
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
-function isValidPhone(phone: string): boolean {
-  if (!phone) return false;
-  const digits = phone.replace(/\D/g, '');
-  return digits.length >= 10 && digits.length <= 14;
-}
-
-function isAppointmentPresentOrFuture(dateStr?: string, timeStr?: string): boolean {
-  if (!dateStr) return false;
-  const apptDate = parseBookingDateTime(dateStr, timeStr);
-  if (isNaN(apptDate.getTime())) return false;
-
-  // Tolerância de 15 minutos para caso o agendamento seja marcado para o horário atual
-  const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000;
-  return apptDate.getTime() >= fifteenMinutesAgo;
-}
-
 export const whatsappService = {
   async sendViaN8n(payload: {
     to: string;
@@ -54,20 +38,8 @@ export const whatsappService = {
     delay_seconds?: number;
     delayAmount?: number;
     delayUnit?: string;
-    trigger_time?: string;
-    booking_date?: string;
-    booking_time?: string;
-    reminder_value?: number;
-    reminder_unit?: string;
-    followup_value?: number;
-    followup_unit?: string;
     instance?: string;
   }) {
-    if (!payload.to || !isValidPhone(payload.to)) {
-      console.warn("🔒 [WhatsApp Service] Disparo bloqueado: telefone inválido ou ausente.");
-      return false;
-    }
-
     const rawPhone = payload.to.replace(/\D/g, '');
     const formattedPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
@@ -80,15 +52,8 @@ export const whatsappService = {
           phone: formattedPhone,
           message: payload.text,
           delay_seconds: payload.delay_seconds || 0,
-          delayAmount: payload.delayAmount || payload.delay_seconds || 0,
-          delayUnit: payload.delayUnit || 'seconds',
-          trigger_time: payload.trigger_time,
-          booking_date: payload.booking_date,
-          booking_time: payload.booking_time,
-          reminder_value: payload.reminder_value,
-          reminder_unit: payload.reminder_unit,
-          followup_value: payload.followup_value,
-          followup_unit: payload.followup_unit,
+          delayAmount: payload.delayAmount || 0,
+          delayUnit: payload.delayUnit || 'minutes',
           instance: payload.instance || 'wats'
         })
       });
@@ -163,25 +128,9 @@ export const whatsappService = {
   },
 
   // 1. Confirmação
-  async sendBookingConfirmation(
-    booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string },
-    customSettings?: StudioSettings,
-    options?: { explicitUserClick?: boolean }
-  ) {
+  async sendBookingConfirmation(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, customSettings?: StudioSettings) {
     try {
-      // TRAVA 1: Só dispara se o usuário clicou no botão do app
-      if (options?.explicitUserClick !== true) {
-        console.warn("🔒 [Segurança Anti-Bugs] Disparo bloqueado: confirmação só pode ser acionada pelo clique ativo no botão do app.");
-        return false;
-      }
-
-      // TRAVA 2: Bloqueia agendamentos fora da data presente/futura
-      if (!isAppointmentPresentOrFuture(booking.date, booking.time)) {
-        console.warn(`🔒 [Segurança Anti-Bugs] Disparo bloqueado: data do agendamento (${booking.date} às ${booking.time}) pertence ao passado.`);
-        return false;
-      }
-
-      if (!booking.userPhone || !isValidPhone(booking.userPhone)) return false;
+      if (!booking.userPhone) return false;
       const settings = await this.getSettings(customSettings);
       if (!settings?.automation?.enabled) return false;
 
@@ -190,8 +139,6 @@ export const whatsappService = {
         to: booking.userPhone,
         text: this.formatMessage(template, booking as Booking),
         action: 'confirmacao',
-        booking_date: booking.date,
-        booking_time: booking.time,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
@@ -209,25 +156,9 @@ export const whatsappService = {
   },
 
   // 2. Reagendamento
-  async sendBookingReschedule(
-    booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string },
-    customSettings?: StudioSettings,
-    options?: { explicitUserClick?: boolean }
-  ) {
+  async sendBookingReschedule(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, customSettings?: StudioSettings) {
     try {
-      // TRAVA 1: Só dispara se o usuário clicou no botão do app
-      if (options?.explicitUserClick !== true) {
-        console.warn("🔒 [Segurança Anti-Bugs] Disparo bloqueado: reagendamento só pode ser acionado pelo clique ativo no botão do app.");
-        return false;
-      }
-
-      // TRAVA 2: Bloqueia reagendamentos fora da data presente/futura
-      if (!isAppointmentPresentOrFuture(booking.date, booking.time)) {
-        console.warn(`🔒 [Segurança Anti-Bugs] Disparo bloqueado: data do reagendamento (${booking.date} às ${booking.time}) pertence ao passado.`);
-        return false;
-      }
-
-      if (!booking.userPhone || !isValidPhone(booking.userPhone)) return false;
+      if (!booking.userPhone) return false;
       const settings = await this.getSettings(customSettings);
       if (!settings?.automation?.enabled) return false;
 
@@ -239,8 +170,6 @@ export const whatsappService = {
         to: booking.userPhone,
         text: this.formatMessage(template, booking as Booking),
         action: 'reagendamento',
-        booking_date: booking.date,
-        booking_time: booking.time,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
@@ -265,26 +194,14 @@ export const whatsappService = {
       if (!settings?.automation?.enabled || !settings.automation.reminderEnabled) return false;
 
       let calculatedDelaySec = delaySeconds;
-      const bookingDate = parseBookingDateTime(booking.date, booking.time);
-      const reminderValue = settings.automation.reminderValue ?? 2;
-      const reminderUnit = settings.automation.reminderUnit || 'minutes';
-      const reminderLeadMs = unitToMilliseconds(reminderValue, reminderUnit);
-      const triggerTimeMs = bookingDate.getTime() - reminderLeadMs;
-      const diffMs = triggerTimeMs - Date.now();
-
       if (typeof calculatedDelaySec === 'undefined') {
-        // Se a data do agendamento for no presente/futuro mas a margem de antecedência já passou
-        // (exemplo clássico de teste rápido onde a sessão é marcada para dali a 1 ou 2 minutos):
-        // NÃO descarta! Dispara após 20 segundos para que a notificação chegue no teste!
-        if (diffMs <= 0) {
-          calculatedDelaySec = 20;
-          console.log(`🔔 [WhatsApp Service] Lembrete em teste rápido/agendamento iminente: disparando em 20s.`);
-        } else {
-          calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
-        }
+        const bookingDate = parseBookingDateTime(booking.date, booking.time);
+        const reminderLeadMs = unitToMilliseconds(settings.automation.reminderValue || 2, settings.automation.reminderUnit || 'minutes');
+        const triggerTime = bookingDate.getTime() - reminderLeadMs;
+        calculatedDelaySec = Math.max(1, Math.round((triggerTime - Date.now()) / 1000));
       }
 
-      console.log(`🔔 [WhatsApp Service] Disparando Campainha de Lembrete: delay = ${calculatedDelaySec}s (${reminderValue} ${reminderUnit} antes de ${booking.date} às ${booking.time})`);
+      console.log(`🔔 [WhatsApp Service] Disparando Campainha de Lembrete: delay = ${calculatedDelaySec}s`);
 
       const template = settings.whatsappTemplates?.lembrete || "⏰ Oi {cliente}, passando para lembrar da sua sessão no dia {data} às {horario}!";
       const success = await this.sendViaN8n({
@@ -292,13 +209,6 @@ export const whatsappService = {
         text: this.formatMessage(template, booking as Booking),
         action: 'lembrete',
         delay_seconds: calculatedDelaySec,
-        delayAmount: calculatedDelaySec,
-        delayUnit: 'seconds',
-        trigger_time: new Date(triggerTimeMs).toISOString(),
-        booking_date: booking.date,
-        booking_time: booking.time,
-        reminder_value: reminderValue,
-        reminder_unit: reminderUnit,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
@@ -317,23 +227,14 @@ export const whatsappService = {
       if (!settings?.automation?.enabled || !settings.automation.followUpEnabled) return false;
 
       let calculatedDelaySec = delaySeconds;
-      const bookingDate = parseBookingDateTime(booking.date, booking.time);
-      const followUpValue = settings.automation.followUpValue ?? 2;
-      const followUpUnit = settings.automation.followUpUnit || 'minutes';
-      const followUpDelayMs = unitToMilliseconds(followUpValue, followUpUnit);
-      const triggerTimeMs = bookingDate.getTime() + followUpDelayMs;
-      const diffMs = triggerTimeMs - Date.now();
-
       if (typeof calculatedDelaySec === 'undefined') {
-        // Se já passou do horário estipulado, coloca 60 segundos
-        if (diffMs <= 0) {
-          calculatedDelaySec = 60;
-        } else {
-          calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
-        }
+        const bookingDate = parseBookingDateTime(booking.date, booking.time);
+        const followUpDelayMs = unitToMilliseconds(settings.automation.followUpValue || 2, settings.automation.followUpUnit || 'minutes');
+        const triggerTime = bookingDate.getTime() + followUpDelayMs;
+        calculatedDelaySec = Math.max(1, Math.round((triggerTime - Date.now()) / 1000));
       }
 
-      console.log(`💬 [WhatsApp Service] Disparando Campainha de Follow-up: delay = ${calculatedDelaySec}s (${followUpValue} ${followUpUnit} após ${booking.date} às ${booking.time})`);
+      console.log(`💬 [WhatsApp Service] Disparando Campainha de Follow-up: delay = ${calculatedDelaySec}s`);
 
       const template = settings.whatsappTemplates?.followup || "✨ Olá {cliente}, como está a cicatrização da sua arte? Qualquer dúvida estamos à disposição!";
       const success = await this.sendViaN8n({
@@ -341,13 +242,6 @@ export const whatsappService = {
         text: this.formatMessage(template, booking as Booking),
         action: 'followup',
         delay_seconds: calculatedDelaySec,
-        delayAmount: calculatedDelaySec,
-        delayUnit: 'seconds',
-        trigger_time: new Date(triggerTimeMs).toISOString(),
-        booking_date: booking.date,
-        booking_time: booking.time,
-        followup_value: followUpValue,
-        followup_unit: followUpUnit,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
@@ -359,39 +253,15 @@ export const whatsappService = {
   },
 
   // 5. Ciclo Completo (Disparo Campainha n8n)
-  async triggerBookingLifecycle(
-    booking: Booking, 
-    isReschedule: boolean = false, 
-    customSettings?: StudioSettings,
-    options?: { explicitUserClick?: boolean }
-  ) {
-    // TRAVA 1: Só dispara se o usuário clicou no botão do app
-    if (options?.explicitUserClick !== true) {
-      console.warn("🔒 [Segurança Anti-Bugs] Disparo do ciclo abortado: requer clique ativo do usuário no app.");
-      return { scheduled: false, reason: 'Requires explicit user click' };
-    }
-
-    // TRAVA 2: Bloqueia agendamentos fora da data presente/futura
-    if (!isAppointmentPresentOrFuture(booking.date, booking.time)) {
-      console.warn(`🔒 [Segurança Anti-Bugs] Disparo abortado: agendamento (${booking.date} às ${booking.time}) pertence ao passado.`);
-      return { scheduled: false, reason: 'Past booking rejected' };
-    }
-
+  async triggerBookingLifecycle(booking: Booking, isReschedule: boolean = false, customSettings?: StudioSettings) {
     const settings = await this.getSettings(customSettings);
     if (!settings?.automation?.enabled) return { scheduled: false, reason: 'Automation disabled' };
 
-    // GUARDRAIL: Validar se telefone do cliente é válido
-    const targetPhone = booking.userPhone || (booking as any).clientPhone || '';
-    if (!isValidPhone(targetPhone)) {
-      console.warn("🔒 [WhatsApp Service] Disparo abortado: telefone de destino inválido ou vazio.");
-      return { scheduled: false, reason: 'Invalid phone' };
-    }
-
-    // Imediato: Confirmação ou Reagendamento (disparo direto com trava de clique)
+    // Imediato: Confirmação ou Reagendamento
     if (isReschedule) {
-      await this.sendBookingReschedule(booking, settings, { explicitUserClick: true });
+      await this.sendBookingReschedule(booking, settings);
     } else if (settings.automation.confirmationEnabled) {
-      await this.sendBookingConfirmation(booking, settings, { explicitUserClick: true });
+      await this.sendBookingConfirmation(booking, settings);
     }
 
     // Programado: Lembrete (com o tempo de antecedência configurado no app)
@@ -405,5 +275,206 @@ export const whatsappService = {
     }
 
     return { scheduled: true };
+  },
+
+  // 6. Mensagem de Aniversário (CRM)
+  async sendBirthdayMessage(client: { name: string; phone?: string; telefone?: string }, couponCode: string = 'NIVER10', customSettings?: StudioSettings) {
+    try {
+      const phone = client.phone || client.telefone;
+      if (!phone) return false;
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.enabled) return false;
+
+      const template = settings.whatsappTemplates?.aniversario || 
+        "🎂 Parabéns {cliente}! O Somos 1 Tattoo Studio deseja um feliz aniversário! Use o cupom {cupom} para um desconto especial na sua próxima tattoo.";
+      
+      const text = template
+        .replace(/{cliente}/g, client.name || 'Cliente')
+        .replace(/{primeiro_nome}/g, (client.name || 'Cliente').split(' ')[0])
+        .replace(/{cupom}/g, couponCode);
+
+      return await this.sendViaN8n({
+        to: phone,
+        text,
+        action: 'aniversario',
+        instance: settings.automation?.evolutionInstance || 'wats'
+      });
+    } catch (err) {
+      console.error("Erro mensagem de aniversário:", err);
+      return false;
+    }
+  },
+
+  // 7. Reativação de Clientes Sumidos (CRM)
+  async sendReactivationMessage(client: { name: string; phone?: string; telefone?: string; daysInactive?: number }, customSettings?: StudioSettings) {
+    try {
+      const phone = client.phone || client.telefone;
+      if (!phone) return false;
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.enabled) return false;
+
+      const template = settings.whatsappTemplates?.reativacao || 
+        "🔥 Olá {primeiro_nome}, faz um tempinho que não te vemos no Somos 1 Tattoo Studio! Que tal tirar aquele projeto do papel? Respondendo essa mensagem você ganha prioridade na agenda!";
+      
+      const text = template
+        .replace(/{cliente}/g, client.name || 'Cliente')
+        .replace(/{primeiro_nome}/g, (client.name || 'Cliente').split(' ')[0])
+        .replace(/{dias_sem_vir}/g, String(client.daysInactive || 45));
+
+      return await this.sendViaN8n({
+        to: phone,
+        text,
+        action: 'reativacao',
+        instance: settings.automation?.evolutionInstance || 'wats'
+      });
+    } catch (err) {
+      console.error("Erro mensagem de reativação:", err);
+      return false;
+    }
+  },
+
+  // 8. Previsão de Retorno / Retoque / Manutenção
+  async sendReturningMessage(client: { name: string; phone?: string; telefone?: string; serviceName?: string }, customSettings?: StudioSettings) {
+    try {
+      const phone = client.phone || client.telefone;
+      if (!phone) return false;
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.enabled) return false;
+
+      const template = settings.whatsappTemplates?.retorno || 
+        "🌿 Oi {primeiro_nome}, tudo bem? Passando para checar se sua arte precisa de retoque ou manutenção periódica. Vamos agendar?";
+      
+      const text = template
+        .replace(/{cliente}/g, client.name || 'Cliente')
+        .replace(/{primeiro_nome}/g, (client.name || 'Cliente').split(' ')[0])
+        .replace(/{servico}/g, client.serviceName || 'tatuagem');
+
+      return await this.sendViaN8n({
+        to: phone,
+        text,
+        action: 'retorno',
+        instance: settings.automation?.evolutionInstance || 'wats'
+      });
+    } catch (err) {
+      console.error("Erro mensagem de retorno:", err);
+      return false;
+    }
+  },
+
+  // 9. Notificação de Vaga na Lista de Espera
+  async sendWaitingListNotification(client: { name: string; phone?: string; telefone?: string }, slotInfo: { date: string; time: string; artist?: string }, customSettings?: StudioSettings) {
+    try {
+      const phone = client.phone || client.telefone;
+      if (!phone) return false;
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.enabled) return false;
+
+      const template = settings.whatsappTemplates?.lista_espera || 
+        "⚡ Olá {primeiro_nome}! Uma vaga que você aguardava acabou de abrir para {data} às {horario} com {profissional}. Deseja confirmar?";
+      
+      const text = template
+        .replace(/{cliente}/g, client.name || 'Cliente')
+        .replace(/{primeiro_nome}/g, (client.name || 'Cliente').split(' ')[0])
+        .replace(/{data}/g, slotInfo.date.split('-').reverse().join('/'))
+        .replace(/{horario}/g, slotInfo.time)
+        .replace(/{profissional}/g, slotInfo.artist || 'Markinhos');
+
+      return await this.sendViaN8n({
+        to: phone,
+        text,
+        action: 'lista_espera',
+        instance: settings.automation?.evolutionInstance || 'wats'
+      });
+    } catch (err) {
+      console.error("Erro mensagem de lista de espera:", err);
+      return false;
+    }
+  },
+
+  // 10. Aviso de Cancelamento
+  async sendBookingCancellation(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, customSettings?: StudioSettings) {
+    try {
+      if (!booking.userPhone) return false;
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.enabled) return false;
+
+      const template = settings.whatsappTemplates?.cancelamento || 
+        "❌ Olá {cliente}, seu agendamento do dia {data} às {horario} foi cancelado. Se desejar remarcar, estamos à disposição!";
+
+      return await this.sendViaN8n({
+        to: booking.userPhone,
+        text: this.formatMessage(template, booking as Booking),
+        action: 'cancelamento',
+        instance: settings.automation?.evolutionInstance || 'wats'
+      });
+    } catch (err) {
+      console.error("Erro mensagem de cancelamento:", err);
+      return false;
+    }
+  },
+
+  // 11. Checagem de Estado da Instância Evolution API
+  async checkInstanceConnection(customSettings?: StudioSettings): Promise<{ connected: boolean; state: string; message?: string }> {
+    try {
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.evolutionBaseUrl || !settings.automation.evolutionInstance) {
+        return { connected: false, state: 'not_configured', message: 'Configurações de URL ou Instância não preenchidas.' };
+      }
+
+      const baseUrl = settings.automation.evolutionBaseUrl.replace(/\/$/, '');
+      const instance = settings.automation.evolutionInstance;
+      const apiKey = settings.automation.evolutionApiKey;
+
+      const url = `${baseUrl}/instance/connectionState/${instance}`;
+      const res = await fetch(url, {
+        headers: {
+          'apikey': apiKey || ''
+        }
+      });
+
+      if (!res.ok) {
+        return { connected: false, state: 'error', message: `Erro HTTP ${res.status}` };
+      }
+
+      const data = await res.json();
+      const state = data?.instance?.state || data?.state || 'unknown';
+      return { connected: state === 'open', state };
+    } catch (err: any) {
+      return { connected: false, state: 'unreachable', message: err.message || 'Servidor inacessível' };
+    }
+  },
+
+  // 12. Obter QR Code da Evolution API
+  async fetchInstanceQrCode(customSettings?: StudioSettings): Promise<{ success: boolean; qrCodeBase64?: string; pairingCode?: string; message?: string }> {
+    try {
+      const settings = await this.getSettings(customSettings);
+      if (!settings?.automation?.evolutionBaseUrl || !settings.automation.evolutionInstance) {
+        return { success: false, message: 'Configurações de URL ou Instância não preenchidas.' };
+      }
+
+      const baseUrl = settings.automation.evolutionBaseUrl.replace(/\/$/, '');
+      const instance = settings.automation.evolutionInstance;
+      const apiKey = settings.automation.evolutionApiKey;
+
+      const url = `${baseUrl}/instance/connect/${instance}`;
+      const res = await fetch(url, {
+        headers: {
+          'apikey': apiKey || ''
+        }
+      });
+
+      if (!res.ok) {
+        return { success: false, message: `Erro ao gerar QR code (HTTP ${res.status})` };
+      }
+
+      const data = await res.json();
+      const base64 = data?.base64 || data?.qrcode?.base64 || null;
+      const pairingCode = data?.pairingCode || null;
+
+      return { success: true, qrCodeBase64: base64, pairingCode };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Erro ao conectar à API' };
+    }
   }
 };
+

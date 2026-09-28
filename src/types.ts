@@ -100,6 +100,11 @@ export interface StudioSettings {
     reagendamento?: string;
     lembrete?: string;
     followup?: string;
+    aniversario?: string;
+    reativacao?: string;
+    retorno?: string;
+    lista_espera?: string;
+    cancelamento?: string;
   };
   automation?: {
     evolutionBaseUrl: string;
@@ -113,6 +118,12 @@ export interface StudioSettings {
     confirmationEnabled?: boolean;
     reminderEnabled?: boolean;
     followUpEnabled?: boolean;
+    birthdayEnabled?: boolean;
+    reactivationEnabled?: boolean;
+    reactivationDays?: number;
+    returningEnabled?: boolean;
+    returningDays?: number;
+    waitingListEnabled?: boolean;
   };
 }
 
