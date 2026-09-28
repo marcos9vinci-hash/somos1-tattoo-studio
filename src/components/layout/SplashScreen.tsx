@@ -1,43 +1,86 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useRef, useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowRight } from 'lucide-react';
 
 interface SplashScreenProps {
   message?: string;
+  onFinish?: () => void;
 }
 
-export const SplashScreen: React.FC<SplashScreenProps> = ({ message = "Inicializando..." }) => {
+export const SplashScreen: React.FC<SplashScreenProps> = ({ 
+  message = "Somos 1 Tattoo Studio", 
+  onFinish 
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+
+  useEffect(() => {
+    // Tenta dar play programático para contornar restrições móveis
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {
+        // Se o navegador bloquear autoplay, fallback para imagem
+        setVideoError(true);
+      });
+    }
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-4 select-none overflow-hidden">
+    <div 
+      onClick={onFinish}
+      className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-0 m-0 select-none overflow-hidden cursor-pointer"
+    >
       {/* Luz ambiente de fundo */}
-      <div className="absolute w-[500px] h-[500px] bg-white/[0.03] rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute w-[500px] h-[500px] bg-white/[0.02] rounded-full blur-[140px] pointer-events-none" />
 
-      {/* Símbolo Oficial Grande ocupando o máximo da tela */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative flex flex-col items-center justify-center w-full max-w-lg"
-      >
-        <img
-          src="/somos1-logo-official.png"
-          alt="Somos 1 Tattoo Studio"
-          className="w-[85vw] max-w-[440px] h-auto object-contain drop-shadow-[0_0_40px_rgba(255,255,255,0.25)]"
-        />
+      {/* Conteúdo Central: Vídeo Animado Oficial */}
+      <div className="relative w-full max-w-2xl flex flex-col items-center justify-center px-4">
+        {!videoError ? (
+          <video
+            ref={videoRef}
+            src="/somos1-intro.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            // @ts-ignore
+            webkit-playsinline="true"
+            onLoadedData={() => setVideoLoaded(true)}
+            onError={() => setVideoError(true)}
+            className="w-full h-auto max-h-[70vh] object-contain rounded-xl drop-shadow-[0_0_35px_rgba(255,255,255,0.18)]"
+          />
+        ) : (
+          <motion.img
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            src="/somos1-logo-official.png"
+            alt="Somos 1 Tattoo Studio"
+            className="w-[80vw] max-w-[360px] h-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.2)]"
+          />
+        )}
 
-        {/* Barra de progresso sutil */}
-        <div className="mt-8 flex flex-col items-center gap-3 w-full">
-          <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+        {/* Rodapé com animação suave e opção de toque */}
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <div className="w-36 h-0.5 bg-white/10 rounded-full overflow-hidden">
             <motion.div
-              animate={{ x: [-192, 192] }}
-              transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
-              className="w-24 h-full bg-white rounded-full"
+              animate={{ x: [-144, 144] }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              className="w-16 h-full bg-white rounded-full"
             />
           </div>
-          <span className="font-headline text-[10px] uppercase tracking-[0.35em] text-zinc-400 font-bold">
+
+          <p className="font-headline text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-semibold flex items-center gap-1.5">
             {message}
-          </span>
+          </p>
+
+          {onFinish && (
+            <span className="text-[9px] text-zinc-600 uppercase font-headline tracking-widest flex items-center gap-1 mt-1 opacity-70 hover:opacity-100 transition-opacity">
+              Toque na tela para continuar <ArrowRight className="w-3 h-3 inline" />
+            </span>
+          )}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };
