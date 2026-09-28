@@ -1,3 +1,5 @@
+import { agentService } from './agentService.js';
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -15,6 +17,33 @@ export default async function handler(req, res) {
 
   const url = new URL(req.url, `https://${req.headers.host || 'galeria-ia-cloudflare.vercel.app'}`);
   const path = url.pathname.replace(/^\/api/, '');
+
+  try {
+    // ==================== AGENTE WHATSAPP (ENDPOINTS IA) ====================
+    if (path === '/agent/slots') {
+      const date = url.searchParams.get('date') || req.query?.date;
+      const size = url.searchParams.get('size') || req.query?.size || 'Pequena';
+      const result = await agentService.getAvailableSlots(date, size);
+      return res.status(200).json(result);
+    }
+
+    if (path === '/agent/book' && req.method === 'POST') {
+      const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const result = await agentService.createBooking(data);
+      return res.status(200).json(result);
+    }
+
+    if (path === '/agent/summary') {
+      const date = url.searchParams.get('date') || req.query?.date;
+      const result = await agentService.getDailySummary(date);
+      return res.status(200).json(result);
+    }
+
+    if (path === '/agent/block' && req.method === 'POST') {
+      const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const result = await agentService.blockSlot(data);
+      return res.status(200).json(result);
+    }
 
   const defaultMetaToken = process.env.META_ACCESS_TOKEN || "EAAU25cua8dMBSlwXBhUVk1OkTTUZCY3Xp3ls370kEzfiyigykKvPCtsnl7Inn3nI1Q5xM4oJZAaqpCZCTZBfLP0mIYhZCWhutUJFZCg6OaIGjRCPfBJid90RHCZAdxzpFiAL95itbIAu8i1q0WG5ppJJpJ9R8vFhgKm5Idzs4otBe4vo6au7m7ZCqjlikmSNK3s07QZAjqQz028LNZCxraufZCrLWmK83tvTGp86n1imklBb3eGmGo6XMoLcZAluwiRiaYrp4Ws54bk00kxMqVZCSo9DIn4TojTqTM4OHCyRM2gZDZD";
   const fbToken = req.cookies?.fb_access_token || req.headers.authorization?.replace('Bearer ', '') || defaultMetaToken;

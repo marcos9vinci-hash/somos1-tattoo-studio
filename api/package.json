@@ -1,6 +1,7 @@
 {
   "name": "galeria-ia-api",
   "version": "1.0.0",
+  "type": "module",
   "description": "Galeria IA - API backend for tattoo studio automation",
   "main": "api/index.js",
   "scripts": {
