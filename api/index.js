@@ -156,6 +156,27 @@ export default async function handler(req, res) {
     }
     parsedBody = parsedBody || {};
 
+    // Webhooks da Evolution API (Substitui Ngrok por URL estática na Vercel)
+    if (path.startsWith('/webhooks/whatsapp') || path.startsWith('/webhook')) {
+      if (req.method === 'GET') {
+        return res.status(200).json({
+          status: 'active',
+          endpoint: 'Evolution WhatsApp Webhook',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const event = parsedBody?.event || req.headers['x-event'] || 'unknown';
+      console.log(`[Evolution Webhook] Event: ${event}, Instance: ${parsedBody?.instance || 'wats'}`);
+
+      return res.status(200).json({
+        success: true,
+        received: true,
+        event: event,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     if (path === '/instagram/scheduled-status') {
       return res.status(200).json({ posts: [] });
     }
