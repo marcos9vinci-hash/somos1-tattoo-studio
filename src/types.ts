@@ -119,9 +119,14 @@ export interface StudioSettings {
     reminderEnabled?: boolean;
     followUpEnabled?: boolean;
     birthdayEnabled?: boolean;
+    birthdayTime?: string;
     reactivationEnabled?: boolean;
+    reactivationValue?: number;
+    reactivationUnit?: 'minutes' | 'hours' | 'days';
     reactivationDays?: number;
     returningEnabled?: boolean;
+    returningValue?: number;
+    returningUnit?: 'minutes' | 'hours' | 'days';
     returningDays?: number;
     waitingListEnabled?: boolean;
   };
