@@ -206,7 +206,7 @@ export default function NovoAgendamentoWizard({
         };
 
         // Aciona o ciclo completo: Envia Confirmação imediata + agenda Lembrete e Follow-up no n8n com tempos dinâmicos
-        whatsappService.triggerBookingLifecycle(bookingData, false).catch(err => {
+        whatsappService.triggerBookingLifecycle(bookingData, false, undefined, { explicitUserClick: true }).catch(err => {
           console.warn("Aviso no disparo do ciclo de automação:", err);
         });
       }

@@ -256,12 +256,18 @@ export default function Admin() {
       }
       await updateDoc(doc(db, 'bookings', booking.id), updateData);
       
-      if (isReschedule || nextStatus === BookingStatus.APPROVED) {
+      if (isReschedule) {
+        whatsappService.sendBookingReschedule({
+          ...booking,
+          ...customData,
+          status: nextStatus
+        }, settings, { explicitUserClick: true });
+      } else if (nextStatus === BookingStatus.APPROVED) {
         whatsappService.sendBookingConfirmation({
           ...booking,
           ...customData,
           status: nextStatus
-        }, settings);
+        }, settings, { explicitUserClick: true });
       }
 
       fetchData(true);

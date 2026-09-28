@@ -148,7 +148,7 @@ export default function Booking() {
         date: dateStr,
         time: selectedTime,
         descricao_servico: `Tatuagem (${size})`
-      }, settings || undefined);
+      }, settings || undefined, { explicitUserClick: true });
 
       navigate('/');
     } catch (err) {

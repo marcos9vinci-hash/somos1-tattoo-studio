@@ -36,6 +36,16 @@ function isValidPhone(phone: string): boolean {
   return digits.length >= 10 && digits.length <= 14;
 }
 
+function isAppointmentPresentOrFuture(dateStr?: string, timeStr?: string): boolean {
+  if (!dateStr) return false;
+  const apptDate = parseBookingDateTime(dateStr, timeStr);
+  if (isNaN(apptDate.getTime())) return false;
+
+  // Tolerância de 15 minutos para caso o agendamento seja marcado para o horário atual
+  const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000;
+  return apptDate.getTime() >= fifteenMinutesAgo;
+}
+
 export const whatsappService = {
   async sendViaN8n(payload: {
     to: string;
@@ -139,9 +149,25 @@ export const whatsappService = {
   },
 
   // 1. Confirmação
-  async sendBookingConfirmation(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, customSettings?: StudioSettings) {
+  async sendBookingConfirmation(
+    booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string },
+    customSettings?: StudioSettings,
+    options?: { explicitUserClick?: boolean }
+  ) {
     try {
-      if (!booking.userPhone) return false;
+      // TRAVA 1: Só dispara se o usuário clicou no botão do app
+      if (options?.explicitUserClick !== true) {
+        console.warn("🔒 [Segurança Anti-Bugs] Disparo bloqueado: confirmação só pode ser acionada pelo clique ativo no botão do app.");
+        return false;
+      }
+
+      // TRAVA 2: Bloqueia agendamentos fora da data presente/futura
+      if (!isAppointmentPresentOrFuture(booking.date, booking.time)) {
+        console.warn(`🔒 [Segurança Anti-Bugs] Disparo bloqueado: data do agendamento (${booking.date} às ${booking.time}) pertence ao passado.`);
+        return false;
+      }
+
+      if (!booking.userPhone || !isValidPhone(booking.userPhone)) return false;
       const settings = await this.getSettings(customSettings);
       if (!settings?.automation?.enabled) return false;
 
@@ -167,9 +193,25 @@ export const whatsappService = {
   },
 
   // 2. Reagendamento
-  async sendBookingReschedule(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, customSettings?: StudioSettings) {
+  async sendBookingReschedule(
+    booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string },
+    customSettings?: StudioSettings,
+    options?: { explicitUserClick?: boolean }
+  ) {
     try {
-      if (!booking.userPhone) return false;
+      // TRAVA 1: Só dispara se o usuário clicou no botão do app
+      if (options?.explicitUserClick !== true) {
+        console.warn("🔒 [Segurança Anti-Bugs] Disparo bloqueado: reagendamento só pode ser acionado pelo clique ativo no botão do app.");
+        return false;
+      }
+
+      // TRAVA 2: Bloqueia reagendamentos fora da data presente/futura
+      if (!isAppointmentPresentOrFuture(booking.date, booking.time)) {
+        console.warn(`🔒 [Segurança Anti-Bugs] Disparo bloqueado: data do reagendamento (${booking.date} às ${booking.time}) pertence ao passado.`);
+        return false;
+      }
+
+      if (!booking.userPhone || !isValidPhone(booking.userPhone)) return false;
       const settings = await this.getSettings(customSettings);
       if (!settings?.automation?.enabled) return false;
 
@@ -278,33 +320,39 @@ export const whatsappService = {
   },
 
   // 5. Ciclo Completo (Disparo Campainha n8n)
-  async triggerBookingLifecycle(booking: Booking, isReschedule: boolean = false, customSettings?: StudioSettings) {
+  async triggerBookingLifecycle(
+    booking: Booking, 
+    isReschedule: boolean = false, 
+    customSettings?: StudioSettings,
+    options?: { explicitUserClick?: boolean }
+  ) {
+    // TRAVA 1: Só dispara se o usuário clicou no botão do app
+    if (options?.explicitUserClick !== true) {
+      console.warn("🔒 [Segurança Anti-Bugs] Disparo do ciclo abortado: requer clique ativo do usuário no app.");
+      return { scheduled: false, reason: 'Requires explicit user click' };
+    }
+
+    // TRAVA 2: Bloqueia agendamentos fora da data presente/futura
+    if (!isAppointmentPresentOrFuture(booking.date, booking.time)) {
+      console.warn(`🔒 [Segurança Anti-Bugs] Disparo abortado: agendamento (${booking.date} às ${booking.time}) pertence ao passado.`);
+      return { scheduled: false, reason: 'Past booking rejected' };
+    }
+
     const settings = await this.getSettings(customSettings);
     if (!settings?.automation?.enabled) return { scheduled: false, reason: 'Automation disabled' };
 
-    // GUARDRAIL 1: Validar se telefone do cliente é válido
+    // GUARDRAIL: Validar se telefone do cliente é válido
     const targetPhone = booking.userPhone || (booking as any).clientPhone || '';
     if (!isValidPhone(targetPhone)) {
       console.warn("🔒 [WhatsApp Service] Disparo abortado: telefone de destino inválido ou vazio.");
       return { scheduled: false, reason: 'Invalid phone' };
     }
 
-    // GUARDRAIL 2: Validar se data/hora é futura ou presente (NUNCA disparar para agendamentos do passado)
-    if (booking.date) {
-      const apptDate = parseBookingDateTime(booking.date, booking.time);
-      const now = Date.now();
-      // Se não é reagendamento e o agendamento já ocorreu há mais de 10 minutos, ABORTA!
-      if (!isReschedule && apptDate.getTime() < (now - 10 * 60 * 1000)) {
-        console.warn("🔒 [WhatsApp Service] Disparo abortado: agendamento pertence ao passado.");
-        return { scheduled: false, reason: 'Past booking rejected' };
-      }
-    }
-
-    // Imediato: Confirmação ou Reagendamento
+    // Imediato: Confirmação ou Reagendamento (disparo direto com trava de clique)
     if (isReschedule) {
-      await this.sendBookingReschedule(booking, settings);
+      await this.sendBookingReschedule(booking, settings, { explicitUserClick: true });
     } else if (settings.automation.confirmationEnabled) {
-      await this.sendBookingConfirmation(booking, settings);
+      await this.sendBookingConfirmation(booking, settings, { explicitUserClick: true });
     }
 
     // Programado: Lembrete (com o tempo de antecedência configurado no app)
