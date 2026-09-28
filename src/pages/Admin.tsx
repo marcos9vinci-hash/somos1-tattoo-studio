@@ -257,17 +257,17 @@ export default function Admin() {
       await updateDoc(doc(db, 'bookings', booking.id), updateData);
       
       if (isReschedule) {
-        whatsappService.sendBookingReschedule({
+        whatsappService.triggerBookingLifecycle({
           ...booking,
           ...customData,
           status: nextStatus
-        }, settings, { explicitUserClick: true });
+        }, true, settings, { explicitUserClick: true });
       } else if (nextStatus === BookingStatus.APPROVED) {
-        whatsappService.sendBookingConfirmation({
+        whatsappService.triggerBookingLifecycle({
           ...booking,
           ...customData,
           status: nextStatus
-        }, settings, { explicitUserClick: true });
+        }, false, settings, { explicitUserClick: true });
       }
 
       fetchData(true);

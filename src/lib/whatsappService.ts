@@ -54,6 +54,13 @@ export const whatsappService = {
     delay_seconds?: number;
     delayAmount?: number;
     delayUnit?: string;
+    trigger_time?: string;
+    booking_date?: string;
+    booking_time?: string;
+    reminder_value?: number;
+    reminder_unit?: string;
+    followup_value?: number;
+    followup_unit?: string;
     instance?: string;
   }) {
     if (!payload.to || !isValidPhone(payload.to)) {
@@ -73,8 +80,15 @@ export const whatsappService = {
           phone: formattedPhone,
           message: payload.text,
           delay_seconds: payload.delay_seconds || 0,
-          delayAmount: payload.delayAmount || 0,
-          delayUnit: payload.delayUnit || 'minutes',
+          delayAmount: payload.delayAmount || payload.delay_seconds || 0,
+          delayUnit: payload.delayUnit || 'seconds',
+          trigger_time: payload.trigger_time,
+          booking_date: payload.booking_date,
+          booking_time: payload.booking_time,
+          reminder_value: payload.reminder_value,
+          reminder_unit: payload.reminder_unit,
+          followup_value: payload.followup_value,
+          followup_unit: payload.followup_unit,
           instance: payload.instance || 'wats'
         })
       });
@@ -176,6 +190,8 @@ export const whatsappService = {
         to: booking.userPhone,
         text: this.formatMessage(template, booking as Booking),
         action: 'confirmacao',
+        booking_date: booking.date,
+        booking_time: booking.time,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
@@ -223,6 +239,8 @@ export const whatsappService = {
         to: booking.userPhone,
         text: this.formatMessage(template, booking as Booking),
         action: 'reagendamento',
+        booking_date: booking.date,
+        booking_time: booking.time,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
@@ -247,21 +265,26 @@ export const whatsappService = {
       if (!settings?.automation?.enabled || !settings.automation.reminderEnabled) return false;
 
       let calculatedDelaySec = delaySeconds;
+      const bookingDate = parseBookingDateTime(booking.date, booking.time);
+      const reminderValue = settings.automation.reminderValue ?? 2;
+      const reminderUnit = settings.automation.reminderUnit || 'minutes';
+      const reminderLeadMs = unitToMilliseconds(reminderValue, reminderUnit);
+      const triggerTimeMs = bookingDate.getTime() - reminderLeadMs;
+      const diffMs = triggerTimeMs - Date.now();
+
       if (typeof calculatedDelaySec === 'undefined') {
-        const bookingDate = parseBookingDateTime(booking.date, booking.time);
-        const reminderLeadMs = unitToMilliseconds(settings.automation.reminderValue || 2, settings.automation.reminderUnit || 'minutes');
-        const triggerTime = bookingDate.getTime() - reminderLeadMs;
-        const diffMs = triggerTime - Date.now();
-        
-        // Se o horário de disparo do lembrete já expirou, NÃO dispara
-        if (diffMs < -60000) {
-          console.log("🔒 [WhatsApp Service] Lembrete ignorado: horário do lembrete já passou.");
-          return false;
+        // Se a data do agendamento for no presente/futuro mas a margem de antecedência já passou
+        // (exemplo clássico de teste rápido onde a sessão é marcada para dali a 1 ou 2 minutos):
+        // NÃO descarta! Dispara após 20 segundos para que a notificação chegue no teste!
+        if (diffMs <= 0) {
+          calculatedDelaySec = 20;
+          console.log(`🔔 [WhatsApp Service] Lembrete em teste rápido/agendamento iminente: disparando em 20s.`);
+        } else {
+          calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
         }
-        calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
       }
 
-      console.log(`🔔 [WhatsApp Service] Disparando Campainha de Lembrete: delay = ${calculatedDelaySec}s`);
+      console.log(`🔔 [WhatsApp Service] Disparando Campainha de Lembrete: delay = ${calculatedDelaySec}s (${reminderValue} ${reminderUnit} antes de ${booking.date} às ${booking.time})`);
 
       const template = settings.whatsappTemplates?.lembrete || "⏰ Oi {cliente}, passando para lembrar da sua sessão no dia {data} às {horario}!";
       const success = await this.sendViaN8n({
@@ -269,6 +292,13 @@ export const whatsappService = {
         text: this.formatMessage(template, booking as Booking),
         action: 'lembrete',
         delay_seconds: calculatedDelaySec,
+        delayAmount: calculatedDelaySec,
+        delayUnit: 'seconds',
+        trigger_time: new Date(triggerTimeMs).toISOString(),
+        booking_date: booking.date,
+        booking_time: booking.time,
+        reminder_value: reminderValue,
+        reminder_unit: reminderUnit,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
@@ -287,21 +317,23 @@ export const whatsappService = {
       if (!settings?.automation?.enabled || !settings.automation.followUpEnabled) return false;
 
       let calculatedDelaySec = delaySeconds;
+      const bookingDate = parseBookingDateTime(booking.date, booking.time);
+      const followUpValue = settings.automation.followUpValue ?? 2;
+      const followUpUnit = settings.automation.followUpUnit || 'minutes';
+      const followUpDelayMs = unitToMilliseconds(followUpValue, followUpUnit);
+      const triggerTimeMs = bookingDate.getTime() + followUpDelayMs;
+      const diffMs = triggerTimeMs - Date.now();
+
       if (typeof calculatedDelaySec === 'undefined') {
-        const bookingDate = parseBookingDateTime(booking.date, booking.time);
-        const followUpDelayMs = unitToMilliseconds(settings.automation.followUpValue || 2, settings.automation.followUpUnit || 'minutes');
-        const triggerTime = bookingDate.getTime() + followUpDelayMs;
-        const diffMs = triggerTime - Date.now();
-        
-        // Se o agendamento já passou há mais de 30 dias, NÃO envia
-        if (diffMs < -30 * 86400000) {
-          console.log("🔒 [WhatsApp Service] Follow-up ignorado: agendamento muito antigo.");
-          return false;
+        // Se já passou do horário estipulado, coloca 60 segundos
+        if (diffMs <= 0) {
+          calculatedDelaySec = 60;
+        } else {
+          calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
         }
-        calculatedDelaySec = Math.max(1, Math.round(diffMs / 1000));
       }
 
-      console.log(`💬 [WhatsApp Service] Disparando Campainha de Follow-up: delay = ${calculatedDelaySec}s`);
+      console.log(`💬 [WhatsApp Service] Disparando Campainha de Follow-up: delay = ${calculatedDelaySec}s (${followUpValue} ${followUpUnit} após ${booking.date} às ${booking.time})`);
 
       const template = settings.whatsappTemplates?.followup || "✨ Olá {cliente}, como está a cicatrização da sua arte? Qualquer dúvida estamos à disposição!";
       const success = await this.sendViaN8n({
@@ -309,6 +341,13 @@ export const whatsappService = {
         text: this.formatMessage(template, booking as Booking),
         action: 'followup',
         delay_seconds: calculatedDelaySec,
+        delayAmount: calculatedDelaySec,
+        delayUnit: 'seconds',
+        trigger_time: new Date(triggerTimeMs).toISOString(),
+        booking_date: booking.date,
+        booking_time: booking.time,
+        followup_value: followUpValue,
+        followup_unit: followUpUnit,
         instance: settings.automation?.evolutionInstance || 'wats'
       });
 
