@@ -20,6 +20,7 @@ import TestCRM from './pages/TestCRM';
 import GaleriaIA from './pages/GaleriaIA';
 import TattooEngineModule from './components/studio/TattooEngineModule';
 import SplashScreen from './components/layout/SplashScreen';
+import PwaInstallBanner from './components/layout/PwaInstallBanner';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, profile } = useAuth();
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/studio" element={<div className="p-4 md:p-6 bg-black min-h-screen flex items-center justify-center"><TattooEngineModule /></div>} />
           <Route path="/tattoo-engine" element={<div className="p-4 md:p-6 bg-black min-h-screen flex items-center justify-center"><TattooEngineModule /></div>} />
         </Routes>
+        <PwaInstallBanner />
       </AuthProvider>
     </Router>
   );

@@ -50,6 +50,14 @@
   --radius-xl: 24px;
 }
 
+html, body {
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: auto !important;
+}
+
 /* ==========================================================================
    ESQUEMA DE INVERSÃO (INVERTED / LIGHT MONOCHROME SCHEME)
    ========================================================================== */

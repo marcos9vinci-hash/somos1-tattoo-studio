@@ -1,5 +1,5 @@
-// Service Worker oficial do Somos 1 Tattoo Studio PWA
-const CACHE_NAME = 'somos1-cache-v1';
+// Service Worker oficial v2 do Somos 1 Tattoo Studio PWA
+const CACHE_NAME = 'somos1-cache-v2';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -19,7 +19,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // Para navegacao HTML ou recursos do proprio app, tenta a rede e fallback no cache
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
