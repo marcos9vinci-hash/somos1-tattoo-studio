@@ -97,6 +97,7 @@ export interface StudioSettings {
   allowArtistBooking: boolean;
   whatsappTemplates?: {
     confirmacao?: string;
+    reagendamento?: string;
     lembrete?: string;
     followup?: string;
   };
