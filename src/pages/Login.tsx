@@ -155,17 +155,6 @@ export default function Login() {
           <p className="mt-2 text-center text-[10px] font-headline text-on-surface-variant uppercase tracking-widest">
             Ao continuar, você concorda com nossos <a className="text-primary-fixed hover:underline" href="/terms">Termos de Uso</a>.
           </p>
-
-          <div className="pt-2 flex justify-center">
-            <button 
-              type="button"
-              onClick={() => navigate('/admin')}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 font-headline uppercase tracking-widest flex items-center gap-1.5 transition-colors py-1.5"
-            >
-              <Shield className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Acesso da Gestão do Estúdio</span>
-            </button>
-          </div>
         </section>
       </main>
 
