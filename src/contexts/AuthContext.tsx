@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { UserProfile, OperationType } from '../types';
+import { UserProfile, OperationType, UserRole } from '../types';
 import { handleFirestoreError } from '../lib/error-handler';
 
 interface AuthContextType {
@@ -71,8 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const adminPhones = ['5511957837132', '11957837132', '+5511957837132', '+5511999999999'];
   const userPhoneClean = (profile?.phone || user?.phoneNumber || '').replace(/\D/g, '');
   const isAdmin = 
-    profile?.role === UserRole.ADMIN || 
     profile?.role === 'admin' || 
+    (typeof UserRole !== 'undefined' && profile?.role === UserRole.ADMIN) || 
     (userPhoneClean.length > 8 && adminPhones.some(p => p.replace(/\D/g, '') === userPhoneClean));
 
   const value = {
