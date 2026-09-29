@@ -11,6 +11,7 @@ import Booking from './pages/Booking';
 import Ranking from './pages/Ranking';
 import Profile from './pages/Profile';
 import Admin from './pages/Admin';
+import AdminGate from './components/admin/AdminGate';
 import Notifications from './pages/Notifications';
 import HowItWorks from './pages/HowItWorks';
 import Onboarding from './pages/Onboarding';
@@ -38,12 +39,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, profile, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   
-  if (loading) return <SplashScreen message="Verificando credenciais de estúdio..." />;
-  if (!user) return <Navigate to="/login" />;
-  if (!profile) return <Navigate to="/welcome" />;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to="/admin" replace />;
   
   return (
     <>
@@ -86,7 +84,7 @@ export default function App() {
           <Route path="/transfer" element={<ProtectedRoute><Transfer /></ProtectedRoute>} />
 
           {/* Rotas Protegidas Exclusivas do Administrador / Tatuador */}
-          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+          <Route path="/admin" element={<AdminGate />} />
           <Route path="/test-crm" element={<AdminRoute><TestCRM /></AdminRoute>} />
           <Route path="/galeria" element={<AdminRoute><GaleriaIA /></AdminRoute>} />
           <Route path="/estudio-ia" element={<AdminRoute><GaleriaIA /></AdminRoute>} />

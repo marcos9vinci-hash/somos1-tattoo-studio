@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, query, getDocs, doc, updateDoc, increment, serverTimestamp, addDoc, where, getDoc, setDoc, orderBy, limit } from 'firebase/firestore';
@@ -10,7 +11,7 @@ import {
   Trash2, ToggleLeft, ToggleRight, Plus, PlusCircle, Gift, Send, Settings, Terminal, Search,
   Menu, X, Sparkles, ChevronRight, MessageSquare, Layers, Wand2, CheckCircle2, ChevronDown, 
   AlertCircle, RefreshCw, Camera, Share2, PanelLeftClose, PanelLeft, Globe, GitFork, Award, ExternalLink,
-  BarChart2, Target, Bot
+  BarChart2, Target, Bot, UserPlus
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import AdminDashboard from './AdminDashboard';
@@ -73,6 +74,7 @@ type IndicaSubTab = 'dashboard' | 'credits' | 'campaigns' | 'invites' | 'rules' 
 type SystemSubTab = 'automation' | 'templates' | 'logs';
 
 export default function Admin() {
+  const navigate = useNavigate();
   const { isAdmin, user } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -537,7 +539,14 @@ export default function Admin() {
                     <span className="font-headline font-black text-sm tracking-wider text-foreground">SOMOS 1</span>
                     <span className="text-[8px] bg-foreground text-background font-black px-1.5 py-0.5 rounded font-headline tracking-wider">STUDIO</span>
                   </div>
-                  <p className="text-[9px] text-muted-foreground font-headline font-bold uppercase tracking-widest">Tattoo Studio</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="text-[9px] text-primary-fixed hover:underline font-headline font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5"
+                  >
+                    <span>Ver App Cliente</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
                 </div>
               </div>
             </div>

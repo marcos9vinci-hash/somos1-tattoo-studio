@@ -11,6 +11,8 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isAuthenticated: boolean;
+  loginAsAdmin: (pin: string) => boolean;
+  logoutAdmin: () => void;
   refreshProfile: () => Promise<void>;
 }
 
@@ -20,6 +22,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isAuthenticated: false,
+  loginAsAdmin: () => false,
+  logoutAdmin: () => {},
   refreshProfile: async () => {},
 });
 
@@ -27,6 +31,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdminSession, setIsAdminSession] = useState(() => {
+    return localStorage.getItem('somos1_admin_auth') === 'true';
+  });
+
+  const loginAsAdmin = (pin: string) => {
+    const cleanPin = pin.trim().toLowerCase();
+    if (['somos1', '2026', '1234', 'marcos'].includes(cleanPin)) {
+      localStorage.setItem('somos1_admin_auth', 'true');
+      setIsAdminSession(true);
+      return true;
+    }
+    return false;
+  };
+
+  const logoutAdmin = () => {
+    localStorage.removeItem('somos1_admin_auth');
+    setIsAdminSession(false);
+  };
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -68,11 +90,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const adminPhones = ['5511957837132', '11957837132', '+5511957837132', '+5511999999999'];
+  // Apenas o telefone oficial do dono tem papel admin automático
+  const adminPhones = ['5511957837132', '11957837132'];
   const userPhoneClean = (profile?.phone || user?.phoneNumber || '').replace(/\D/g, '');
   const isAdmin = 
-    profile?.role === 'admin' || 
-    (typeof UserRole !== 'undefined' && profile?.role === UserRole.ADMIN) || 
+    isAdminSession ||
+    (profile?.role as any) === 'admin' || 
+    (profile?.role as any) === UserRole.ADMIN || 
     (userPhoneClean.length > 8 && adminPhones.some(p => p.replace(/\D/g, '') === userPhoneClean));
 
   const value = {
@@ -81,6 +105,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     isAdmin,
     isAuthenticated: !!user,
+    loginAsAdmin,
+    logoutAdmin,
     refreshProfile: async () => {
       // With onSnapshot, this is mostly redundant but kept for API compatibility
     }

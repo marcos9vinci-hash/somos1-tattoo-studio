@@ -31,34 +31,20 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       {/* Luz ambiente de fundo */}
       <div className="absolute w-[500px] h-[500px] bg-white/[0.02] rounded-full blur-[140px] pointer-events-none" />
 
-      {/* Conteúdo Central: Vídeo Animado 9:16 Oficial */}
+      {/* Conteúdo Central: Logo Oficial Vazada */}
       <div className="relative w-full max-w-md flex flex-col items-center justify-center px-4">
-        {!videoError ? (
-          <video
-            ref={videoRef}
-            src="/somos1-intro.mp4"
-            autoPlay
-            muted
-            loop
-            playsInline
-            // @ts-ignore
-            webkit-playsinline="true"
-            // @ts-ignore
-            x5-playsinline="true"
-            preload="auto"
-            onError={() => setVideoError(true)}
-            className="w-full max-w-[380px] h-auto max-h-[75vh] object-contain rounded-2xl drop-shadow-[0_0_35px_rgba(255,255,255,0.22)]"
-          />
-        ) : (
-          <motion.img
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="relative flex flex-col items-center justify-center"
+        >
+          <img
             src="/somos1-logo-official.png"
             alt="Somos 1 Tattoo Studio"
-            className="w-[85vw] max-w-[380px] h-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.22)]"
+            className="w-[75vw] max-w-[280px] h-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.25)]"
           />
-        )}
+        </motion.div>
 
         {/* Rodapé: Barra de Carregamento Fluida */}
         <div className="mt-4 flex flex-col items-center gap-2.5">
