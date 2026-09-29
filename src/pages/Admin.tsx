@@ -129,6 +129,11 @@ export default function Admin() {
   const [bonusReason, setBonusReason] = useState('');
   const [savingBonus, setSavingBonus] = useState(false);
 
+  // Cadastrar Novo Cliente Modal
+  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [newClientData, setNewClientData] = useState({ name: '', phone: '', email: '', instagram: '' });
+  const [creatingClient, setCreatingClient] = useState(false);
+
   const [settings, setSettings] = useState<StudioSettings>({
     workingDays: [1, 2, 3, 4, 5, 6],
     workingHours: { start: '09:00', end: '19:00' },
@@ -433,6 +438,38 @@ export default function Admin() {
       });
       setNewInvite({ code: '', maxUses: 10, expiresInDays: '' }); fetchData();
     } catch (err) { console.error(err); }
+  };
+
+  const handleCreateNewClient = async () => {
+    if (!newClientData.name.trim() || !newClientData.phone.trim()) {
+      alert("Por favor, preencha o Nome e o WhatsApp do cliente.");
+      return;
+    }
+    setCreatingClient(true);
+    try {
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const payload = {
+        name: newClientData.name.trim(),
+        phone: newClientData.phone.replace(/\D/g, ''),
+        email: newClientData.email.trim() || '',
+        instagram: newClientData.instagram.trim() || '',
+        role: 'user' as UserRole,
+        tier: 'Bronze' as UserTier,
+        creditsBalance: 0,
+        inviteCode,
+        createdAt: serverTimestamp()
+      };
+      await addDoc(collection(db, 'users'), payload);
+      alert(`✅ Cliente ${newClientData.name} cadastrado com sucesso!`);
+      setNewClientData({ name: '', phone: '', email: '', instagram: '' });
+      setIsNewClientModalOpen(false);
+      fetchData(true);
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao cadastrar cliente: " + err.message);
+    } finally {
+      setCreatingClient(false);
+    }
   };
 
   const toggleInvite = async (inv: InviteCode) => { await updateDoc(doc(db, 'invites', inv.id), { active: !inv.active }); fetchData(); };
@@ -1393,6 +1430,14 @@ export default function Admin() {
                               <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-white bg-zinc-800 px-2 py-1 rounded-md">Limpar</button>
                             )}
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsNewClientModalOpen(true)}
+                            className="flex items-center justify-center gap-2 px-4 py-3 bg-primary-fixed text-black font-headline font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-90 transition-all shadow-md active:scale-95 shrink-0"
+                          >
+                            <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                            <span>+ Novo Cliente</span>
+                          </button>
                           <div className="text-[10px] uppercase font-headline font-black text-zinc-500 flex items-center justify-end px-1">
                             {filteredUsers.length} de {users.length} cadastrados (A-Z)
                           </div>
@@ -1923,6 +1968,96 @@ export default function Admin() {
                       className="flex-1 h-12 rounded-xl bg-primary-fixed text-black font-headline text-xs uppercase font-black disabled:opacity-50 hover:bg-primary-fixed/90 transition-colors shadow-lg shadow-primary-fixed/20"
                     >
                       {savingBonus ? "Creditando..." : "Conceder Bônus"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL CADASTRAR NOVO CLIENTE */}
+          {isNewClientModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+              <div className="bg-zinc-950 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+                <button
+                  type="button"
+                  onClick={() => setIsNewClientModalOpen(false)}
+                  className="absolute top-4 right-4 text-zinc-400 hover:text-white bg-zinc-900 rounded-full p-1 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-primary-fixed/20 border border-primary-fixed/40 flex items-center justify-center text-primary-fixed">
+                    <UserPlus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-headline font-bold text-white text-base uppercase">Cadastrar Novo Cliente</h3>
+                    <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-headline">Ficha de Cliente · Somos 1 Tattoo Studio</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Nome Completo *</label>
+                    <input
+                      type="text"
+                      value={newClientData.name}
+                      onChange={e => setNewClientData(p => ({ ...p, name: e.target.value }))}
+                      placeholder="Ex: Amanda Silva"
+                      autoFocus
+                      className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-fixed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">WhatsApp (com DDD) *</label>
+                    <input
+                      type="text"
+                      value={newClientData.phone}
+                      onChange={e => setNewClientData(p => ({ ...p, phone: e.target.value }))}
+                      placeholder="Ex: 11987654321"
+                      className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-fixed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">E-mail (opcional)</label>
+                    <input
+                      type="email"
+                      value={newClientData.email}
+                      onChange={e => setNewClientData(p => ({ ...p, email: e.target.value }))}
+                      placeholder="Ex: amanda@email.com"
+                      className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-fixed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-zinc-300 font-semibold block mb-1">Instagram (opcional)</label>
+                    <input
+                      type="text"
+                      value={newClientData.instagram}
+                      onChange={e => setNewClientData(p => ({ ...p, instagram: e.target.value }))}
+                      placeholder="Ex: @amanda.tattoo"
+                      className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-fixed"
+                    />
+                  </div>
+
+                  <div className="flex gap-2.5 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsNewClientModalOpen(false)}
+                      className="flex-1 py-2.5 px-4 rounded-xl border border-white/10 text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateNewClient}
+                      disabled={creatingClient || !newClientData.name.trim() || !newClientData.phone.trim()}
+                      className="flex-1 py-2.5 px-4 bg-primary-fixed text-black font-headline font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-90 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    >
+                      {creatingClient ? "Salvando..." : "Salvar Cliente"}
                     </button>
                   </div>
                 </div>

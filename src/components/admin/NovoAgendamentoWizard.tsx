@@ -223,25 +223,58 @@ export default function NovoAgendamentoWizard({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
-      <div className="bg-zinc-950 border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative my-8">
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 text-zinc-400 hover:text-white bg-zinc-900 rounded-full p-1"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-3.5 mb-6">
-          <img src="/somos1-logo-official.png" alt="Somos 1" className="w-12 h-12 object-contain rounded-xl bg-black p-1 border border-white/10 shadow-md drop-shadow-[0_0_10px_rgba(255,255,255,0.15)]" />
-          <div>
-            <h2 className="text-xl font-bold text-white uppercase font-headline tracking-wide leading-none">Novo Agendamento</h2>
-            <p className="text-[10px] text-primary-fixed font-headline font-bold uppercase tracking-widest mt-1">Somos 1 Tattoo Studio</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
+      <div className="bg-zinc-950 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl relative max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+        {/* HEADER FIXO - NUNCA CORTA NO CELULAR */}
+        <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-zinc-950 z-10">
+          <div className="flex items-center gap-3">
+            <img src="/somos1-logo-official.png" alt="Somos 1" className="w-10 h-10 object-contain rounded-xl bg-black p-1 border border-white/10 shadow-md" />
+            <div>
+              <h2 className="text-lg font-bold text-white uppercase font-headline tracking-wide leading-none">Novo Agendamento</h2>
+              <p className="text-[10px] text-primary-fixed font-headline font-bold uppercase tracking-widest mt-1">Somos 1 Tattoo Studio</p>
+            </div>
           </div>
+          <button 
+            type="button"
+            onClick={onClose}
+            className="text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 rounded-full p-2 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Cliente */}
-          <div className="space-y-3">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          {/* CORPO DO FORMULÁRIO COM SCROLL SUAVE */}
+          <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-5 scrollbar-thin">
+            
+            {/* SELETOR DE MODO DE CLIENTE (GRANDE E DESTACADO) */}
+            <div className="grid grid-cols-2 gap-2 p-1.5 bg-zinc-900/90 border border-white/10 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setShowNovoCliente(false)}
+                className={cn(
+                  "py-2.5 px-3 rounded-lg text-xs font-headline font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all",
+                  !showNovoCliente ? "bg-primary-fixed text-black shadow-md" : "text-zinc-400 hover:text-white"
+                )}
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Buscar Cliente</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNovoCliente(true)}
+                className={cn(
+                  "py-2.5 px-3 rounded-lg text-xs font-headline font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all",
+                  showNovoCliente ? "bg-primary-fixed text-black shadow-md" : "text-primary-fixed hover:bg-primary-fixed/10"
+                )}
+              >
+                <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                <span>+ Novo Cliente</span>
+              </button>
+            </div>
+
+            {/* Cliente */}
+            <div className="space-y-3">
             {showNovoCliente ? (
               /* MODO CADASTRO NOVO CLIENTE */
               <div className="border border-white/10 rounded-2xl p-4 space-y-4 bg-zinc-900/70">
@@ -588,13 +621,18 @@ export default function NovoAgendamentoWizard({
             )}
           </div>
 
-          <button 
-            type="submit" 
-            className="w-full bg-primary-fixed text-black font-bold py-3 rounded-xl uppercase tracking-widest disabled:opacity-50 hover:bg-primary-fixed/90 transition-colors"
-            disabled={isLoading || !form.cliente_id || !form.data_agendamento}
-          >
-            {isLoading ? "Salvando..." : "Confirmar Agendamento"}
-          </button>
+          </div>
+
+          {/* FOOTER FIXO COM BOTÃO DE CONFIRMAR */}
+          <div className="p-4 sm:p-5 border-t border-white/10 shrink-0 bg-zinc-950/95 backdrop-blur-sm z-10">
+            <button 
+              type="submit" 
+              className="w-full bg-primary-fixed text-black font-headline font-black py-3.5 rounded-xl uppercase tracking-widest text-xs disabled:opacity-50 hover:bg-primary-fixed/90 transition-all shadow-lg shadow-primary-fixed/20 active:scale-98"
+              disabled={isLoading || !form.cliente_id || !form.data_agendamento}
+            >
+              {isLoading ? "Salvando..." : "Confirmar Agendamento"}
+            </button>
+          </div>
         </form>
       </div>
     </div>

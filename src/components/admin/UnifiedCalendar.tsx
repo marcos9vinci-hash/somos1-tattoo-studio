@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Ban, X, Clock, User, Ruler } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Ban, X, Clock, User, Ruler, Plus, UserPlus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Booking, StudioSettings, BookingStatus } from '../../types';
 import { db } from '../../lib/firebase';
@@ -69,8 +69,8 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
 
   // ─── HEADER ──────────────────────────────────────────────────
   const renderHeader = () => (
-    <div className="flex items-center justify-between mb-6 bg-card p-4 rounded-2xl border border-border shadow-xs">
-      <div className="flex items-center gap-4">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6 bg-card p-4 rounded-2xl border border-border shadow-xs">
+      <div className="flex items-center gap-4 flex-wrap">
         <h2 className="font-headline text-lg font-black text-foreground uppercase tracking-widest">
           {view === 'day'
             ? format(currentDate, "dd 'de' MMMM", { locale: ptBR })
@@ -91,13 +91,23 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
           ))}
         </div>
       </div>
-      <div className="flex gap-2">
-        <button onClick={prev} className="p-2 hover:bg-muted rounded-xl border border-border text-foreground transition-colors">
-          <ChevronLeft className="w-5 h-5 text-foreground" />
+      <div className="flex items-center gap-2.5 justify-between sm:justify-end">
+        <button
+          type="button"
+          onClick={() => openDayModal(currentDate)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary-fixed text-black font-headline font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-90 transition-all shadow-md active:scale-95 shrink-0"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          <span>Novo Agendamento / Cliente</span>
         </button>
-        <button onClick={next} className="p-2 hover:bg-muted rounded-xl border border-border text-foreground transition-colors">
-          <ChevronRight className="w-5 h-5 text-foreground" />
-        </button>
+        <div className="flex gap-1.5">
+          <button onClick={prev} className="p-2 hover:bg-muted rounded-xl border border-border text-foreground transition-colors" title="Anterior">
+            <ChevronLeft className="w-5 h-5 text-foreground" />
+          </button>
+          <button onClick={next} className="p-2 hover:bg-muted rounded-xl border border-border text-foreground transition-colors" title="Próximo">
+            <ChevronRight className="w-5 h-5 text-foreground" />
+          </button>
+        </div>
       </div>
     </div>
   );

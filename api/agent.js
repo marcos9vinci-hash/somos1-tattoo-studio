@@ -66,6 +66,16 @@ function parseSize(t) {
   return 'Média';
 }
 
+function parsePrice(t) {
+  const m = t.match(/(?:valor|r\$|por|custo|preco|preço)\s*[:=]?\s*(\d{2,4})/i) || t.match(/r\$\s*(\d{2,4})/i);
+  return m ? parseFloat(m[1]) : 0;
+}
+
+function parseDeposit(t) {
+  const m = t.match(/(?:sinal|entrada)\s*[:=]?\s*(\d{2,4})/i);
+  return m ? parseFloat(m[1]) : 0;
+}
+
 async function getAvailableSlots(targetDate, targetSize = 'Pequena') {
   const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
   const queryBody = {
@@ -155,6 +165,8 @@ async function getDailySummary(targetDate) {
 
 async function createBooking(data) {
   const duration = data.size === 'Grande' ? 240 : (data.size === 'Média' ? 120 : 60);
+  const priceEstimated = data.priceEstimated || (data.size === 'Grande' ? 800 : (data.size === 'Média' ? 450 : 200));
+  const depositPaid = data.depositPaid || 0;
   const createUrl = `${FIRESTORE_BASE}/bookings?key=${FIREBASE_API_KEY}`;
   const docData = {
     fields: {
@@ -164,8 +176,10 @@ async function createBooking(data) {
       time: { stringValue: data.time },
       duration: { integerValue: duration },
       size: { stringValue: data.size || 'Média' },
+      priceEstimated: { doubleValue: Number(priceEstimated) },
+      depositPaid: { doubleValue: Number(depositPaid) },
       artistId: { stringValue: 'Markinhos' },
-      description: { stringValue: `Tatuagem ${data.size || 'Média'} (Agendada via WhatsApp)` },
+      description: { stringValue: data.description || `Tatuagem ${data.size || 'Média'} (Agendada via WhatsApp)` },
       status: { stringValue: data.status || 'approved' },
       createdAt: { timestampValue: new Date().toISOString() },
       source: { stringValue: 'whatsapp_ai_agent' }
@@ -267,6 +281,13 @@ export default async function handler(req, res) {
 
       const adminPhones = ['5511948116922', '5511957837132'];
       const isAdmin = adminPhones.includes(senderPhone);
+
+      // REGRA EXPLÍCITA DO MARKINHOS: O robô NÃO faz atendimento para clientes!
+      // Ele atua estritamente como assistente pessoal e executivo do próprio tatuador.
+      if (!isAdmin) {
+        return res.status(200).json({ status: 'ignored_client', message: 'Agente restrito ao Markinhos.' });
+      }
+
       const text = userText.toLowerCase();
 
       const targetDate = parseDate(text) || new Date().toISOString().split('T')[0];
@@ -302,12 +323,18 @@ export default async function handler(req, res) {
           }
         }
 
+        const price = parsePrice(text);
+        const deposit = parseDeposit(text);
+
         await createBooking({
           clientName,
           clientPhone: isAdmin ? '' : senderPhone,
           date: targetDate,
           time: targetTime,
           size: targetSize,
+          priceEstimated: price,
+          depositPaid: deposit,
+          description: `Tatuagem ${targetSize}${price > 0 ? ` (R$ ${price})` : ''}`,
           status: isAdmin ? 'approved' : 'pending_approval'
         });
 
@@ -315,9 +342,9 @@ export default async function handler(req, res) {
         const formattedDate = `${d}/${m}/${y}`;
 
         if (isAdmin) {
-          replyText = `✅ *Agendamento Confirmado pelo Chefe!*\n\n👤 *Cliente:* ${clientName}\n📅 *Data:* ${formattedDate} às *${targetTime}*\n🎨 *Tamanho:* ${targetSize}\n✍️ *Artista:* Markinhos\n\nJá está gravado no sistema e bloqueado na agenda! 🚀`;
+          replyText = `✅ *Agendamento Confirmado pelo Chefe!*\n\n👤 *Cliente:* ${clientName}\n📅 *Data:* ${formattedDate} às *${targetTime}*\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Valor:* R$ ${price}` : ''}${deposit > 0 ? ` (Sinal: R$ ${deposit})` : ''}\n✍️ *Artista:* Markinhos\n\nJá está gravado no sistema e bloqueado na agenda! 🚀`;
         } else {
-          replyText = `🎉 *Agendamento Recebido com Sucesso, ${clientName}!* 🖤\n\n📅 *Data:* ${formattedDate}\n⏰ *Horário:* ${targetTime}\n🎨 *Tamanho:* ${targetSize}\n✍️ *Artista:* Markinhos\n📍 *Local:* Rua Francesco de Martini 29, São Caetano do Sul\n\nSeu horário está pré-reservado. Qualquer dúvida ou imprevisto, é só me chamar por aqui! Te esperamos 🤘✨`;
+          replyText = `🎉 *Agendamento Recebido com Sucesso, ${clientName}!* 🖤\n\n📅 *Data:* ${formattedDate}\n⏰ *Horário:* ${targetTime}\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Estimativa:* R$ ${price}` : ''}\n✍️ *Artista:* Markinhos\n📍 *Local:* Rua Francesco de Martini 29, São Caetano do Sul\n\nSeu horário está pré-reservado. Qualquer dúvida ou imprevisto, é só me chamar por aqui! Te esperamos 🤘✨`;
         }
       }
 
