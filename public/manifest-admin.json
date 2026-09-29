@@ -2,7 +2,7 @@
   "name": "Somos 1 Gestão",
   "short_name": "Somos 1 Gestão",
   "description": "Painel de Gestão e Operação do Somos 1 Tattoo Studio",
-  "id": "somos1-admin-app",
+  "id": "/admin?source=pwa_admin",
   "start_url": "/admin?source=pwa_admin",
   "scope": "/admin",
   "display": "standalone",

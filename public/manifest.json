@@ -1,7 +1,7 @@
 {
   "name": "Somos 1 Tattoo",
   "short_name": "Somos 1 Tattoo",
-  "id": "somos1-client-app",
+  "id": "/?source=pwa_client",
   "start_url": "/?source=pwa_client",
   "scope": "/",
   "display": "standalone",
