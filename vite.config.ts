@@ -80,5 +80,13 @@ export default defineConfig(({mode}) => {
       host: '0.0.0.0',
       hmr: process.env.DISABLE_HMR !== 'true',
     },
+    build: {
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          admin: path.resolve(__dirname, 'admin.html'),
+        },
+      },
+    },
   };
 });

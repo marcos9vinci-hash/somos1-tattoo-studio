@@ -57,6 +57,8 @@ export const PwaInstallBanner: React.FC = () => {
     }
   };
 
+  const isAdminRoute = window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/studio');
+
   if (!isVisible || installed) return null;
 
   return (
@@ -64,14 +66,18 @@ export const PwaInstallBanner: React.FC = () => {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <img 
-            src="/somos1-icon-192.png" 
-            alt="Somos 1 Tattoo" 
+            src={isAdminRoute ? "/somos1-admin-icon-192.png" : "/somos1-icon-192.png"} 
+            alt={isAdminRoute ? "Somos 1 Gestão" : "Somos 1 Tattoo"} 
             className="w-12 h-12 rounded-xl object-contain bg-black p-1 border border-white/10 shadow-md shrink-0" 
           />
           <div>
-            <h4 className="font-headline font-black text-xs text-white uppercase tracking-wider">Instalar no Celular</h4>
+            <h4 className="font-headline font-black text-xs text-white uppercase tracking-wider">
+              {isAdminRoute ? 'Instalar Somos 1 Gestão' : 'Instalar no Celular'}
+            </h4>
             <p className="text-[11px] text-zinc-400 mt-0.5 leading-tight">
-              Adicione o Somos 1 à tela inicial para acesso rápido e tela cheia.
+              {isAdminRoute 
+                ? 'Instale o app de gestão na tela inicial para acesso direto à agenda e CRM.'
+                : 'Adicione o Somos 1 à tela inicial para acesso rápido e tela cheia.'}
             </p>
           </div>
         </div>
@@ -89,7 +95,7 @@ export const PwaInstallBanner: React.FC = () => {
           onClick={handleInstallClick}
           className="flex-1 bg-white hover:bg-zinc-200 text-black font-headline font-bold text-xs py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-md"
         >
-          <Download className="w-3.5 h-3.5" /> Instalar Aplicativo
+          <Download className="w-3.5 h-3.5" /> {isAdminRoute ? 'Instalar Gestão' : 'Instalar Aplicativo'}
         </button>
         <button
           onClick={() => setIsVisible(false)}
