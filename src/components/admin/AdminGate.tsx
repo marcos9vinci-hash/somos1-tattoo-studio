@@ -41,12 +41,12 @@ export default function AdminGate() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-sm flex flex-col items-center text-center relative z-10"
       >
-        {/* Logo Oficial Vazada */}
+        {/* Logo Oficial Ouro Metálico */}
         <div className="mb-6 flex justify-center">
           <img 
-            src="/somos1-logo-official.png" 
+            src="/somos1-ouro-metal-preto.png" 
             alt="Somos 1 Tattoo Studio" 
-            className="w-52 h-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.25)]" 
+            className="w-56 h-auto object-contain" 
           />
         </div>
 

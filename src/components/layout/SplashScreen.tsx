@@ -5,15 +5,30 @@ import { ArrowRight } from 'lucide-react';
 interface SplashScreenProps {
   message?: string;
   onFinish?: () => void;
+  isAdmin?: boolean;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ 
-  message = "Carregando Somos 1...", 
-  onFinish 
+  message, 
+  onFinish,
+  isAdmin
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+
+  const isStudioAdmin = isAdmin ?? (
+    typeof window !== 'undefined' && (
+      window.location.pathname.startsWith('/admin') || 
+      window.location.pathname.startsWith('/studio') ||
+      window.location.pathname.startsWith('/test-crm') ||
+      window.location.pathname.startsWith('/galeria')
+    )
+  );
+
+  const videoSrc = isStudioAdmin ? "/somos1-admin-intro.mp4" : "/somos1-intro.mp4";
+  const imageSrc = isStudioAdmin ? "/somos1-ouro-metal-preto.png" : "/somos1-logo-official.png";
+  const displayMsg = message || (isStudioAdmin ? "Somos 1 Studio" : "Carregando Somos 1...");
 
   useEffect(() => {
     if (videoRef.current) {
@@ -42,7 +57,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-0 m-0 select-none overflow-hidden cursor-pointer"
     >
       {/* Luz ambiente de fundo */}
-      <div className="absolute w-[500px] h-[500px] bg-white/[0.02] rounded-full blur-[140px] pointer-events-none" />
+      <div className={`absolute w-[500px] h-[500px] ${isStudioAdmin ? 'bg-amber-500/[0.04]' : 'bg-white/[0.02]'} rounded-full blur-[140px] pointer-events-none`} />
 
       {/* Conteúdo Central: Logo inicial seguida pelo Vídeo Animado 9:16 */}
       <div className="relative w-full max-w-md flex flex-col items-center justify-center px-4">
@@ -57,17 +72,17 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
                 className="relative flex flex-col items-center justify-center"
               >
                 <img
-                  src="/somos1-logo-official.png"
+                  src={imageSrc}
                   alt="Somos 1 Tattoo Studio"
                   className="w-[75vw] max-w-[280px] h-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.25)]"
                 />
               </motion.div>
             )}
 
-            {/* Vídeo Animado 9:16 Oficial - Rola até o final antes de abrir */}
+            {/* Vídeo Animado 9:16 Oficial (Dourado no Admin / Prateado no Cliente) */}
             <video
               ref={videoRef}
-              src="/somos1-intro.mp4"
+              src={videoSrc}
               autoPlay
               muted
               playsInline
@@ -95,7 +110,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             className="relative flex flex-col items-center justify-center"
           >
             <img
-              src="/somos1-logo-official.png"
+              src={imageSrc}
               alt="Somos 1 Tattoo Studio"
               className="w-[75vw] max-w-[280px] h-auto object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.25)]"
             />
@@ -113,7 +128,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           </div>
 
           <p className="font-headline text-[10px] uppercase tracking-[0.3em] text-zinc-400 font-bold">
-            {message}
+            {displayMsg}
           </p>
 
           {onFinish && (
