@@ -178,15 +178,15 @@ export default function Booking() {
 
       await refreshProfile();
 
-      // 1. DISPARO DIRETO DO APP
-      whatsappService.sendBookingConfirmation({
+      // 1. DISPARO DO CICLO DE AGENDAMENTO (Confirmação Imediata + Lembrete + Follow-up)
+      whatsappService.triggerBookingLifecycle({
         id: bookingRef.id,
         userName: profile.name,
         userPhone: profile.phone,
         date: dateStr,
         time: selectedTime,
         descricao_servico: `Tatuagem (${size}) - ${regiaoCorpo}`
-      }, settings || undefined, { explicitUserClick: true });
+      } as any, false, settings || undefined);
 
       navigate('/');
     } catch (err) {

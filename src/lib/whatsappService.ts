@@ -34,7 +34,7 @@ export const whatsappService = {
   async sendViaN8n(payload: {
     to: string;
     text: string;
-    action?: 'confirmacao' | 'reagendamento' | 'lembrete' | 'followup';
+    action?: 'confirmacao' | 'reagendamento' | 'lembrete' | 'followup' | 'cancelamento' | 'lista_espera';
     delay_seconds?: number;
     delayAmount?: number;
     delayUnit?: string;
@@ -43,10 +43,14 @@ export const whatsappService = {
     const rawPhone = payload.to.replace(/\D/g, '');
     const formattedPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
     try {
       const response = await fetch(DEFAULT_N8N_WEBHOOK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           action: payload.action || 'confirmacao',
           phone: formattedPhone,
@@ -57,28 +61,27 @@ export const whatsappService = {
           instance: payload.instance || 'wats'
         })
       });
-      return response.ok;
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        console.warn(`⚠️ [n8n Webhook] Retornou erro HTTP ${response.status}`);
+        return false;
+      }
+      return true;
     } catch (err: any) {
-      console.warn("⚠️ n8n webhook falhou:", err.message);
+      clearTimeout(timeoutId);
+      console.warn("⚠️ [n8n Webhook] Indisponível ou timeout:", err.message);
       return false;
     }
   },
 
-  async sendMessage(to: string, text: string, settings: StudioSettings) {
-    const n8nSuccess = await this.sendViaN8n({
-      to,
-      text,
-      action: 'confirmacao',
-      instance: settings.automation?.evolutionInstance || 'wats'
-    });
-    if (n8nSuccess) return true;
-
-    if (!settings.automation?.enabled || !settings.automation.evolutionBaseUrl) {
-      console.warn("WhatsApp: Configuração ausente.");
+  async sendDirectEvolution(to: string, text: string, settings?: StudioSettings | null) {
+    const resolvedSettings = await this.getSettings(settings || undefined);
+    if (!resolvedSettings?.automation?.enabled || !resolvedSettings.automation.evolutionBaseUrl) {
+      console.warn("WhatsApp: Configuração Evolution ausente ou automação desativada.");
       return false;
     }
 
-    const { evolutionBaseUrl, evolutionApiKey, evolutionInstance } = settings.automation;
+    const { evolutionBaseUrl, evolutionApiKey, evolutionInstance } = resolvedSettings.automation;
     const rawPhone = to.replace(/\D/g, '');
     const formattedPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
@@ -99,11 +102,31 @@ export const whatsappService = {
         })
       });
 
-      return response.ok;
+      if (response.ok) {
+        console.log(`✅ [Evolution API] Mensagem enviada diretamente com sucesso para ${formattedPhone}!`);
+        return true;
+      } else {
+        console.error(`❌ [Evolution API] Erro ao enviar (${response.status}):`, await response.text());
+        return false;
+      }
     } catch (err: any) {
       console.error("❌ Erro WhatsApp direto:", err.message);
       return false;
     }
+  },
+
+  async sendMessage(to: string, text: string, settings?: StudioSettings | null, action: any = 'confirmacao') {
+    const resolvedSettings = await this.getSettings(settings || undefined);
+    const n8nSuccess = await this.sendViaN8n({
+      to,
+      text,
+      action,
+      instance: resolvedSettings?.automation?.evolutionInstance || 'wats'
+    });
+    if (n8nSuccess) return true;
+
+    console.warn(`⚠️ [WhatsApp Service] n8n fora ou falhou. Disparando imediatamente via Evolution API para ${to}...`);
+    return await this.sendDirectEvolution(to, text, resolvedSettings);
   },
 
   formatMessage(template: string, booking: Booking) {
@@ -135,12 +158,8 @@ export const whatsappService = {
       if (!settings?.automation?.enabled) return false;
 
       const template = settings.whatsappTemplates?.confirmacao || "✅ Olá {cliente}, agendamento confirmado para {data} às {horario}!";
-      const success = await this.sendViaN8n({
-        to: booking.userPhone,
-        text: this.formatMessage(template, booking as Booking),
-        action: 'confirmacao',
-        instance: settings.automation?.evolutionInstance || 'wats'
-      });
+      const text = this.formatMessage(template, booking as Booking);
+      const success = await this.sendMessage(booking.userPhone, text, settings, 'confirmacao');
 
       if (success && booking.id) {
         await updateDoc(doc(db, 'bookings', booking.id), { 
@@ -165,13 +184,8 @@ export const whatsappService = {
       const template = settings.whatsappTemplates?.reagendamento || 
         settings.whatsappTemplates?.confirmacao || 
         "🗓️ Olá {cliente}, informamos que seu agendamento foi REAGENDADO com sucesso para {data} às {horario}!";
-
-      const success = await this.sendViaN8n({
-        to: booking.userPhone,
-        text: this.formatMessage(template, booking as Booking),
-        action: 'reagendamento',
-        instance: settings.automation?.evolutionInstance || 'wats'
-      });
+      const text = this.formatMessage(template, booking as Booking);
+      const success = await this.sendMessage(booking.userPhone, text, settings, 'reagendamento');
 
       if (success && booking.id) {
         await updateDoc(doc(db, 'bookings', booking.id), { 
@@ -406,13 +420,9 @@ export const whatsappService = {
 
       const template = settings.whatsappTemplates?.cancelamento || 
         "❌ Olá {cliente}, seu agendamento do dia {data} às {horario} foi cancelado. Se desejar remarcar, estamos à disposição!";
+      const text = this.formatMessage(template, booking as Booking);
 
-      return await this.sendViaN8n({
-        to: booking.userPhone,
-        text: this.formatMessage(template, booking as Booking),
-        action: 'cancelamento',
-        instance: settings.automation?.evolutionInstance || 'wats'
-      });
+      return await this.sendMessage(booking.userPhone, text, settings, 'cancelamento');
     } catch (err) {
       console.error("Erro mensagem de cancelamento:", err);
       return false;
