@@ -5,6 +5,22 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const DEFAULT_N8N_WEBHOOK = 'https://www.marcos9vinci.dedyn.io/webhook/indica-automacao';
 
+/* ==========================================================================
+   🔒 BLOQUEIO ARQUITETURAL DEFINITIVO — NÚCLEO TEMPORAL DE MENSAGERIA 🔒
+   STATUS: CONGELADO / NÃO MODIFICAR
+   Aprovado e validado em 29/09/2026.
+   
+   REGRAS CRÍTICAS IMUTÁVEIS:
+   1. LEMBRETE: Disparado estritamente com antecedência em relação ao HORÁRIO DA SESSÃO:
+      Alvo = (Data/Hora da Sessão) - (Tempo de antecedência configurado).
+   2. FOLLOW-UP: Disparado estritamente após o HORÁRIO DA SESSÃO:
+      Alvo = (Data/Hora da Sessão) + (Tempo pós-sessão configurado).
+   3. UNIDADES VÁLIDAS: 'minutes' | 'hours' | 'days' (estritamente preservadas).
+   4. RESILIÊNCIA: Se o n8n estiver indisponível ou retornar erro, dispara via Evolution API.
+   
+   ⚠️ PROIBIDO ALTERAR O CÁLCULO DE TEMPO OU A INTEGRAÇÃO SEM SOLICITAÇÃO EXPLÍCITA.
+   ========================================================================== */
+
 function unitToMilliseconds(value: number = 2, unit: string = 'minutes'): number {
   switch (unit) {
     case 'minutes':
@@ -150,7 +166,13 @@ export const whatsappService = {
     return null;
   },
 
-  // 1. Confirmação
+  /* ========================================================================
+     ⛔ BLOCO CONGELADO: PIPELINE DE CICLO DE VIDA DO AGENDAMENTO (1 A 5) ⛔
+     ESTA SEÇÃO ESTÁ HOMOLOGADA E TRAVADA POR DETERMINAÇÃO DO USUÁRIO.
+     NÃO ALTERAR A ORDEM DE DISPARO, OS MÉTODOS DE FALLBACK OU OS CÁLCULOS.
+     ======================================================================== */
+
+  // 1. Confirmação (BLOQUEADO / NÃO ALTERAR)
   async sendBookingConfirmation(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, customSettings?: StudioSettings) {
     try {
       if (!booking.userPhone) return false;
@@ -312,6 +334,9 @@ export const whatsappService = {
 
     return { scheduled: true };
   },
+  /* ========================================================================
+     ⛔ FIM DO BLOCO CONGELADO: PIPELINE DE CICLO DE VIDA DO AGENDAMENTO ⛔
+     ======================================================================== */
 
   // 6. Mensagem de Aniversário (CRM)
   async sendBirthdayMessage(client: { name: string; phone?: string; telefone?: string }, couponCode: string = 'NIVER10', customSettings?: StudioSettings) {
