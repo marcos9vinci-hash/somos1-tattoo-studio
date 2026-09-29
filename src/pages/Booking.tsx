@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar as CalendarIcon, Clock, CheckCircle2, ChevronRight, Menu, Info, Radio, Zap, Loader2, AlertCircle, Ban } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, CheckCircle2, ChevronRight, Menu, Info, Radio, Zap, Loader2, AlertCircle, Ban, Upload, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { db, auth } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, updateDoc, doc, increment, getDoc, getDocs, query, where } from 'firebase/firestore';
@@ -34,9 +34,42 @@ export default function Booking() {
   const [size, setSize] = useState<Size>('Média');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
+  const [regiaoCorpo, setRegiaoCorpo] = useState('Antebraço');
+  const [descricaoIdeia, setDescricaoIdeia] = useState('');
+  const [fotosReferencia, setFotosReferencia] = useState<string[]>([]);
+  const [uploadingImg, setUploadingImg] = useState(false);
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState<StudioSettings | null>(null);
   const [bookingsOnDay, setBookingsOnDay] = useState(0);
+
+  const handleUploadFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = e.target.files ? Array.from(e.target.files) : [];
+    if (!files.length) return;
+    setUploadingImg(true);
+
+    const readAsDataURL = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+
+    try {
+      const urls = await Promise.all(files.map(f => readAsDataURL(f)));
+      setFotosReferencia(prev => [...prev, ...urls]);
+    } catch (err) {
+      console.error("Erro ao carregar imagem de referência:", err);
+    } finally {
+      setUploadingImg(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoverFoto = (idx: number) => {
+    setFotosReferencia(prev => prev.filter((_, i) => i !== idx));
+  };
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -66,7 +99,7 @@ export default function Booking() {
   useEffect(() => {
     if (selectedDate) {
       const fetchBookingsOnDay = async () => {
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
         const q = query(collection(db, 'bookings'), where('date', '==', dateStr));
         const snap = await getDocs(q);
         const bookings = snap.docs.map(doc => doc.data());
@@ -93,14 +126,19 @@ export default function Booking() {
     setLoading(true);
     
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       // 1. Create Booking
       const bookingRef = await addDoc(collection(db, 'bookings'), {
         userId: profile.uid,
         userName: profile.name,
+        userPhone: profile.phone || '',
         artistId: null, // Ready for multi-artist
         size,
+        regiao_corpo: regiaoCorpo,
+        fotos_referencia: fotosReferencia,
+        descricao_servico: `Tatuagem (${size}) - ${regiaoCorpo}${descricaoIdeia ? ` - Obs: ${descricaoIdeia}` : ''}`,
+        observacoes: descricaoIdeia,
         date: dateStr,
         time: selectedTime,
         status: BookingStatus.PENDING_APPROVAL,
@@ -132,7 +170,7 @@ export default function Booking() {
           userId: adminDoc.id,
           type: NotificationType.SYSTEM,
           title: 'Novo agendamento! 📅',
-          message: `${profile.name} solicitou uma tattoo (${size}) para ${dateStr}.`,
+          message: `${profile.name} solicitou uma tattoo (${size}) em ${regiaoCorpo} para ${dateStr}.`,
           createdAt: serverTimestamp(),
           read: false
         });
@@ -147,7 +185,7 @@ export default function Booking() {
         userPhone: profile.phone,
         date: dateStr,
         time: selectedTime,
-        descricao_servico: `Tatuagem (${size})`
+        descricao_servico: `Tatuagem (${size}) - ${regiaoCorpo}`
       }, settings || undefined, { explicitUserClick: true });
 
       navigate('/');
@@ -255,13 +293,19 @@ export default function Booking() {
 
     if (isUser && !settings.allowIndicatorBooking) return [];
     if (isUser && !settings.allowArtistBooking) return [];
+
+    // 0.1 Trava de limite de sessões diárias
+    const maxSessions = settings.maxSessionsPerDay || 5;
+    if (bookingsOnDay >= maxSessions) return [];
     
-    const times = [];
+    const times: string[] = [];
     const [startH, startM] = settings.workingHours.start.split(':').map(Number);
     const [endH, endM] = settings.workingHours.end.split(':').map(Number);
     
     const durationMinutes = settings.durations?.[size] || (size === 'Pequena' ? 60 : size === 'Média' ? 120 : 240);
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const isToday = isSameDay(selectedDate, new Date());
+    const now = new Date();
 
     let current = new Date();
     current.setHours(startH, startM, 0, 0);
@@ -271,6 +315,16 @@ export default function Booking() {
     while (current.getTime() + durationMinutes * 60000 <= endTime.getTime()) {
       const timeStr = format(current, 'HH:mm');
       const sessionEnd = new Date(current.getTime() + durationMinutes * 60000);
+
+      // Trava para o mesmo dia: só permite agendamento com pelo menos 60 minutos de antecedência
+      if (isToday) {
+        const slotDateTime = new Date(selectedDate);
+        slotDateTime.setHours(current.getHours(), current.getMinutes(), 0, 0);
+        if (slotDateTime.getTime() <= now.getTime() + 60 * 60 * 1000) {
+          current.setMinutes(current.getMinutes() + 30);
+          continue;
+        }
+      }
 
       // 1. Check against Administrative Blocks
       const isBlocked = settings.blockedIntervals?.some(block => {
@@ -283,12 +337,12 @@ export default function Booking() {
         return sStart < bEnd && sEnd > bStart;
       });
 
-      // 2. Check against existing approved bookings
+      // 2. Check against existing approved bookings (com margem de 15min)
       const isOccupied = existingBookings.some(b => {
         if (b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW) return false;
         const bStart = new Date(`2000-01-01T${b.time}`);
         const bDuration = settings.durations?.[b.size as Size] || (b.size === 'Pequena' ? 60 : b.size === 'Média' ? 120 : 240);
-        const bEnd = new Date(bStart.getTime() + bDuration * 60000);
+        const bEnd = new Date(bStart.getTime() + (bDuration + 15) * 60000);
         
         const sStart = new Date(`2000-01-01T${timeStr}`);
         const sEnd = new Date(`2000-01-01T${format(sessionEnd, 'HH:mm')}`);
@@ -299,7 +353,6 @@ export default function Booking() {
         times.push(timeStr);
       }
       
-      current = addDays(current, 0); // maintain same day
       current.setMinutes(current.getMinutes() + 30); // 30min slot granularity
     }
     return times;
@@ -308,7 +361,7 @@ export default function Booking() {
   const isDayAvailable = (date: Date) => {
     if (!settings) return false;
     const dayOfWeek = date.getDay();
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = format(date, 'yyyy-MM-dd');
     return settings.workingDays.includes(dayOfWeek) && !settings.blockedDates.includes(dateStr);
   };
 
@@ -354,6 +407,91 @@ export default function Booking() {
                 )}
               </button>
             ))}
+
+            {/* Aviso de Estimativa */}
+            <div className="p-3 bg-zinc-900/60 rounded-xl border border-white/5 flex items-start gap-3">
+              <Info className="w-4 h-4 text-primary-fixed flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
+                <strong className="text-white">Estimativa de tempo & valor base:</strong> O valor final e a arte personalizada serão avaliados e validados diretamente pelo tatuador na confirmação do agendamento.
+              </p>
+            </div>
+
+            {/* Detalhes da Ideia & Local */}
+            <div className="space-y-3 pt-2">
+              <label className="text-[10px] font-headline uppercase tracking-widest text-zinc-400 font-bold block">
+                Região do Corpo
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {['Antebraço', 'Braço', 'Perna', 'Costela', 'Costas', 'Peito', 'Mão', 'Pescoço', 'Outro'].map((reg) => (
+                  <button
+                    key={reg}
+                    type="button"
+                    onClick={() => setRegiaoCorpo(reg)}
+                    className={cn(
+                      "py-2 px-3 rounded-lg text-xs font-headline uppercase tracking-wider transition-all border",
+                      regiaoCorpo === reg
+                        ? "bg-primary-fixed text-black font-black border-primary-fixed shadow-[0_0_10px_rgba(204,255,0,0.2)]"
+                        : "glass-panel border-white/5 text-zinc-400 hover:text-white hover:border-white/20"
+                    )}
+                  >
+                    {reg}
+                  </button>
+                ))}
+              </div>
+
+              <label className="text-[10px] font-headline uppercase tracking-widest text-zinc-400 font-bold block pt-2">
+                Ideia / Descrição do desenho
+              </label>
+              <textarea
+                value={descricaoIdeia}
+                onChange={(e) => setDescricaoIdeia(e.target.value)}
+                placeholder="Ex: Leão geométrico no antebraço, traço fino, aprox. 12cm..."
+                rows={2}
+                className="w-full bg-zinc-900/80 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-primary-fixed/50 resize-none font-sans"
+              />
+
+              {/* Upload de Fotos de Referência */}
+              <div className="space-y-2 pt-2">
+                <label className="text-[10px] font-headline uppercase tracking-widest text-zinc-400 font-bold block">
+                  Foto de Referência (Opcional)
+                </label>
+                <div className="border border-dashed border-white/15 rounded-xl p-4 text-center hover:bg-white/5 transition-colors cursor-pointer bg-zinc-900/40">
+                  <input
+                    type="file"
+                    id="booking-foto-upload"
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                    onChange={handleUploadFoto}
+                  />
+                  <label htmlFor="booking-foto-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                    <Upload className="w-5 h-5 text-primary-fixed" />
+                    <span className="text-xs text-zinc-300 font-medium">
+                      {uploadingImg ? "Carregando foto..." : "Clique para anexar foto ou print da ideia"}
+                    </span>
+                    <span className="text-[10px] text-zinc-500">PNG, JPG até 5MB</span>
+                  </label>
+                </div>
+
+                {fotosReferencia.length > 0 && (
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    {fotosReferencia.map((url, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/20 group shadow-md">
+                        <img src={url} alt="Referência" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoverFoto(i)}
+                          className="absolute top-1 right-1 bg-black/80 text-white rounded-full p-0.5 hover:bg-red-500 transition-colors"
+                          title="Remover"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 

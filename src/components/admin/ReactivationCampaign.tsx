@@ -35,7 +35,7 @@ export default function ReactivationCampaign({ users, onClose, days }: Props) {
 
   const getCampaignMessage = (name: string, code: string, daysIn: number) => {
     const firstName = name.split(' ')[0];
-    const baseUrl = `https://indica-ai-app.netlify.app?ref=${code}`;
+    const baseUrl = `https://somos1-tattoo-studio.vercel.app?ref=${code}`;
     
     if (daysIn <= 7) {
       return `💉 Ei ${firstName}! Faz uns dias que você não entra no Clube VIP 👀\n\nVocê ainda tem benefícios te esperando! Dá uma olhada no que tem de novo:\n\n👉 ${baseUrl}\n\nSeu código: ${code}`;

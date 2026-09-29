@@ -233,8 +233,13 @@ return [{
             ]
           },
           sendBody: true,
-          specifyBody: "json",
-          jsonBody: "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": \"{{ $json.message }}\"\n}",
+          specifyBody: "keypair",
+          bodyParameters: {
+            parameters: [
+              { name: "number", value: "={{ $json.phone }}" },
+              { name: "text", value: "={{ $json.message }}" }
+            ]
+          },
           options: {},
           onError: "continueRegularOutput"
         },

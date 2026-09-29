@@ -19,52 +19,75 @@ service cloud.firestore {
     // --- Users ---
     match /users/{userId} {
       allow read: if true;
-      allow write: if true;
+      allow create: if isSignedIn();
+      // Não permite que o próprio usuário comum altere seu role, tier ou saldo de créditos diretamente
+      allow update: if isAdmin() || (
+        isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'tier'])
+      );
+      allow delete: if isAdmin();
     }
 
     // --- Transactions ---
     match /transactions/{transactionId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     // --- Bookings ---
     match /bookings/{bookingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isSignedIn();
+      // Usuário comum não pode aprovar ou alterar valores pagos diretamente
+      allow update: if isAdmin() || (
+        isOwner(resource.data.userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'depositPaid'])
+      );
+      allow delete: if isAdmin();
     }
 
     // --- Studio Settings ---
     match /studio_settings/{settingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // --- Automation Logs ---
     match /automation_logs/{logId} {
-      allow read, write: if true;
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // --- Invites ---
     match /invites/{code} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
     }
 
     // --- Studio Rules ---
     match /studio_rules/{ruleId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // --- Campaigns ---
     match /campaigns/{campaignId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // --- Artists ---
     match /artists/{artistId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // --- Notifications ---
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
   }
 }

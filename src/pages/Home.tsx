@@ -59,7 +59,7 @@ export default function Home() {
   const handleShareWhatsApp = () => {
     if (!profile?.inviteCode) return;
 
-    const message = `💉 Entrei no Clube VIP do meu tatuador!\n\nVocê ganha desconto e eu também 😍\n\nEntre pelo meu link VIP:\nhttps://indica-ai-app.netlify.app?ref=${profile.inviteCode}\n\n(Ou use meu código: ${profile.inviteCode})`;
+    const message = `💉 Entrei no Clube VIP do meu tatuador!\n\nVocê ganha desconto e eu também 😍\n\nEntre pelo meu link VIP:\nhttps://somos1-tattoo-studio.vercel.app?ref=${profile.inviteCode}\n\n(Ou use meu código: ${profile.inviteCode})`;
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
     

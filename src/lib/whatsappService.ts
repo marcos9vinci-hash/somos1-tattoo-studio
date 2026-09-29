@@ -90,7 +90,7 @@ export const whatsappService = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': evolutionApiKey || '020F2F224360-40F7-B022-D17AB8E529E2'
+          'apikey': evolutionApiKey || (import.meta as any).env?.VITE_EVOLUTION_API_KEY || ''
         },
         body: JSON.stringify({
           number: formattedPhone,

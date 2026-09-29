@@ -101,7 +101,7 @@ export const billingService = {
     successUrl?: string,
     cancelUrl?: string
   ): Promise<{ url: string }> {
-    const siteUrl = 'https://galeria-ia-inkdream.netlify.app';
+    const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://somos1-tattoo-studio.vercel.app';
     
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe/create-checkout-session`, {
       method: 'POST',
@@ -123,7 +123,7 @@ export const billingService = {
   },
 
   async createPortalSession(organizationId: string, returnUrl?: string): Promise<{ url: string }> {
-    const siteUrl = 'https://galeria-ia-inkdream.netlify.app';
+    const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://somos1-tattoo-studio.vercel.app';
     
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe/create-portal-session`, {
       method: 'POST',
