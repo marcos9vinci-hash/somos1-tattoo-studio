@@ -37,6 +37,22 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   );
 };
 
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading, profile, isAdmin } = useAuth();
+  
+  if (loading) return <SplashScreen message="Verificando credenciais de estúdio..." />;
+  if (!user) return <Navigate to="/login" />;
+  if (!profile) return <Navigate to="/welcome" />;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  
+  return (
+    <>
+      {children}
+      <BottomNav />
+    </>
+  );
+};
+
 export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -57,8 +73,8 @@ export default function App() {
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/terms" element={<Terms />} />
           
-          <Route path="/" element={<Admin />} />
-          <Route path="/admin" element={<Admin />} />
+          {/* Rotas Oficiais do Cliente / Indicado */}
+          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/network" element={<ProtectedRoute><Network /></ProtectedRoute>} />
           <Route path="/booking" element={<ProtectedRoute><Booking /></ProtectedRoute>} />
@@ -68,11 +84,14 @@ export default function App() {
           <Route path="/como-funciona" element={<HowItWorks />} />
           <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
           <Route path="/transfer" element={<ProtectedRoute><Transfer /></ProtectedRoute>} />
-          <Route path="/test-crm" element={<TestCRM />} />
-          <Route path="/galeria" element={<GaleriaIA />} />
-          <Route path="/estudio-ia" element={<GaleriaIA />} />
-          <Route path="/studio" element={<div className="p-4 md:p-6 bg-black min-h-screen flex items-center justify-center"><TattooEngineModule /></div>} />
-          <Route path="/tattoo-engine" element={<div className="p-4 md:p-6 bg-black min-h-screen flex items-center justify-center"><TattooEngineModule /></div>} />
+
+          {/* Rotas Protegidas Exclusivas do Administrador / Tatuador */}
+          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+          <Route path="/test-crm" element={<AdminRoute><TestCRM /></AdminRoute>} />
+          <Route path="/galeria" element={<AdminRoute><GaleriaIA /></AdminRoute>} />
+          <Route path="/estudio-ia" element={<AdminRoute><GaleriaIA /></AdminRoute>} />
+          <Route path="/studio" element={<AdminRoute><div className="p-4 md:p-6 bg-black min-h-screen flex items-center justify-center"><TattooEngineModule /></div></AdminRoute>} />
+          <Route path="/tattoo-engine" element={<AdminRoute><div className="p-4 md:p-6 bg-black min-h-screen flex items-center justify-center"><TattooEngineModule /></div></AdminRoute>} />
         </Routes>
         <PwaInstallBanner />
       </AuthProvider>

@@ -7,16 +7,19 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
 
-  const navItems = [
+  const baseNavItems = [
     { label: 'Status', icon: Home, path: '/' },
     { label: 'Rede', icon: Users, path: '/network' },
     { label: 'Agendar', icon: Calendar, path: '/booking' },
     { label: 'Ranking', icon: Trophy, path: '/ranking' },
     { label: 'Perfil', icon: User, path: '/profile' },
-    { label: 'Admin', icon: ShieldAlert, path: '/admin' },
   ];
+
+  const navItems = isAdmin 
+    ? [...baseNavItems, { label: 'Admin', icon: ShieldAlert, path: '/admin' }]
+    : baseNavItems;
 
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 pt-3 pb-6 bg-zinc-950/90 backdrop-blur-2xl border-t border-white/10 rounded-t-2xl shadow-[0_-4px_20px_rgba(204,255,0,0.1)]">

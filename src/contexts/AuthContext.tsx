@@ -68,11 +68,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
+  const adminPhones = ['5511957837132', '11957837132', '+5511957837132', '+5511999999999'];
+  const userPhoneClean = (profile?.phone || user?.phoneNumber || '').replace(/\D/g, '');
+  const isAdmin = 
+    profile?.role === UserRole.ADMIN || 
+    profile?.role === 'admin' || 
+    (userPhoneClean.length > 8 && adminPhones.some(p => p.replace(/\D/g, '') === userPhoneClean));
+
   const value = {
     user,
     profile,
     loading,
-    isAdmin: true,
+    isAdmin,
     isAuthenticated: !!user,
     refreshProfile: async () => {
       // With onSnapshot, this is mostly redundant but kept for API compatibility
