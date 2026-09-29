@@ -146,8 +146,8 @@ export default function Admin() {
       evolutionBaseUrl: 'https://p01--evolution--6n2dx6dsdlsf.code.run',
       evolutionApiKey: '020F2F224360-40F7-B022-D17AB8E529E2',
       evolutionInstance: 'wats',
-      reminderValue: 24, reminderUnit: 'hours',
-      followUpValue: 7, followUpUnit: 'days',
+      reminderValue: 2, reminderUnit: 'minutes',
+      followUpValue: 5, followUpUnit: 'minutes',
       enabled: false, confirmationEnabled: false, reminderEnabled: false, followUpEnabled: false
     }
   });

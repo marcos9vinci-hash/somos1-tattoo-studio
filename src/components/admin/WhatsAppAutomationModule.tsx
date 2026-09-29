@@ -495,10 +495,11 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
                   +
                 </button>
                 <select
-                  value={auto.reminderUnit || 'hours'}
+                  value={auto.reminderUnit || 'minutes'}
                   onChange={(e) => updateAutomation('reminderUnit', e.target.value)}
                   className="h-7 text-xs font-bold rounded-lg border border-border bg-card px-2"
                 >
+                  <option value="minutes">Minutos</option>
                   <option value="hours">Horas</option>
                   <option value="days">Dias</option>
                 </select>
@@ -563,12 +564,13 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
                   +
                 </button>
                 <select
-                  value={auto.followUpUnit || 'days'}
+                  value={auto.followUpUnit || 'minutes'}
                   onChange={(e) => updateAutomation('followUpUnit', e.target.value)}
                   className="h-7 text-xs font-bold rounded-lg border border-border bg-card px-2"
                 >
-                  <option value="days">Dias</option>
+                  <option value="minutes">Minutos</option>
                   <option value="hours">Horas</option>
+                  <option value="days">Dias</option>
                 </select>
               </div>
             </div>
