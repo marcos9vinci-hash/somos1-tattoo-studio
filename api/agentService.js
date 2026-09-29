@@ -276,5 +276,172 @@ export const agentService = {
       await updateDoc(settingsRef, { blockedIntervals });
       return { success: true, message: `Intervalo ${date} das ${start} às ${end} bloqueado com sucesso.` };
     }
+  },
+
+  /**
+   * Processador Central de Mensagens Inbound (Meta Business Agent Style)
+   */
+  async processIncomingMessage({ senderPhone, senderName, text }) {
+    const rawText = (text || '').trim();
+    const lower = rawText.toLowerCase();
+
+    // 1. Identifica se é administrador
+    const adminPhones = ['5511948116922', '5511957837132'];
+    const isAdmin = adminPhones.includes(senderPhone);
+
+    // Helpers de Parsing de Data/Hora/Tamanho
+    function parseDate(t) {
+      const now = new Date();
+      const matchBr = t.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+      if (matchBr) {
+        const d = String(matchBr[1]).padStart(2, '0');
+        const m = String(matchBr[2]).padStart(2, '0');
+        const y = matchBr[3] ? (matchBr[3].length === 2 ? '20' + matchBr[3] : matchBr[3]) : String(now.getFullYear());
+        return `${y}-${m}-${d}`;
+      }
+      if (t.includes('hoje')) {
+        return now.toISOString().split('T')[0];
+      }
+      if (t.includes('amanha') || t.includes('amanhã')) {
+        const tm = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        return tm.toISOString().split('T')[0];
+      }
+      const days = { 'domingo': 0, 'segunda': 1, 'terça': 2, 'terca': 2, 'quarta': 3, 'quinta': 4, 'sexta': 5, 'sábado': 6, 'sabado': 6 };
+      for (const [dayName, dayIdx] of Object.entries(days)) {
+        if (t.includes(dayName)) {
+          const currentDay = now.getDay();
+          let diff = dayIdx - currentDay;
+          if (diff <= 0) diff += 7;
+          const target = new Date(now.getTime() + diff * 24 * 60 * 60 * 1000);
+          return target.toISOString().split('T')[0];
+        }
+      }
+      return null;
+    }
+
+    function parseTime(t) {
+      const m = t.match(/(\b[0-2]?\d)(?:[:hH](\d{2})|\s*h\b|\s*horas\b)/i);
+      if (m) {
+        const hour = String(parseInt(m[1])).padStart(2, '0');
+        const min = m[2] ? String(m[2]).padStart(2, '0') : '00';
+        return `${hour}:${min}`;
+      }
+      return null;
+    }
+
+    function parseSize(t) {
+      if (t.includes('grande') || t.includes('fechamento')) return 'Grande';
+      if (t.includes('media') || t.includes('média')) return 'Média';
+      if (t.includes('pequena') || t.includes('delicada') || t.includes('escrita')) return 'Pequena';
+      return 'Média';
+    }
+
+    const targetDate = parseDate(lower);
+    const targetTime = parseTime(lower);
+    const targetSize = parseSize(lower);
+
+    // Classificação de Intenção
+    let intent = 'CONVERSATION';
+
+    if (lower.includes('agenda de') || lower.includes('como tá a agenda') || lower.includes('como esta a agenda') || lower.includes('ver agenda') || (lower.includes('agenda') && (lower.includes('hoje') || lower.includes('amanha')))) {
+      intent = 'SUMMARY';
+    } else if (lower.includes('bloquear') || lower.includes('bloqueia') || lower.includes('trava o dia') || lower.includes('travar')) {
+      intent = 'BLOCK';
+    } else if ((lower.includes('agenda') || lower.includes('agendar') || lower.includes('marcar') || lower.includes('marca')) && targetDate && targetTime) {
+      intent = 'BOOK';
+    } else if (lower.includes('horário') || lower.includes('horario') || lower.includes('vaga') || lower.includes('disponivel') || lower.includes('disponível') || (targetDate && !targetTime)) {
+      intent = 'CHECK_SLOTS';
+    }
+
+    let replyText = '';
+
+    // A. Resumo da Agenda
+    if (intent === 'SUMMARY') {
+      const dateToQuery = targetDate || new Date().toISOString().split('T')[0];
+      const summary = await this.getDailySummary(dateToQuery);
+      replyText = summary.summaryText;
+    }
+
+    // B. Bloqueio de Agenda (Admin)
+    else if (intent === 'BLOCK' && isAdmin) {
+      const dateToBlock = targetDate || new Date().toISOString().split('T')[0];
+      const isFullDay = lower.includes('dia') || !targetTime;
+      const blockRes = await this.blockSlot({
+        date: dateToBlock,
+        start: targetTime || '09:00',
+        end: '19:00',
+        label: 'Bloqueio via WhatsApp (Admin)',
+        fullDay: isFullDay
+      });
+      replyText = `🔒 *Bloqueio Efetuado!*\n${blockRes.message}`;
+    }
+
+    // C. Agendar Diretamente
+    else if (intent === 'BOOK') {
+      let clientName = senderName;
+
+      // Se for o admin agendando para terceiros (Ex: "agenda o Lucas amanhã...")
+      if (isAdmin) {
+        const matchName = rawText.match(/(?:agenda(?:r)?|marca(?:r)?)\s+(?:o|a)?\s*([a-zA-ZÀ-ÿ]+)/i);
+        if (matchName && matchName[1] && !['uma', 'pra', 'para', 'com', 'no', 'na'].includes(matchName[1].toLowerCase())) {
+          clientName = matchName[1].charAt(0).toUpperCase() + matchName[1].slice(1);
+        }
+      }
+
+      const bookRes = await this.createBooking({
+        clientName: clientName,
+        clientPhone: isAdmin ? '' : senderPhone,
+        date: targetDate,
+        time: targetTime,
+        size: targetSize,
+        artistId: 'Markinhos',
+        description: `Tatuagem ${targetSize}`,
+        createdByAdmin: isAdmin,
+        status: 'approved'
+      });
+
+      const [y, m, d] = targetDate.split('-');
+      const formattedDate = `${d}/${m}/${y}`;
+
+      if (isAdmin) {
+        replyText = `✅ *Agendamento Confirmado pelo Admin!*\n\n👤 *Cliente:* ${clientName}\n📅 *Data:* ${formattedDate} às ${targetTime}\n🎨 *Tamanho:* ${targetSize}\n✍️ *Artista:* Markinhos\n\nJá está registrado na agenda do sistema! 🚀`;
+      } else {
+        replyText = `🎉 *Tudo Pronto, ${clientName}!*\n\nSeu horário está *CONFIRMADO* no Somos 1 Tattoo Studio! 🖤\n\n📅 *Data:* ${formattedDate}\n⏰ *Horário:* ${targetTime}\n🎨 *Tamanho:* ${targetSize}\n✍️ *Artista:* Markinhos\n📍 *Local:* Somos 1 Tattoo Studio\n\n💡 Qualquer imprevisto, só responder aqui. Te esperamos! 🤘✨`;
+      }
+    }
+
+    // D. Consultar Horários Disponíveis
+    else if (intent === 'CHECK_SLOTS') {
+      const dateToQuery = targetDate || new Date().toISOString().split('T')[0];
+      const slots = await this.getAvailableSlots(dateToQuery, targetSize);
+
+      const [y, m, d] = dateToQuery.split('-');
+      const formattedDate = `${d}/${m}/${y}`;
+
+      if (slots.available && slots.freeSlots?.length > 0) {
+        const topSlots = slots.freeSlots.slice(0, 6).join('  •  ');
+        replyText = `📅 *Horários Disponíveis para ${slots.dayOfWeek || ''} (${formattedDate}):*\n\n⏰ ${topSlots}\n\nQual desses horários você prefere agendar? Só me responder com a hora desejada (Ex: "Quero às ${slots.freeSlots[0]}")! 🖤`;
+      } else {
+        replyText = `⚠️ Para o dia *${formattedDate}*, o estúdio não tem horários livres disponíveis (${slots.reason || 'agenda completa'}).\n\nGostaria de verificar para o dia seguinte?`;
+      }
+    }
+
+    // E. Conversação / Saudação Padrão
+    else {
+      if (isAdmin) {
+        replyText = `Olá, chefe! 🤘 Sou o assistente da agenda do *Somos 1 Tattoo Studio*.\n\nVocê pode me pedir:\n• *"Agenda o [Nome] [data] às [horário]"*\n• *"Como tá a agenda de hoje / amanhã?"*\n• *"Bloqueia o dia [data]"*\n\nO que deseja fazer agora?`;
+      } else {
+        replyText = `Olá, ${senderName}! 🖤 Tudo bem? Bem-vindo(a) ao *Somos 1 Tattoo Studio*!\n\nSou o assistente virtual de agendamentos. Para marcar seu horário ou tirar dúvidas, você pode:\n\n1. Me dizer qual dia você gostaria de tatuar (Ex: *"Quais horários tem na sexta?"*)\n2. Dizer o horário desejado (Ex: *"Quero agendar amanhã às 15h"*)\n\nComo posso te ajudar hoje? 🤘✨`;
+      }
+    }
+
+    return {
+      intent,
+      isAdmin,
+      targetDate,
+      targetTime,
+      targetSize,
+      replyText
+    };
   }
 };

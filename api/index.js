@@ -45,6 +45,68 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
+    if (path === '/agent/webhook' && req.method === 'POST') {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      
+      // 1. Validar se é evento de mensagem
+      if (body?.event && body.event !== 'messages.upsert') {
+        return res.status(200).json({ status: 'ignored_not_message' });
+      }
+
+      const data = body?.data || body || {};
+      const key = data.key || {};
+
+      // Ignorar mensagens enviadas pelo próprio robô
+      if (key.fromMe) {
+        return res.status(200).json({ status: 'ignored_from_me' });
+      }
+
+      const remoteJid = key.remoteJid || '';
+      if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
+        return res.status(200).json({ status: 'ignored_group' });
+      }
+
+      const senderPhone = remoteJid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+      const senderName = data.pushName || 'Cliente';
+
+      // Extrair texto da mensagem
+      const msg = data.message || {};
+      let userText = msg.conversation || msg.extendedTextMessage?.text || msg.imageMessage?.caption || '';
+
+      if (!userText || userText.trim().length === 0) {
+        return res.status(200).json({ status: 'ignored_empty_text' });
+      }
+
+      // 2. Processar a mensagem pelo Agente
+      const result = await agentService.processIncomingMessage({
+        senderPhone,
+        senderName,
+        text: userText.trim()
+      });
+
+      // 3. Responder via Evolution API
+      if (result.replyText) {
+        try {
+          await fetch('https://p01--evolution--6n2dx6dsdlsf.code.run/message/sendText/wats', {
+            method: 'POST',
+            headers: {
+              'apikey': '020F2F224360-40F7-B022-D17AB8E529E2',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              number: senderPhone,
+              text: result.replyText,
+              linkPreview: true
+            })
+          });
+        } catch (evoErr) {
+          console.error("Erro ao enviar resposta via Evolution API:", evoErr);
+        }
+      }
+
+      return res.status(200).json({ success: true, processed: true, intent: result.intent, replyText: result.replyText });
+    }
+
   const defaultMetaToken = process.env.META_ACCESS_TOKEN || "EAAU25cua8dMBSlwXBhUVk1OkTTUZCY3Xp3ls370kEzfiyigykKvPCtsnl7Inn3nI1Q5xM4oJZAaqpCZCTZBfLP0mIYhZCWhutUJFZCg6OaIGjRCPfBJid90RHCZAdxzpFiAL95itbIAu8i1q0WG5ppJJpJ9R8vFhgKm5Idzs4otBe4vo6au7m7ZCqjlikmSNK3s07QZAjqQz028LNZCxraufZCrLWmK83tvTGp86n1imklBb3eGmGo6XMoLcZAluwiRiaYrp4Ws54bk00kxMqVZCSo9DIn4TojTqTM4OHCyRM2gZDZD";
   const fbToken = req.cookies?.fb_access_token || req.headers.authorization?.replace('Bearer ', '') || defaultMetaToken;
   const bufferToken = process.env.BUFFER_ACCESS_TOKEN || req.cookies?.buffer_access_token;
