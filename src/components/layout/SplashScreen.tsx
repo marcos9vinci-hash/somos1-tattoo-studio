@@ -26,6 +26,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    // Se o vídeo der erro, dá fallback de 3.5s na imagem e abre
+    if (videoError) {
+      const timer = setTimeout(() => {
+        onFinish?.();
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [videoError, onFinish]);
+
   return (
     <div 
       onClick={onFinish}
@@ -54,13 +64,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
               </motion.div>
             )}
 
-            {/* Vídeo Animado 9:16 Oficial em tela cheia */}
+            {/* Vídeo Animado 9:16 Oficial - Rola até o final antes de abrir */}
             <video
               ref={videoRef}
               src="/somos1-intro.mp4"
               autoPlay
               muted
-              loop
               playsInline
               // @ts-ignore
               webkit-playsinline="true"
@@ -69,9 +78,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
               preload="auto"
               onPlay={() => setVideoLoaded(true)}
               onLoadedData={() => setVideoLoaded(true)}
+              onEnded={() => {
+                console.log('[Splash] Vídeo completo finalizado!');
+                onFinish?.();
+              }}
               onError={() => setVideoError(true)}
               style={{ display: videoLoaded ? 'block' : 'none' }}
-              className="w-full max-w-[380px] h-auto max-h-[75vh] object-contain rounded-2xl drop-shadow-[0_0_35px_rgba(255,255,255,0.22)]"
+              className="w-full max-w-[420px] h-auto max-h-[78vh] object-contain rounded-2xl drop-shadow-[0_0_35px_rgba(255,255,255,0.22)]"
             />
           </div>
         ) : (

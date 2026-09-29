@@ -162,10 +162,10 @@ export default function Verify() {
           <button 
             type="submit"
             disabled={loading || code.join('').length < 6}
-            className="w-full h-14 bg-primary-container text-black font-headline text-xl rounded-lg neon-glow active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-50"
+            className="w-full h-14 bg-[#ccff00] hover:bg-[#d4ff33] text-black font-headline text-lg font-black uppercase tracking-wider rounded-xl shadow-[0_0_30px_rgba(204,255,0,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed cursor-pointer"
           >
             {loading ? 'Confirmando...' : 'Confirmar'}
-            {!loading && <ArrowRight className="w-6 h-6" />}
+            {!loading && <ArrowRight className="w-5 h-5 stroke-[3]" />}
           </button>
         </form>
 

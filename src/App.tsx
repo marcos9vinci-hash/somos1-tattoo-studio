@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
@@ -51,6 +51,15 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export default function App() {
+  const [splashFinished, setSplashFinished] = useState(() => {
+    return sessionStorage.getItem('somos1_splash_seen') === 'true';
+  });
+
+  const handleFinishSplash = () => {
+    sessionStorage.setItem('somos1_splash_seen', 'true');
+    setSplashFinished(true);
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const refCode = params.get('ref');
@@ -60,6 +69,10 @@ export default function App() {
       console.log('Código de convite detectado:', refCode);
     }
   }, []);
+
+  if (!splashFinished) {
+    return <SplashScreen onFinish={handleFinishSplash} message="Somos 1 Tattoo Studio" />;
+  }
 
   return (
     <Router>
