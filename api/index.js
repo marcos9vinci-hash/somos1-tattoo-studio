@@ -18,7 +18,15 @@ export default async function handler(req, res) {
   const url = new URL(req.url, `https://${req.headers.host || 'galeria-ia-cloudflare.vercel.app'}`);
   const path = url.pathname.replace(/^\/api/, '');
 
+  const defaultMetaToken = process.env.META_ACCESS_TOKEN || "EAAU25cua8dMBSlwXBhUVk1OkTTUZCY3Xp3ls370kEzfiyigykKvPCtsnl7Inn3nI1Q5xM4oJZAaqpCZCTZBfLP0mIYhZCWhutUJFZCg6OaIGjRCPfBJid90RHCZAdxzpFiAL95itbIAu8i1q0WG5ppJJpJ9R8vFhgKm5Idzs4otBe4vo6au7m7ZCqjlikmSNK3s07QZAjqQz028LNZCxraufZCrLWmK83tvTGp86n1imklBb3eGmGo6XMoLcZAluwiRiaYrp4Ws54bk00kxMqVZCSo9DIn4TojTqTM4OHCyRM2gZDZD";
+  const fbToken = req.cookies?.fb_access_token || req.headers.authorization?.replace('Bearer ', '') || defaultMetaToken;
+  const bufferToken = process.env.BUFFER_ACCESS_TOKEN || req.cookies?.buffer_access_token;
+
   try {
+    if (path === '/health' || path === '' || path === '/') {
+      return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+    }
+
     // ==================== AGENTE WHATSAPP (ENDPOINTS IA) ====================
     if (path === '/agent/slots') {
       const date = url.searchParams.get('date') || req.query?.date;
@@ -105,15 +113,6 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ success: true, processed: true, intent: result.intent, replyText: result.replyText });
-    }
-
-  const defaultMetaToken = process.env.META_ACCESS_TOKEN || "EAAU25cua8dMBSlwXBhUVk1OkTTUZCY3Xp3ls370kEzfiyigykKvPCtsnl7Inn3nI1Q5xM4oJZAaqpCZCTZBfLP0mIYhZCWhutUJFZCg6OaIGjRCPfBJid90RHCZAdxzpFiAL95itbIAu8i1q0WG5ppJJpJ9R8vFhgKm5Idzs4otBe4vo6au7m7ZCqjlikmSNK3s07QZAjqQz028LNZCxraufZCrLWmK83tvTGp86n1imklBb3eGmGo6XMoLcZAluwiRiaYrp4Ws54bk00kxMqVZCSo9DIn4TojTqTM4OHCyRM2gZDZD";
-  const fbToken = req.cookies?.fb_access_token || req.headers.authorization?.replace('Bearer ', '') || defaultMetaToken;
-  const bufferToken = process.env.BUFFER_ACCESS_TOKEN || req.cookies?.buffer_access_token;
-
-  try {
-    if (path === '/health' || path === '' || path === '/') {
-      return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     }
 
     if (path === '/auth/facebook/delete' || path === '/auth/facebook/deauthorize') {
