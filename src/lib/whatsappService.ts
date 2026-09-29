@@ -200,7 +200,7 @@ export const whatsappService = {
     }
   },
 
-  // 3. Lembrete (usando tempo configurado em settings.automation)
+  // 3. Lembrete (Disparado com antecedência configurada em relação à sessão)
   async sendBookingReminder(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, delaySeconds?: number, customSettings?: StudioSettings) {
     try {
       if (!booking.userPhone) return false;
@@ -212,11 +212,19 @@ export const whatsappService = {
 
       let calculatedDelaySec = delaySeconds;
       if (typeof calculatedDelaySec === 'undefined') {
-        const directDelayMs = unitToMilliseconds(reminderValue, reminderUnit);
-        calculatedDelaySec = Math.max(1, Math.round(directDelayMs / 1000));
+        if (booking.date) {
+          const apptDate = parseBookingDateTime(booking.date, booking.time);
+          const reminderLeadMs = unitToMilliseconds(reminderValue, reminderUnit);
+          const targetTimeMs = apptDate.getTime() - reminderLeadMs;
+          const diffSec = Math.round((targetTimeMs - Date.now()) / 1000);
+          calculatedDelaySec = diffSec > 0 ? diffSec : 5;
+        } else {
+          const directDelayMs = unitToMilliseconds(reminderValue, reminderUnit);
+          calculatedDelaySec = Math.max(1, Math.round(directDelayMs / 1000));
+        }
       }
 
-      console.log(`🔔 [WhatsApp Service] Disparando Campainha de Lembrete: delay = ${calculatedDelaySec}s (${reminderValue} ${reminderUnit})`);
+      console.log(`🔔 [WhatsApp Service] Disparando Lembrete: ${calculatedDelaySec}s até o momento do lembrete (${reminderValue} ${reminderUnit} antes de ${booking.date} às ${booking.time})`);
 
       const template = settings.whatsappTemplates?.lembrete || "⏰ Oi {cliente}, passando para lembrar da sua sessão no dia {data} às {horario}!";
       const success = await this.sendViaN8n({
@@ -236,7 +244,7 @@ export const whatsappService = {
     }
   },
 
-  // 4. Follow-up (usando tempo configurado em settings.automation)
+  // 4. Follow-up (Disparado pós-sessão conforme configurado)
   async sendBookingFollowUp(booking: Partial<Booking> & { id?: string; userPhone?: string; userName?: string; date?: string; time?: string }, delaySeconds?: number, customSettings?: StudioSettings) {
     try {
       if (!booking.userPhone) return false;
@@ -248,11 +256,19 @@ export const whatsappService = {
 
       let calculatedDelaySec = delaySeconds;
       if (typeof calculatedDelaySec === 'undefined') {
-        const directDelayMs = unitToMilliseconds(followUpValue, followUpUnit);
-        calculatedDelaySec = Math.max(1, Math.round(directDelayMs / 1000));
+        if (booking.date) {
+          const apptDate = parseBookingDateTime(booking.date, booking.time);
+          const followUpLeadMs = unitToMilliseconds(followUpValue, followUpUnit);
+          const targetTimeMs = apptDate.getTime() + followUpLeadMs;
+          const diffSec = Math.round((targetTimeMs - Date.now()) / 1000);
+          calculatedDelaySec = diffSec > 0 ? diffSec : 5;
+        } else {
+          const directDelayMs = unitToMilliseconds(followUpValue, followUpUnit);
+          calculatedDelaySec = Math.max(1, Math.round(directDelayMs / 1000));
+        }
       }
 
-      console.log(`💬 [WhatsApp Service] Disparando Campainha de Follow-up: delay = ${calculatedDelaySec}s (${followUpValue} ${followUpUnit})`);
+      console.log(`💬 [WhatsApp Service] Disparando Follow-up: ${calculatedDelaySec}s até o momento do follow-up (${followUpValue} ${followUpUnit} após ${booking.date} às ${booking.time})`);
 
       const template = settings.whatsappTemplates?.followup || "✨ Olá {cliente}, como está a cicatrização da sua arte? Qualquer dúvida estamos à disposição!";
       const success = await this.sendViaN8n({
