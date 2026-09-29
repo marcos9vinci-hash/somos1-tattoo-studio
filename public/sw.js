@@ -1,5 +1,5 @@
-// Service Worker oficial v4 do Somos 1 Tattoo Studio PWA
-const CACHE_NAME = 'somos1-cache-v4';
+// Service Worker oficial v5 do Somos 1 Tattoo Studio PWA
+const CACHE_NAME = 'somos1-cache-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

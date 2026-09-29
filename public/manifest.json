@@ -1,8 +1,8 @@
 {
   "name": "Somos 1 Tattoo Studio",
   "short_name": "Somos 1",
-  "id": "/somos1-app-v2",
-  "start_url": "/?source=pwa",
+  "id": "somos1-client-v5",
+  "start_url": "/?pwa=client",
   "scope": "/",
   "display": "standalone",
   "background_color": "#000000",

@@ -26,7 +26,7 @@ import GaleriaIA from './GaleriaIA';
 import ReferralTree from '../components/network/ReferralTree';
 import { buildReferralTree } from '../lib/referralUtils';
 import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
-import SplashScreen from '../components/layout/SplashScreen';
+import LoadingScreen from '../components/layout/LoadingScreen';
 
 // Error Boundary isolador por módulo
 class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: string }, { hasError: boolean; error: Error | null }> {
@@ -1376,7 +1376,7 @@ export default function Admin() {
         {/* VIEWPORT BODY */}
         <main className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
           {loading ? (
-            <SplashScreen message="Carregando Somos 1 Super-App..." />
+            <LoadingScreen message="Carregando Somos 1 Studio..." isAdmin={true} />
           ) : (
             <div>
               

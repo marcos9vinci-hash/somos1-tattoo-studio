@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
 
@@ -16,6 +16,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const hasFinishedRef = useRef(false);
+
+  const handleComplete = useCallback(() => {
+    if (hasFinishedRef.current) return;
+    hasFinishedRef.current = true;
+    console.log('[Splash] Vídeo finalizado com sucesso.');
+    onFinish?.();
+  }, [onFinish]);
 
   const isStudioAdmin = isAdmin ?? (
     typeof window !== 'undefined' && (
@@ -42,18 +50,18 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   }, []);
 
   useEffect(() => {
-    // Se o vídeo der erro, dá fallback de 3.5s na imagem e abre
+    // Se o vídeo der erro, dá fallback de 3.5s na imagem e conclui
     if (videoError) {
       const timer = setTimeout(() => {
-        onFinish?.();
+        handleComplete();
       }, 3500);
       return () => clearTimeout(timer);
     }
-  }, [videoError, onFinish]);
+  }, [videoError, handleComplete]);
 
   return (
     <div 
-      onClick={onFinish}
+      onClick={handleComplete}
       className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-0 m-0 select-none overflow-hidden cursor-pointer"
     >
       {/* Luz ambiente de fundo */}
@@ -93,9 +101,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
               preload="auto"
               onPlay={() => setVideoLoaded(true)}
               onLoadedData={() => setVideoLoaded(true)}
-              onEnded={() => {
-                console.log('[Splash] Vídeo completo finalizado!');
-                onFinish?.();
+              onEnded={handleComplete}
+              onTimeUpdate={(e) => {
+                const v = e.currentTarget;
+                if (v.duration > 0 && v.currentTime >= v.duration - 0.15) {
+                  handleComplete();
+                }
               }}
               onError={() => setVideoError(true)}
               style={{ display: videoLoaded ? 'block' : 'none' }}

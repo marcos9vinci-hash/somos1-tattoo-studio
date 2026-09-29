@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
@@ -10,7 +10,6 @@ import Network from './pages/Network';
 import Booking from './pages/Booking';
 import Ranking from './pages/Ranking';
 import Profile from './pages/Profile';
-import Admin from './pages/Admin';
 import AdminGate from './components/admin/AdminGate';
 import Notifications from './pages/Notifications';
 import HowItWorks from './pages/HowItWorks';
@@ -21,12 +20,13 @@ import TestCRM from './pages/TestCRM';
 import GaleriaIA from './pages/GaleriaIA';
 import TattooEngineModule from './components/studio/TattooEngineModule';
 import SplashScreen from './components/layout/SplashScreen';
+import LoadingScreen from './components/layout/LoadingScreen';
 import PwaInstallBanner from './components/layout/PwaInstallBanner';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, profile } = useAuth();
   
-  if (loading) return <SplashScreen message="Carregando Somos 1..." />;
+  if (loading) return <LoadingScreen message="Carregando Somos 1..." />;
   if (!user) return <Navigate to="/login" />;
   if (!profile) return <Navigate to="/welcome" />;
   
@@ -51,14 +51,23 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export default function App() {
+  const isStudioAdmin = typeof window !== 'undefined' && (
+    window.location.pathname.startsWith('/admin') || 
+    window.location.pathname.startsWith('/studio') ||
+    window.location.pathname.startsWith('/test-crm') ||
+    window.location.pathname.startsWith('/galeria')
+  );
+  
+  const splashStorageKey = isStudioAdmin ? 'somos1_admin_splash_seen' : 'somos1_client_splash_seen';
+
   const [splashFinished, setSplashFinished] = useState(() => {
-    return sessionStorage.getItem('somos1_splash_seen') === 'true';
+    return sessionStorage.getItem(splashStorageKey) === 'true';
   });
 
-  const handleFinishSplash = () => {
-    sessionStorage.setItem('somos1_splash_seen', 'true');
+  const handleFinishSplash = useCallback(() => {
+    sessionStorage.setItem(splashStorageKey, 'true');
     setSplashFinished(true);
-  };
+  }, [splashStorageKey]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -70,13 +79,16 @@ export default function App() {
     }
   }, []);
 
-  if (!splashFinished) {
-    return <SplashScreen onFinish={handleFinishSplash} message="Somos 1 Tattoo Studio" />;
-  }
-
   return (
     <Router>
       <AuthProvider>
+        {!splashFinished && (
+          <SplashScreen 
+            onFinish={handleFinishSplash} 
+            isAdmin={isStudioAdmin} 
+            message={isStudioAdmin ? "Somos 1 Studio" : "Somos 1 Tattoo Studio"} 
+          />
+        )}
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/verify" element={<Verify />} />
