@@ -223,10 +223,10 @@ export default function NovoAgendamentoWizard({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
-      <div className="bg-zinc-950 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl relative max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95">
-        {/* HEADER FIXO - NUNCA CORTA NO CELULAR */}
-        <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-zinc-950 z-10">
+    <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center p-0 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in overflow-hidden">
+      <div className="bg-zinc-950 border-0 sm:border sm:border-white/10 sm:rounded-2xl w-full max-w-lg shadow-2xl relative h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+        {/* HEADER FIXO NO TOPO - NUNCA CORTA NO CELULAR */}
+        <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-zinc-950 z-10 pt-safe">
           <div className="flex items-center gap-3">
             <img src="/somos1-logo-official.png" alt="Somos 1" className="w-10 h-10 object-contain rounded-xl bg-black p-1 border border-white/10 shadow-md" />
             <div>

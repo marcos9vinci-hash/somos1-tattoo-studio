@@ -1977,8 +1977,8 @@ export default function Admin() {
 
           {/* MODAL CADASTRAR NOVO CLIENTE */}
           {isNewClientModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-              <div className="bg-zinc-950 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center p-0 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in overflow-hidden">
+              <div className="bg-zinc-950 border-0 sm:border sm:border-white/10 sm:rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl relative h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col overflow-y-auto">
                 <button
                   type="button"
                   onClick={() => setIsNewClientModalOpen(false)}
