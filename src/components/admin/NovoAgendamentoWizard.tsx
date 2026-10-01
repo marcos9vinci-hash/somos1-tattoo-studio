@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, UserPlus, ChevronUp, ChevronDown, Upload, FileText, Search, ArrowLeft, Check, RotateCcw, Phone, UserCheck, Loader2 } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, getDocs, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp, query, where, doc, updateDoc } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
 import { BookingStatus } from '../../types';
 import { whatsappService } from '../../lib/whatsappService';
@@ -203,21 +203,28 @@ export default function NovoAgendamentoWizard({
     try {
       const selectedUser = clientesLocais.find(c => c.id === form.cliente_id);
       
+      const cleanValue = (val: any, fallback: any = '') => (val === undefined || val === null ? fallback : val);
+
       const payload: any = {
         userId: form.cliente_id,
-        userName: selectedUser?.name || 'Cliente',
-        userPhone: selectedUser?.phone || '',
-        artistId: form.profissional_id || 'admin',
+        userName: cleanValue(selectedUser?.name, 'Cliente'),
+        userPhone: cleanValue(selectedUser?.phone || selectedUser?.telefone, ''),
+        artistId: cleanValue(form.profissional_id, 'admin'),
         date: dataParte,
         time: horaParte,
-        priceEstimated: form.valor_estimado ? parseFloat(form.valor_estimado) : 0,
-        depositPaid: form.valor_sinal ? parseFloat(form.valor_sinal) : 0,
-        fotos_referencia: form.fotos_referencia,
-        descricao_servico: form.descricao_servico,
-        estilo: form.estilo,
-        primeira_tatuagem: form.primeira_tatuagem,
-        regiao_corpo: form.regiao_corpo
+        priceEstimated: form.valor_estimado ? (parseFloat(form.valor_estimado) || 0) : 0,
+        depositPaid: form.valor_sinal ? (parseFloat(form.valor_sinal) || 0) : 0,
+        fotos_referencia: form.fotos_referencia || [],
+        descricao_servico: cleanValue(form.descricao_servico, ''),
+        estilo: cleanValue(form.estilo, ''),
+        primeira_tatuagem: !!form.primeira_tatuagem,
+        regiao_corpo: cleanValue(form.regiao_corpo, '')
       };
+
+      // Remove qualquer chave undefined remanescente
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === undefined) delete payload[key];
+      });
 
       if (agendamentoParaEditar && agendamentoParaEditar.id) {
         await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), {
@@ -298,6 +305,7 @@ export default function NovoAgendamentoWizard({
       }
 
       onSuccess();
+      onClose();
     } catch (error) {
       console.error("Erro ao agendar:", error);
       alert("Erro ao salvar agendamento: " + (error as any).message);
