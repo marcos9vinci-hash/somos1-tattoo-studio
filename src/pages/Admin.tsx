@@ -27,6 +27,7 @@ import ReferralTree from '../components/network/ReferralTree';
 import { buildReferralTree } from '../lib/referralUtils';
 import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
 import LoadingScreen from '../components/layout/LoadingScreen';
+import { CRMDashboardPage } from './CRMDashboardPage';
 
 // Error Boundary isolador por módulo
 class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: string }, { hasError: boolean; error: Error | null }> {
@@ -69,7 +70,7 @@ class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: s
 }
 
 type MainModule = 'agenda' | 'indicaai' | 'studio' | 'galeria' | 'system';
-type AgendaSubTab = 'calendar' | 'members' | 'hours';
+type AgendaSubTab = 'crm' | 'calendar' | 'members' | 'hours';
 type IndicaSubTab = 'dashboard' | 'credits' | 'campaigns' | 'invites' | 'rules' | 'tree';
 type SystemSubTab = 'automation' | 'templates' | 'logs';
 
@@ -594,6 +595,20 @@ export default function Admin() {
             {/* Sub-itens da Cascata */}
             {(!sidebarCollapsed && expandedCategories.agenda) && (
               <div className="p-2 pt-0 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                <button
+                  type="button"
+                  onClick={() => { setCurrentModule('agenda'); setAgendaSubTab('crm'); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-headline font-bold transition-all text-left",
+                    currentModule === 'agenda' && agendaSubTab === 'crm'
+                      ? "bg-amber-500 text-black shadow-xs font-black"
+                      : "text-amber-400 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Dashboard CRM (Funil & IA)</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => { setCurrentModule('agenda'); setAgendaSubTab('calendar'); }}
@@ -1236,6 +1251,16 @@ export default function Admin() {
                 <>
                   <button
                     type="button"
+                    onClick={() => setAgendaSubTab('crm')}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
+                      agendaSubTab === 'crm' ? "bg-amber-500 text-black border-amber-500 shadow-md font-black" : "text-amber-400 border-amber-500/30 bg-card hover:text-white hover:bg-muted/50"
+                    )}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 inline mr-1.5" /> Dashboard CRM & IA
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setAgendaSubTab('calendar')}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all border shrink-0",
@@ -1383,6 +1408,12 @@ export default function Admin() {
               {/* ==================== MÓDULO 1: AGENDA & ATENDIMENTOS ==================== */}
               {currentModule === 'agenda' && (
                 <div className="space-y-6">
+                  {agendaSubTab === 'crm' && (
+                    <ModuleErrorBoundary moduleName="Dashboard CRM">
+                      <CRMDashboardPage />
+                    </ModuleErrorBoundary>
+                  )}
+
                   {agendaSubTab === 'calendar' && (
                     <ModuleErrorBoundary moduleName="Calendário">
                       <div className="space-y-6">

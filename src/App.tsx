@@ -17,6 +17,7 @@ import Onboarding from './pages/Onboarding';
 import Transfer from './pages/Transfer';
 import BottomNav from './components/layout/BottomNav';
 import TestCRM from './pages/TestCRM';
+import { CRMDashboardPage } from './pages/CRMDashboardPage';
 import GaleriaIA from './pages/GaleriaIA';
 import TattooEngineModule from './components/studio/TattooEngineModule';
 import SplashScreen from './components/layout/SplashScreen';
@@ -109,6 +110,7 @@ export default function App() {
 
           {/* Rotas Protegidas Exclusivas do Administrador / Tatuador */}
           <Route path="/admin" element={<AdminGate />} />
+          <Route path="/crm" element={<AdminRoute><CRMDashboardPage /></AdminRoute>} />
           <Route path="/test-crm" element={<AdminRoute><TestCRM /></AdminRoute>} />
           <Route path="/galeria" element={<AdminRoute><GaleriaIA /></AdminRoute>} />
           <Route path="/estudio-ia" element={<AdminRoute><GaleriaIA /></AdminRoute>} />
