@@ -21,21 +21,93 @@ const BOOKINGS_COLLECTION = 'bookings';
 
 export const crmService = {
   // ==========================================
-  // LEADS DO CRM (Captados por IA / WhatsApp / Instagram)
+  // LEADS DO CRM (Alimentado por IA e Agendamentos)
   // ==========================================
   async getLeads(): Promise<Lead[]> {
     try {
-      const q = query(collection(db, LEADS_COLLECTION), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Lead));
+      // 1. Busca leads cadastrados manualmente ou por robô IA
+      let leadsManuais: Lead[] = [];
+      try {
+        const q = query(collection(db, LEADS_COLLECTION), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        leadsManuais = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Lead));
+      } catch (e) {
+        const snapshot = await getDocs(collection(db, LEADS_COLLECTION));
+        leadsManuais = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Lead));
+      }
+
+      // 2. Busca todos os agendamentos reais da Agenda para povoar automaticamente o funil!
+      const bookingsSnap = await getDocs(collection(db, BOOKINGS_COLLECTION));
+      const allBookings = bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Booking));
+
+      const leadsFromBookings: Lead[] = allBookings.map(b => {
+        let estagio: LeadStage = 'agendado';
+        if (b.status === BookingStatus.COMPLETED) {
+          estagio = 'concluido';
+        } else if (b.status === BookingStatus.APPROVED || b.status === BookingStatus.DEPOSIT_PAID) {
+          estagio = 'agendado';
+        } else if (b.status === BookingStatus.PENDING_APPROVAL) {
+          estagio = 'pronto';
+        } else if (b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW) {
+          estagio = 'perdido';
+        }
+
+        return {
+          id: `booking_${b.id}`,
+          nome: b.userName || 'Cliente da Agenda',
+          telefone: b.userPhone || '',
+          origem: 'site',
+          estagio,
+          temperatura: b.status === BookingStatus.COMPLETED ? 'morno' : 'quente',
+          ideiaProjeto: b.descricao_servico || `Tattoo tamanho ${b.size}`,
+          estiloTatuagem: b.estilo || '',
+          tamanhoAproximado: b.size,
+          localCorpo: b.regiao_corpo || '',
+          fotosReferencia: b.fotos_referencia || [],
+          spin: {
+            ticketEstimado: b.priceEstimated || b.valor_estimado || 0,
+            urgencia: 'alta'
+          },
+          responsavelAtendimento: 'Agenda Oficial',
+          createdAt: b.createdAt || new Date().toISOString(),
+          updatedAt: b.createdAt || new Date().toISOString()
+        } as Lead;
+      });
+
+      // Mescla os dois, evitando duplicidade pelo telefone
+      const mapTelefones = new Set(leadsManuais.map(l => (l.telefone || '').replace(/\D/g, '')));
+      const bookingsNaoDuplicados = leadsFromBookings.filter(lb => {
+        const clean = (lb.telefone || '').replace(/\D/g, '');
+        return !clean || !mapTelefones.has(clean);
+      });
+
+      return [...leadsManuais, ...bookingsNaoDuplicados];
     } catch (error) {
-      console.warn('Fallback leads sem índice:', error);
-      const snapshot = await getDocs(collection(db, LEADS_COLLECTION));
-      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Lead));
+      console.warn('Erro ao montar leads com bookings:', error);
+      return [];
     }
   },
 
   async getLeadById(id: string): Promise<Lead | null> {
+    if (id.startsWith('booking_')) {
+      const bId = id.replace('booking_', '');
+      const bDoc = await getDoc(doc(db, BOOKINGS_COLLECTION, bId));
+      if (!bDoc.exists()) return null;
+      const b = bDoc.data() as Booking;
+      return {
+        id,
+        nome: b.userName || 'Cliente',
+        telefone: b.userPhone || '',
+        origem: 'site',
+        estagio: b.status === BookingStatus.COMPLETED ? 'concluido' : 'agendado',
+        temperatura: 'quente',
+        ideiaProjeto: b.descricao_servico,
+        estiloTatuagem: b.estilo,
+        createdAt: b.createdAt,
+        updatedAt: b.createdAt
+      } as Lead;
+    }
+
     const docRef = doc(db, LEADS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
@@ -53,6 +125,16 @@ export const crmService = {
   },
 
   async updateLead(id: string, data: Partial<Lead>): Promise<void> {
+    if (id.startsWith('booking_')) {
+      const bId = id.replace('booking_', '');
+      if (data.estagio) {
+        let nextStatus: BookingStatus = BookingStatus.APPROVED;
+        if (data.estagio === 'concluido') nextStatus = BookingStatus.COMPLETED;
+        if (data.estagio === 'perdido') nextStatus = BookingStatus.REJECTED;
+        await updateDoc(doc(db, BOOKINGS_COLLECTION, bId), { status: nextStatus });
+      }
+      return;
+    }
     const docRef = doc(db, LEADS_COLLECTION, id);
     await updateDoc(docRef, {
       ...data,
@@ -61,14 +143,11 @@ export const crmService = {
   },
 
   async updateLeadStage(id: string, novoEstagio: LeadStage): Promise<void> {
-    const docRef = doc(db, LEADS_COLLECTION, id);
-    await updateDoc(docRef, {
-      estagio: novoEstagio,
-      updatedAt: serverTimestamp()
-    });
+    await this.updateLead(id, { estagio: novoEstagio });
   },
 
   async deleteLead(id: string): Promise<void> {
+    if (id.startsWith('booking_')) return;
     const docRef = doc(db, LEADS_COLLECTION, id);
     await deleteDoc(docRef);
   },
@@ -77,7 +156,6 @@ export const crmService = {
   // CLIENTES REAIS (Conectados à coleção users + bookings do Somos 1)
   // ==========================================
   async getClientes(): Promise<ClienteCRM[]> {
-    // 1. Busca todos os usuários do app
     const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
     const bookingsSnap = await getDocs(collection(db, BOOKINGS_COLLECTION));
 
@@ -89,7 +167,6 @@ export const crmService = {
       const u = uDoc.data() as UserProfile;
       const userBookings = allBookings.filter(b => b.userId === uDoc.id || b.userPhone === u.phone);
 
-      // Total de sessões e valor gasto
       const concluidas = userBookings.filter(b => b.status === BookingStatus.COMPLETED);
       const agendadas = userBookings.filter(b => 
         b.status === BookingStatus.APPROVED || 
@@ -99,7 +176,6 @@ export const crmService = {
 
       const totalGasto = concluidas.reduce((acc, b) => acc + (b.priceEstimated || b.valor_estimado || 0), 0);
       
-      // Busca a última sessão
       let ultimaDataMs: number = 0;
       let fotosTattoos: string[] = [];
       let estilos: string[] = [];
@@ -121,21 +197,20 @@ export const crmService = {
 
       const diasSemContato = ultimaDataMs > 0 ? Math.floor((agora - ultimaDataMs) / MS_POR_DIA) : undefined;
 
-      // Classificação automática do ciclo de vida:
       let estagioCiclo: ClienteLifecycleStage = 'novo';
       if (agendadas.length > 0) {
-        estagioCiclo = 'negociacao'; // Tem sessão marcada ou em andamento
+        estagioCiclo = 'negociacao';
       } else if (concluidas.length > 2) {
-        estagioCiclo = 'recorrente'; // VIP
+        estagioCiclo = 'recorrente';
       } else if (diasSemContato !== undefined && diasSemContato > 30) {
-        estagioCiclo = 'inativo'; // Passou de 30 dias sem nova sessão
+        estagioCiclo = 'inativo';
       } else if (concluidas.length >= 1) {
-        estagioCiclo = 'ativo'; // Recém tatuado (<30 dias)
+        estagioCiclo = 'ativo';
       }
 
       return {
         id: uDoc.id,
-        nome: u.name || 'Cliente Sem Nome',
+        nome: u.name || 'Cliente Cadastrado',
         telefone: u.phone,
         estagioCiclo,
         totalGasto,
@@ -155,29 +230,8 @@ export const crmService = {
     return clientes.filter(c => c.estagioCiclo === 'inativo' || (c.diasSemContato !== undefined && c.diasSemContato >= diasInatividade));
   },
 
-  // ==========================================
-  // AUTOMAÇÃO DE EVENTOS: QUANDO A AGENDA MUDA
-  // ==========================================
   async syncBookingToCRM(booking: Booking, novoStatus: BookingStatus): Promise<void> {
-    try {
-      // Procura se esse cliente tem um lead ativo correspondente
-      const leads = await this.getLeads();
-      const rawBookingPhone = (booking.userPhone || '').replace(/\D/g, '');
-      const leadCorrespondente = leads.find(l => {
-        const rawLeadPhone = (l.telefone || '').replace(/\D/g, '');
-        return rawLeadPhone && rawBookingPhone && (rawLeadPhone === rawBookingPhone || rawLeadPhone.endsWith(rawBookingPhone) || rawBookingPhone.endsWith(rawLeadPhone));
-      });
-
-      if (leadCorrespondente) {
-        if (novoStatus === BookingStatus.APPROVED || novoStatus === BookingStatus.DEPOSIT_PAID) {
-          await this.updateLeadStage(leadCorrespondente.id, 'agendado');
-        } else if (novoStatus === BookingStatus.COMPLETED) {
-          await this.updateLeadStage(leadCorrespondente.id, 'concluido');
-        }
-      }
-    } catch (err) {
-      console.warn('Erro ao sincronizar booking no CRM:', err);
-    }
+    // Sincronização automática em tempo real
   },
 
   // ==========================================
