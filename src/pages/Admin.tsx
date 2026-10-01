@@ -17,6 +17,7 @@ import { cn } from '../lib/utils';
 import AdminDashboard from './AdminDashboard';
 import { creditService } from '../lib/creditService';
 import UnifiedCalendar from '../components/admin/UnifiedCalendar';
+import NovoAgendamentoWizard from '../components/admin/NovoAgendamentoWizard';
 import { AgendaScheduleSettings } from '../components/admin/AgendaScheduleSettings';
 import { WhatsAppAutomationModule } from '../components/admin/WhatsAppAutomationModule';
 import { WhatsAppTemplatesModule } from '../components/admin/WhatsAppTemplatesModule';
@@ -1448,7 +1449,17 @@ export default function Admin() {
                                 {b.status === BookingStatus.PENDING_APPROVAL && (<><button onClick={() => handleStatusChange(b, BookingStatus.APPROVED)} className="flex-1 bg-blue-600/20 text-blue-400 text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg border border-blue-600/30 hover:bg-blue-600/30 font-black">Aprovar</button><button onClick={() => handleStatusChange(b, BookingStatus.REJECTED)} className="flex-1 bg-red-600/20 text-red-400 text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg border border-blue-600/30 hover:bg-blue-600/30 font-black">Recusar</button></>)}
                                 {b.status === BookingStatus.APPROVED && (<button onClick={() => handleStatusChange(b, BookingStatus.DEPOSIT_PAID, { depositPaid: 80 })} className="flex-1 bg-primary-fixed/20 text-primary-fixed text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg border border-primary-fixed/30 hover:bg-primary-fixed/30 font-black">Confirmar Sinal (R$80)</button>)}
                                 {(b.status === BookingStatus.DEPOSIT_PAID || b.status === BookingStatus.RESCHEDULED || b.status === BookingStatus.APPROVED) && (<button onClick={() => handleCompleteTattoo(b)} className="flex-1 bg-primary-fixed text-black text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg hover:opacity-90 font-black shadow-lg shadow-primary-fixed/20 animate-pulse">✅ Concluir Serviço</button>)}
-                                {b.status !== BookingStatus.COMPLETED && b.status !== BookingStatus.REJECTED && (<div className="flex gap-2 w-full mt-2"><button onClick={() => setSelectedBooking(b)} className="flex-1 bg-zinc-800 text-zinc-400 text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg hover:bg-zinc-700 font-black">Reagendar</button><button onClick={() => handleStatusChange(b, BookingStatus.NO_SHOW)} className="px-4 bg-zinc-800 text-red-400 text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg hover:bg-zinc-700 font-black">No-Show</button></div>)}
+                                {b.status !== BookingStatus.COMPLETED && b.status !== BookingStatus.REJECTED && (
+                                  <div className="flex gap-2 w-full mt-2">
+                                    <button onClick={() => setSelectedBooking(b)} className="flex-1 bg-zinc-800 text-zinc-300 hover:text-white text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg hover:bg-zinc-700 font-black flex items-center justify-center gap-1.5 transition-all">
+                                      <Settings className="w-3 h-3 text-primary-fixed" />
+                                      Editar Tattoo
+                                    </button>
+                                    <button onClick={() => handleStatusChange(b, BookingStatus.NO_SHOW)} className="px-4 bg-zinc-800 text-red-400 text-[10px] font-headline uppercase tracking-widest py-2 rounded-lg hover:bg-zinc-700 font-black">
+                                      No-Show
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1864,19 +1875,17 @@ export default function Admin() {
             </div>
           )}
 
-          {/* RESCHEDULE MODAL */}
+          {/* MODAL DE EDIÇÃO COMPLETA DA TATTOO (MESMOS MODAIS DE NOVO AGENDAMENTO) */}
           {selectedBooking && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
-              <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setSelectedBooking(null)}></div>
-              <div className="bg-zinc-900 border border-white/10 p-6 rounded-2xl w-full max-w-sm relative z-10">
-                <h3 className="font-headline text-lg text-white mb-4 uppercase">Reagendar Tattoo</h3>
-                <div className="space-y-4">
-                  <div><label className="text-[10px] uppercase font-headline text-zinc-500 block mb-1">Nova Data</label><input type="date" onChange={(e) => setRescheduleData({...rescheduleData, date: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg h-12 px-4 text-white" /></div>
-                  <div><label className="text-[10px] uppercase font-headline text-zinc-500 block mb-1">Novo Horário</label><input type="time" onChange={(e) => setRescheduleData({...rescheduleData, time: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg h-12 px-4 text-white" /></div>
-                  <div className="flex gap-2 pt-2"><button onClick={() => setSelectedBooking(null)} className="flex-1 py-3 bg-zinc-800 text-white rounded-lg font-headline text-[10px] uppercase">Cancelar</button><button onClick={() => handleStatusChange(selectedBooking, BookingStatus.RESCHEDULED, rescheduleData)} className="flex-1 py-3 bg-primary-fixed text-black rounded-lg font-headline text-[10px] uppercase font-black">Confirmar</button></div>
-                </div>
-              </div>
-            </div>
+            <NovoAgendamentoWizard
+              isOpen={!!selectedBooking}
+              onClose={() => setSelectedBooking(null)}
+              onSuccess={() => {
+                setSelectedBooking(null);
+                fetchData(true);
+              }}
+              agendamentoParaEditar={selectedBooking}
+            />
           )}
 
           {/* ADJUST CREDITS MODAL */}

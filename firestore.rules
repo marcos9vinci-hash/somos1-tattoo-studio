@@ -89,5 +89,18 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
+
+    // --- CRM Collections ---
+    match /leads/{leadId} {
+      allow read, write: if true;
+    }
+
+    match /clientes/{clienteId} {
+      allow read, write: if true;
+    }
+
+    match /crm_tasks/{taskId} {
+      allow read, write: if true;
+    }
   }
 }

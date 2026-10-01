@@ -224,7 +224,34 @@ export default function NovoAgendamentoWizard({
           ...payload,
           updatedAt: serverTimestamp()
         });
-        alert("Agendamento atualizado com sucesso!");
+
+        if (form.enviarConfirmacao && selectedUser) {
+          whatsappService.triggerBookingLifecycle({
+            id: agendamentoParaEditar.id,
+            userName: selectedUser.name || 'Cliente',
+            userPhone: selectedUser.phone || '',
+            date: dataParte,
+            time: horaParte,
+            descricao_servico: form.descricao_servico,
+            artistId: form.profissional_id
+          }, false, {
+            automation: {
+              enabled: true,
+              confirmationEnabled: true,
+              reminderEnabled: form.enviarLembrete,
+              reminderValue: Number(form.tempoLembreteValor) || 2,
+              reminderUnit: form.tempoLembreteUnidade,
+              followUpEnabled: form.enviarFollowUp,
+              followUpValue: Number(form.tempoFollowUpValor) || 2,
+              followUpUnit: form.tempoFollowUpUnidade,
+              evolutionInstance: 'wats'
+            }
+          } as any, { explicitUserClick: true }).catch(err => {
+            console.warn("Aviso no disparo do ciclo de automação ao editar:", err);
+          });
+        }
+
+        alert("Tattoo atualizada com sucesso!");
         onSuccess();
         onClose();
         return;
@@ -289,7 +316,9 @@ export default function NovoAgendamentoWizard({
           <div className="flex items-center gap-3">
             <img src="/somos1-logo-official.png" alt="Somos 1" className="w-10 h-10 object-contain rounded-xl bg-black p-1 border border-white/10 shadow-md" />
             <div>
-              <h2 className="text-lg font-bold text-white uppercase font-headline tracking-wide leading-none">Novo Agendamento</h2>
+              <h2 className="text-lg font-bold text-white uppercase font-headline tracking-wide leading-none">
+                {agendamentoParaEditar ? "Editar Tattoo" : "Novo Agendamento"}
+              </h2>
               <p className="text-[10px] text-primary-fixed font-headline font-bold uppercase tracking-widest mt-1">Somos 1 Tattoo Studio</p>
             </div>
           </div>
@@ -802,7 +831,7 @@ export default function NovoAgendamentoWizard({
               className="w-full bg-primary-fixed text-black font-headline font-black py-3.5 rounded-xl uppercase tracking-widest text-xs disabled:opacity-50 hover:bg-primary-fixed/90 transition-all shadow-lg shadow-primary-fixed/20 active:scale-98"
               disabled={isLoading || !form.cliente_id || !form.data_agendamento}
             >
-              {isLoading ? "Salvando..." : "Confirmar Agendamento"}
+              {isLoading ? "Salvando..." : (agendamentoParaEditar ? "Salvar Alterações" : "Confirmar Agendamento")}
             </button>
           </div>
         </form>

@@ -513,7 +513,6 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
             setSelectedBookingDetails(null);
             setEditingBooking(b);
             setIsWizardOpen(true);
-            onEditBooking?.(b);
           }}
           onStatusChange={() => {
             onBookingCreated?.(); // Refresh view
