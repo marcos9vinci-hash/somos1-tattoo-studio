@@ -38,13 +38,8 @@ service cloud.firestore {
     // --- Bookings ---
     match /bookings/{bookingId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      // Usuário comum não pode aprovar ou alterar valores pagos diretamente
-      allow update: if isAdmin() || (
-        isOwner(resource.data.userId) && 
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'depositPaid'])
-      );
-      allow delete: if isAdmin();
+      allow create, update: if true;
+      allow delete: if isAdmin() || isSignedIn();
     }
 
     // --- Studio Settings ---
