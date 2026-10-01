@@ -28,6 +28,7 @@ import { buildReferralTree } from '../lib/referralUtils';
 import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
 import LoadingScreen from '../components/layout/LoadingScreen';
 import { CRMDashboardPage } from './CRMDashboardPage';
+import { crmService } from '../lib/crmService';
 
 // Error Boundary isolador por módulo
 class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: string }, { hasError: boolean; error: Error | null }> {
@@ -269,6 +270,9 @@ export default function Admin() {
       }
       await updateDoc(doc(db, 'bookings', booking.id), updateData);
       
+      // Sincroniza automaticamente a esteira do CRM (lead/cliente)
+      crmService.syncBookingToCRM(booking, nextStatus);
+
       if (isReschedule) {
         whatsappService.triggerBookingLifecycle({
           ...booking,
