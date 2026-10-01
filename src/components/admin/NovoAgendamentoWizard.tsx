@@ -13,6 +13,7 @@ interface NovoAgendamentoWizardProps {
   onSuccess: () => void;
   initialDate?: Date | null;
   initialTime?: string | null;
+  agendamentoParaEditar?: Booking | null;
 }
 
 export default function NovoAgendamentoWizard({
@@ -20,7 +21,8 @@ export default function NovoAgendamentoWizard({
   onClose,
   onSuccess,
   initialDate,
-  initialTime
+  initialTime,
+  agendamentoParaEditar
 }: NovoAgendamentoWizardProps) {
   const [form, setForm] = useState({
     cliente_id: '',
@@ -41,7 +43,7 @@ export default function NovoAgendamentoWizard({
     tempoLembreteUnidade: 'hours', // minutes, hours, days
     enviarFollowUp: true,
     tempoFollowUpValor: 2,
-    tempoFollowUpUnidade: 'days' // hours, days
+    tempoFollowUpUnidade: 'minutes' // minutes, hours, days
   });
 
   const [clientesLocais, setClientesLocais] = useState<any[]>([]);
@@ -69,11 +71,34 @@ export default function NovoAgendamentoWizard({
     if (isOpen) {
       fetchClientes();
       setClientSearch('');
-      const dateStr = initialDate ? initialDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-      const timeStr = initialTime || '10:00';
-      setForm(f => ({ ...f, data_agendamento: `${dateStr}T${timeStr}` }));
+      if (agendamentoParaEditar) {
+        setForm({
+          cliente_id: agendamentoParaEditar.userId || '',
+          profissional_id: agendamentoParaEditar.artistId || '',
+          data_agendamento: `${agendamentoParaEditar.date}T${agendamentoParaEditar.time || '10:00'}`,
+          descricao_servico: agendamentoParaEditar.descricao_servico || '',
+          valor_estimado: agendamentoParaEditar.priceEstimated?.toString() || agendamentoParaEditar.valor_estimado?.toString() || '',
+          valor_sinal: agendamentoParaEditar.depositPaid?.toString() || agendamentoParaEditar.valor_sinal?.toString() || '',
+          estilo: agendamentoParaEditar.estilo || '',
+          primeira_tatuagem: agendamentoParaEditar.primeira_tatuagem || false,
+          regiao_corpo: agendamentoParaEditar.regiao_corpo || '',
+          fotos_referencia: agendamentoParaEditar.fotos_referencia || [],
+          enviarConfirmacao: false,
+          tempoConfirmacao: 'imediato',
+          enviarLembrete: true,
+          tempoLembreteValor: 2,
+          tempoLembreteUnidade: 'hours',
+          enviarFollowUp: true,
+          tempoFollowUpValor: 2,
+          tempoFollowUpUnidade: 'minutes'
+        });
+      } else {
+        const dateStr = initialDate ? initialDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        const timeStr = initialTime || '10:00';
+        setForm(f => ({ ...f, data_agendamento: `${dateStr}T${timeStr}` }));
+      }
     }
-  }, [isOpen, initialDate, initialTime]);
+  }, [isOpen, initialDate, initialTime, agendamentoParaEditar]);
 
   const filteredClientes = useMemo(() => {
     const q = clientSearch.toLowerCase().trim();
@@ -178,26 +203,37 @@ export default function NovoAgendamentoWizard({
     try {
       const selectedUser = clientesLocais.find(c => c.id === form.cliente_id);
       
-      const payload = {
+      const payload: any = {
         userId: form.cliente_id,
         userName: selectedUser?.name || 'Cliente',
         userPhone: selectedUser?.phone || '',
         artistId: form.profissional_id || 'admin',
         date: dataParte,
         time: horaParte,
-        size: 'Média', // default mapping
         priceEstimated: form.valor_estimado ? parseFloat(form.valor_estimado) : 0,
         depositPaid: form.valor_sinal ? parseFloat(form.valor_sinal) : 0,
-        creditsUsed: 0,
-        status: BookingStatus.APPROVED,
-        createdAt: serverTimestamp(),
-        // Extra fields
         fotos_referencia: form.fotos_referencia,
         descricao_servico: form.descricao_servico,
         estilo: form.estilo,
         primeira_tatuagem: form.primeira_tatuagem,
         regiao_corpo: form.regiao_corpo
       };
+
+      if (agendamentoParaEditar && agendamentoParaEditar.id) {
+        await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), {
+          ...payload,
+          updatedAt: serverTimestamp()
+        });
+        alert("Agendamento atualizado com sucesso!");
+        onSuccess();
+        onClose();
+        return;
+      }
+
+      payload.size = 'Média';
+      payload.creditsUsed = 0;
+      payload.status = BookingStatus.APPROVED;
+      payload.createdAt = serverTimestamp();
 
       const docRef = await addDoc(collection(db, 'bookings'), payload);
       alert("Agendamento realizado com sucesso!");
@@ -748,6 +784,7 @@ export default function NovoAgendamentoWizard({
                     value={form.tempoFollowUpUnidade}
                     onChange={e => handleChange('tempoFollowUpUnidade', e.target.value)}
                   >
+                    <option value="minutes">Minutos depois</option>
                     <option value="hours">Horas depois</option>
                     <option value="days">Dias depois</option>
                   </select>

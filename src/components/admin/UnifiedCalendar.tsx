@@ -64,6 +64,7 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardInitialDate, setWizardInitialDate] = useState<Date | null>(null);
   const [wizardInitialTime, setWizardInitialTime] = useState<string | null>(null);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [selectedBookingDetails, setSelectedBookingDetails] = useState<Booking | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [localSettings, setLocalSettings] = useState<StudioSettings>(settings);
@@ -491,19 +492,29 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
       <>
         <NovoAgendamentoWizard 
           isOpen={isWizardOpen}
-          onClose={() => setIsWizardOpen(false)}
+          onClose={() => {
+            setIsWizardOpen(false);
+            setEditingBooking(null);
+          }}
           onSuccess={() => {
             setIsWizardOpen(false);
+            setEditingBooking(null);
             onBookingCreated?.();
           }}
           initialDate={wizardInitialDate}
           initialTime={wizardInitialTime}
+          agendamentoParaEditar={editingBooking}
         />
         <DetalhesAgendamentoModal
           agendamento={selectedBookingDetails}
           settings={settings}
           onClose={() => setSelectedBookingDetails(null)}
-          onEdit={onEditBooking}
+          onEdit={(b) => {
+            setSelectedBookingDetails(null);
+            setEditingBooking(b);
+            setIsWizardOpen(true);
+            onEditBooking?.(b);
+          }}
           onStatusChange={() => {
             onBookingCreated?.(); // Refresh view
           }}
