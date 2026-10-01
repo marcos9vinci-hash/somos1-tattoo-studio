@@ -72,6 +72,7 @@ export default function NovoAgendamentoWizard({
       fetchClientes();
       setClientSearch('');
       if (agendamentoParaEditar) {
+        const customAuto = agendamentoParaEditar.customAutomation;
         setForm({
           cliente_id: agendamentoParaEditar.userId || '',
           profissional_id: agendamentoParaEditar.artistId || '',
@@ -85,12 +86,12 @@ export default function NovoAgendamentoWizard({
           fotos_referencia: agendamentoParaEditar.fotos_referencia || [],
           enviarConfirmacao: false,
           tempoConfirmacao: 'imediato',
-          enviarLembrete: true,
-          tempoLembreteValor: 2,
-          tempoLembreteUnidade: 'hours',
-          enviarFollowUp: true,
-          tempoFollowUpValor: 2,
-          tempoFollowUpUnidade: 'minutes'
+          enviarLembrete: customAuto?.enviarLembrete ?? true,
+          tempoLembreteValor: customAuto?.reminderValue ?? 2,
+          tempoLembreteUnidade: customAuto?.reminderUnit ?? 'hours',
+          enviarFollowUp: customAuto?.enviarFollowUp ?? true,
+          tempoFollowUpValor: customAuto?.followUpValue ?? 2,
+          tempoFollowUpUnidade: customAuto?.followUpUnit ?? 'minutes'
         });
       } else {
         const dateStr = initialDate ? initialDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
@@ -218,7 +219,15 @@ export default function NovoAgendamentoWizard({
         descricao_servico: cleanValue(form.descricao_servico, ''),
         estilo: cleanValue(form.estilo, ''),
         primeira_tatuagem: !!form.primeira_tatuagem,
-        regiao_corpo: cleanValue(form.regiao_corpo, '')
+        regiao_corpo: cleanValue(form.regiao_corpo, ''),
+        customAutomation: {
+          reminderValue: Number(form.tempoLembreteValor) || 2,
+          reminderUnit: form.tempoLembreteUnidade || 'hours',
+          followUpValue: Number(form.tempoFollowUpValor) || 2,
+          followUpUnit: form.tempoFollowUpUnidade || 'minutes',
+          enviarLembrete: form.enviarLembrete,
+          enviarFollowUp: form.enviarFollowUp
+        }
       };
 
       // Remove qualquer chave undefined remanescente
@@ -227,21 +236,43 @@ export default function NovoAgendamentoWizard({
       });
 
       if (agendamentoParaEditar && agendamentoParaEditar.id) {
-        await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), {
+        // Detecta se a data ou horário foram alterados
+        const oldDate = agendamentoParaEditar.date;
+        const oldTime = agendamentoParaEditar.time;
+        const isDateTimeChanged = Boolean(
+          (dataParte && oldDate && dataParte !== oldDate) ||
+          (horaParte && oldTime && horaParte !== oldTime)
+        );
+
+        const updateData: any = {
           ...payload,
           updatedAt: serverTimestamp()
-        });
+        };
 
-        if (form.enviarConfirmacao && selectedUser) {
+        // Se mudou data/hora, marca como REAGENDADO e reseta flags de envio
+        if (isDateTimeChanged) {
+          updateData.status = BookingStatus.RESCHEDULED;
+          updateData.rescheduleSent = false;
+          updateData.reminderSent = false;
+          updateData.followUpSent = false;
+        }
+
+        await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), updateData);
+
+        // Dispara mensagem no WhatsApp se houver reagendamento OU se o usuário marcou enviar confirmação
+        if (selectedUser && (isDateTimeChanged || form.enviarConfirmacao)) {
+          const isReschedule = isDateTimeChanged;
           whatsappService.triggerBookingLifecycle({
             id: agendamentoParaEditar.id,
             userName: selectedUser.name || 'Cliente',
-            userPhone: selectedUser.phone || '',
+            userPhone: selectedUser.phone || selectedUser.telefone || '',
             date: dataParte,
             time: horaParte,
             descricao_servico: form.descricao_servico,
-            artistId: form.profissional_id
-          }, false, {
+            artistId: form.profissional_id,
+            priceEstimated: payload.priceEstimated,
+            depositPaid: payload.depositPaid
+          }, isReschedule, {
             automation: {
               enabled: true,
               confirmationEnabled: true,
@@ -253,12 +284,12 @@ export default function NovoAgendamentoWizard({
               followUpUnit: form.tempoFollowUpUnidade,
               evolutionInstance: 'wats'
             }
-          } as any, { explicitUserClick: true }).catch(err => {
+          } as any).catch(err => {
             console.warn("Aviso no disparo do ciclo de automação ao editar:", err);
           });
         }
 
-        alert("Tattoo atualizada com sucesso!");
+        alert(isDateTimeChanged ? "Agendamento reagendado e atualizado com sucesso!" : "Tattoo atualizada com sucesso!");
         onSuccess();
         onClose();
         return;
@@ -291,15 +322,17 @@ export default function NovoAgendamentoWizard({
         const bookingData = {
           id: docRef.id,
           userName: selectedUser.name || 'Cliente',
-          userPhone: selectedUser.phone || '',
+          userPhone: selectedUser.phone || selectedUser.telefone || '',
           date: dataParte,
           time: horaParte,
           descricao_servico: form.descricao_servico,
-          artistId: form.profissional_id
+          artistId: form.profissional_id,
+          priceEstimated: payload.priceEstimated,
+          depositPaid: payload.depositPaid
         };
 
         // Aciona o ciclo completo: Envia Confirmação + agenda Lembrete e Follow-up com tempos definidos
-        whatsappService.triggerBookingLifecycle(bookingData, false, dynamicSettings as any, { explicitUserClick: true }).catch(err => {
+        whatsappService.triggerBookingLifecycle(bookingData, false, dynamicSettings as any).catch(err => {
           console.warn("Aviso no disparo do ciclo de automação:", err);
         });
       }

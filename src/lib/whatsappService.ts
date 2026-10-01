@@ -147,23 +147,51 @@ export const whatsappService = {
 
   formatMessage(template: string, booking: Booking) {
     if (!template) return "";
+    const clienteNome = booking.userName || 'Cliente';
+    const primeiroNome = clienteNome.split(' ')[0] || clienteNome;
+    const dataFmt = booking.date ? booking.date.split('-').reverse().join('/') : '';
+    const valorEstimado = booking.priceEstimated || booking.valor_estimado ? `R$ ${booking.priceEstimated || booking.valor_estimado}` : '';
+    const valorSinal = booking.depositPaid || booking.valor_sinal ? `R$ ${booking.depositPaid || booking.valor_sinal}` : '';
+
     return template
-      .replace(/{cliente}/g, booking.userName || 'Cliente')
-      .replace(/{data}/g, booking.date ? booking.date.split('-').reverse().join('/') : '')
+      .replace(/{cliente}/g, clienteNome)
+      .replace(/{primeiro_nome}/g, primeiroNome)
+      .replace(/{data}/g, dataFmt)
       .replace(/{horario}/g, booking.time || '')
       .replace(/{servico}/g, booking.descricao_servico || 'tatuagem')
-      .replace(/{profissional}/g, booking.artistId || 'Markinhos');
+      .replace(/{profissional}/g, booking.artistId || 'Markinhos')
+      .replace(/{valor}/g, valorEstimado)
+      .replace(/{sinal}/g, valorSinal);
   },
 
   async getSettings(customSettings?: StudioSettings): Promise<StudioSettings | null> {
-    if (customSettings) return customSettings;
+    let baseSettings: StudioSettings | null = null;
     try {
       const snap = await getDoc(doc(db, 'studio_settings', 'main'));
-      if (snap.exists()) return snap.data() as StudioSettings;
+      if (snap.exists()) baseSettings = snap.data() as StudioSettings;
     } catch (e) {
       console.error("Erro ao carregar settings:", e);
     }
-    return null;
+
+    if (!customSettings) return baseSettings;
+    if (!baseSettings) return customSettings;
+
+    return {
+      ...baseSettings,
+      ...customSettings,
+      automation: {
+        ...(baseSettings.automation || {}),
+        ...(customSettings.automation || {}),
+        evolutionBaseUrl: customSettings.automation?.evolutionBaseUrl || baseSettings.automation?.evolutionBaseUrl || 'https://p01--evolution--6n2dx6dsdlsf.code.run',
+        evolutionApiKey: customSettings.automation?.evolutionApiKey || baseSettings.automation?.evolutionApiKey || '020F2F224360-40F7-B022-D17AB8E529E2',
+        evolutionInstance: customSettings.automation?.evolutionInstance || baseSettings.automation?.evolutionInstance || 'wats',
+        enabled: customSettings.automation?.enabled ?? baseSettings.automation?.enabled ?? true
+      },
+      whatsappTemplates: {
+        ...(baseSettings.whatsappTemplates || {}),
+        ...(customSettings.whatsappTemplates || {})
+      }
+    };
   },
 
   /* ========================================================================
