@@ -32,7 +32,16 @@ export default function NovoAgendamentoWizard({
     estilo: '',
     primeira_tatuagem: false,
     regiao_corpo: '',
-    fotos_referencia: [] as string[]
+    fotos_referencia: [] as string[],
+    // Opções de tempo para automação WhatsApp
+    enviarConfirmacao: true,
+    tempoConfirmacao: 'imediato', // imediato, 5min, 15min
+    enviarLembrete: true,
+    tempoLembreteValor: 2,
+    tempoLembreteUnidade: 'hours', // minutes, hours, days
+    enviarFollowUp: true,
+    tempoFollowUpValor: 2,
+    tempoFollowUpUnidade: 'days' // hours, days
   });
 
   const [clientesLocais, setClientesLocais] = useState<any[]>([]);
@@ -193,8 +202,22 @@ export default function NovoAgendamentoWizard({
       const docRef = await addDoc(collection(db, 'bookings'), payload);
       alert("Agendamento realizado com sucesso!");
 
-      // 1. DISPARO DO CICLO COMPLETO DO WHATSAPP (Confirmação, Lembrete e Follow-up)
       if (selectedUser) {
+        // Configurações personalizadas definidas diretamente neste agendamento
+        const dynamicSettings = {
+          automation: {
+            enabled: true,
+            confirmationEnabled: form.enviarConfirmacao,
+            reminderEnabled: form.enviarLembrete,
+            reminderValue: Number(form.tempoLembreteValor) || 2,
+            reminderUnit: form.tempoLembreteUnidade,
+            followUpEnabled: form.enviarFollowUp,
+            followUpValue: Number(form.tempoFollowUpValor) || 2,
+            followUpUnit: form.tempoFollowUpUnidade,
+            evolutionInstance: 'wats'
+          }
+        };
+
         const bookingData = {
           id: docRef.id,
           userName: selectedUser.name || 'Cliente',
@@ -205,8 +228,8 @@ export default function NovoAgendamentoWizard({
           artistId: form.profissional_id
         };
 
-        // Aciona o ciclo completo: Envia Confirmação imediata + agenda Lembrete e Follow-up no n8n com tempos dinâmicos
-        whatsappService.triggerBookingLifecycle(bookingData, false, undefined, { explicitUserClick: true }).catch(err => {
+        // Aciona o ciclo completo: Envia Confirmação + agenda Lembrete e Follow-up com tempos definidos
+        whatsappService.triggerBookingLifecycle(bookingData, false, dynamicSettings as any, { explicitUserClick: true }).catch(err => {
           console.warn("Aviso no disparo do ciclo de automação:", err);
         });
       }
@@ -619,6 +642,118 @@ export default function NovoAgendamentoWizard({
                 ))}
               </div>
             )}
+          </div>
+
+          {/* CONFIGURAÇÃO DE TEMPOS DE WHATSAPP (Confirmação, Lembrete, Follow-up) */}
+          <div className="bg-zinc-900/80 border border-primary-fixed/20 rounded-xl p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">💬</span>
+                <span className="text-xs font-bold text-white uppercase font-headline tracking-wider">Disparos WhatsApp Automáticos</span>
+              </div>
+              <span className="text-[10px] text-primary-fixed bg-primary-fixed/10 px-2 py-0.5 rounded-full font-bold">Evolution Ativa</span>
+            </div>
+
+            {/* 1. Confirmação */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-primary-fixed w-3.5 h-3.5 rounded"
+                    checked={form.enviarConfirmacao}
+                    onChange={e => handleChange('enviarConfirmacao', e.target.checked)}
+                  />
+                  <span>1. Confirmação do Agendamento</span>
+                </label>
+                <span className="text-[11px] text-zinc-400">Tempo:</span>
+              </div>
+              {form.enviarConfirmacao && (
+                <div className="grid grid-cols-2 gap-2 pl-5">
+                  <select
+                    className="w-full bg-zinc-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary-fixed"
+                    value={form.tempoConfirmacao}
+                    onChange={e => handleChange('tempoConfirmacao', e.target.value)}
+                  >
+                    <option value="imediato">⚡ Imediato (ao salvar)</option>
+                    <option value="5min">⏱️ Após 5 minutos</option>
+                    <option value="15min">⏱️ Após 15 minutos</option>
+                  </select>
+                  <p className="text-[10px] text-zinc-500 flex items-center">Dispara no zap com dados da tattoo</p>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Lembrete Pré-Sessão */}
+            <div className="space-y-1.5 border-t border-white/5 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-primary-fixed w-3.5 h-3.5 rounded"
+                    checked={form.enviarLembrete}
+                    onChange={e => handleChange('enviarLembrete', e.target.checked)}
+                  />
+                  <span>2. Lembrete de Sessão</span>
+                </label>
+                <span className="text-[11px] text-zinc-400">Antecedência:</span>
+              </div>
+              {form.enviarLembrete && (
+                <div className="grid grid-cols-2 gap-2 pl-5">
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-full bg-zinc-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary-fixed"
+                    value={form.tempoLembreteValor}
+                    onChange={e => handleChange('tempoLembreteValor', e.target.value)}
+                  />
+                  <select
+                    className="w-full bg-zinc-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary-fixed"
+                    value={form.tempoLembreteUnidade}
+                    onChange={e => handleChange('tempoLembreteUnidade', e.target.value)}
+                  >
+                    <option value="minutes">Minutos antes</option>
+                    <option value="hours">Horas antes</option>
+                    <option value="days">Dias antes</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Follow-up Pós-Tattoo */}
+            <div className="space-y-1.5 border-t border-white/5 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-primary-fixed w-3.5 h-3.5 rounded"
+                    checked={form.enviarFollowUp}
+                    onChange={e => handleChange('enviarFollowUp', e.target.checked)}
+                  />
+                  <span>3. Follow-up (Pós-Venda / Cicatrização)</span>
+                </label>
+                <span className="text-[11px] text-zinc-400">Após a tattoo:</span>
+              </div>
+              {form.enviarFollowUp && (
+                <div className="grid grid-cols-2 gap-2 pl-5">
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-full bg-zinc-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary-fixed"
+                    value={form.tempoFollowUpValor}
+                    onChange={e => handleChange('tempoFollowUpValor', e.target.value)}
+                  />
+                  <select
+                    className="w-full bg-zinc-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary-fixed"
+                    value={form.tempoFollowUpUnidade}
+                    onChange={e => handleChange('tempoFollowUpUnidade', e.target.value)}
+                  >
+                    <option value="hours">Horas depois</option>
+                    <option value="days">Dias depois</option>
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           </div>

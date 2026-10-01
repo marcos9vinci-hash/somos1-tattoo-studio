@@ -28,12 +28,13 @@ const STATUS_COLORS = {
 };
 
 const statusOptions = [
-  { value: BookingStatus.APPROVED, label: 'Aprovado', icon: Calendar },
-  { value: BookingStatus.DEPOSIT_PAID, label: 'Sinal Pago', icon: CheckCircle2 },
-  { value: BookingStatus.PENDING_APPROVAL, label: 'Pendente', icon: Loader2 },
-  { value: BookingStatus.COMPLETED, label: 'Concluído', icon: CheckCircle2, color: 'text-green-500' },
-  { value: BookingStatus.REJECTED, label: 'Recusado', icon: AlertTriangle },
-  { value: BookingStatus.RESCHEDULED, label: 'Reagendado', icon: List }
+  { value: BookingStatus.APPROVED, label: '🟢 Confirmado / Aprovado', icon: CheckCircle2 },
+  { value: BookingStatus.DEPOSIT_PAID, label: '🟢 Sinal Pago', icon: CheckCircle2 },
+  { value: BookingStatus.PENDING_APPROVAL, label: '🟡 Agendado / Pendente', icon: Loader2 },
+  { value: BookingStatus.NO_SHOW, label: '🔴 Faltou (Não Compareceu)', icon: AlertTriangle },
+  { value: BookingStatus.COMPLETED, label: '✅ Concluído', icon: CheckCircle2, color: 'text-green-500' },
+  { value: BookingStatus.REJECTED, label: '❌ Cancelado / Recusado', icon: AlertTriangle },
+  { value: BookingStatus.RESCHEDULED, label: '🗓️ Reagendado', icon: List }
 ];
 
 const MESSAGE_TYPES = [

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Ban, X, Clock, User, Ruler, Plus, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Ban, X, Clock, User, Ruler, Plus, UserPlus, Settings as SettingsIcon, Sliders } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Booking, StudioSettings, BookingStatus } from '../../types';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import NovoAgendamentoWizard from './NovoAgendamentoWizard';
 import DetalhesAgendamentoModal from './DetalhesAgendamentoModal';
+import { AgendaScheduleSettings } from './AgendaScheduleSettings';
 interface UnifiedCalendarProps {
   bookings: Booking[];
   settings: StudioSettings;
@@ -24,6 +25,37 @@ interface QuickBookingForm {
   priceEstimated: number;
 }
 
+// CORES E BORDAS DOS AGENDAMENTOS (Confirmado: verde | Faltou: vermelho | Agendado: amarelo)
+function getBookingStatusTheme(status: string) {
+  switch (status) {
+    case BookingStatus.APPROVED:
+    case BookingStatus.DEPOSIT_PAID:
+      return {
+        badgeBg: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50',
+        ringClass: 'ring-2 ring-emerald-500/80 shadow-emerald-500/10',
+        dotColor: 'bg-emerald-500',
+        label: 'Confirmado'
+      };
+    case BookingStatus.NO_SHOW:
+    case BookingStatus.REJECTED:
+      return {
+        badgeBg: 'bg-red-500/20 text-red-400 border border-red-500/50',
+        ringClass: 'ring-2 ring-red-500/80 shadow-red-500/10',
+        dotColor: 'bg-red-500',
+        label: 'Faltou'
+      };
+    case BookingStatus.PENDING_APPROVAL:
+    case BookingStatus.DEPOSIT_PENDING:
+    default:
+      return {
+        badgeBg: 'bg-amber-500/20 text-amber-400 border border-amber-500/50',
+        ringClass: 'ring-2 ring-amber-500/80 shadow-amber-500/10',
+        dotColor: 'bg-amber-500',
+        label: 'Agendado'
+      };
+  }
+}
+
 export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBookingCreated, onEditBooking }: UnifiedCalendarProps) {
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -33,6 +65,24 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
   const [wizardInitialDate, setWizardInitialDate] = useState<Date | null>(null);
   const [wizardInitialTime, setWizardInitialTime] = useState<string | null>(null);
   const [selectedBookingDetails, setSelectedBookingDetails] = useState<Booking | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [localSettings, setLocalSettings] = useState<StudioSettings>(settings);
+
+  // Sincroniza localSettings quando settings mudar
+  React.useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
+
+  const handleSaveSettings = async () => {
+    try {
+      await setDoc(doc(db, 'studio_settings', 'main'), localSettings);
+      alert('Configurações da agenda salvas com sucesso!');
+      setIsSettingsOpen(false);
+      onBookingCreated?.();
+    } catch (err: any) {
+      alert('Erro ao salvar configurações: ' + err.message);
+    }
+  };
 
   const next = () => {
     if (view === 'month') setCurrentDate(addMonths(currentDate, 1));
@@ -98,7 +148,16 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
           className="flex items-center gap-1.5 px-4 py-2 bg-primary-fixed text-black font-headline font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-90 transition-all shadow-md active:scale-95 shrink-0"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Novo Agendamento / Cliente</span>
+          <span>Novo Agendamento</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsSettingsOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 text-foreground font-headline font-bold text-xs uppercase tracking-wider rounded-xl border border-border transition-all active:scale-95 shrink-0"
+          title="Configurações Completas da Agenda"
+        >
+          <Sliders className="w-4 h-4" />
+          <span className="hidden sm:inline">Configurar Agenda</span>
         </button>
         <div className="flex gap-1.5">
           <button onClick={prev} className="p-2 hover:bg-muted rounded-xl border border-border text-foreground transition-colors" title="Anterior">
@@ -156,15 +215,23 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
                 {(blocked || hasSpecificBlocks) && <Ban className="w-3 h-3 text-destructive/50" />}
               </div>
               <div className="mt-1.5 space-y-0.5">
-                {dayBookings.slice(0, 3).map(b => (
-                  <div 
-                    key={b.id} 
-                    onClick={(e) => { e.stopPropagation(); setSelectedBookingDetails(b); }}
-                    className="text-[8px] px-1.5 py-0.5 rounded bg-muted text-foreground border border-border truncate font-headline uppercase hover:bg-muted/80 transition-colors z-20 cursor-pointer font-bold"
-                  >
-                    {b.time} · {b.userName || 'Tattoo'}
-                  </div>
-                ))}
+                {dayBookings.slice(0, 3).map(b => {
+                  const theme = getBookingStatusTheme(b.status);
+                  return (
+                    <div 
+                      key={b.id} 
+                      onClick={(e) => { e.stopPropagation(); setSelectedBookingDetails(b); }}
+                      className={cn(
+                        "text-[8px] px-1.5 py-0.5 rounded truncate font-headline uppercase transition-all z-20 cursor-pointer font-bold flex items-center gap-1",
+                        theme.badgeBg
+                      )}
+                      title={`${b.userName} - ${theme.label}`}
+                    >
+                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", theme.dotColor)} />
+                      <span className="truncate">{b.time} · {b.userName || 'Tattoo'}</span>
+                    </div>
+                  );
+                })}
                 {dayBookings.length > 3 && (
                   <div className="text-[8px] text-muted-foreground pl-1 font-headline font-bold">+{dayBookings.length - 3}</div>
                 )}
@@ -241,15 +308,25 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
                         {specificBlock.label || 'Bloqueado'}
                       </div>
                     )}
-                    {booking && (
-                      <div 
-                        className="absolute inset-1 rounded-lg bg-muted text-foreground border border-border p-1.5 overflow-hidden z-20 cursor-pointer hover:bg-muted/80 transition-colors shadow-xs"
-                        onClick={(e) => { e.stopPropagation(); setSelectedBookingDetails(booking); }}
-                      >
-                        <p className="text-[8px] font-black text-foreground uppercase truncate">{booking.userName}</p>
-                        <p className="text-[7px] text-muted-foreground uppercase">{booking.time} · {booking.size}</p>
-                      </div>
-                    )}
+                    {booking && (() => {
+                      const theme = getBookingStatusTheme(booking.status);
+                      return (
+                        <div 
+                          className={cn(
+                            "absolute inset-1 rounded-lg p-1.5 overflow-hidden z-20 cursor-pointer transition-all shadow-xs flex flex-col justify-between",
+                            theme.badgeBg,
+                            theme.ringClass
+                          )}
+                          onClick={(e) => { e.stopPropagation(); setSelectedBookingDetails(booking); }}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-[8px] font-black uppercase truncate">{booking.userName}</p>
+                            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", theme.dotColor)} />
+                          </div>
+                          <p className="text-[7px] opacity-80 uppercase">{booking.time} · {theme.label}</p>
+                        </div>
+                      );
+                    })()}
                     {!isBlocked && !booking && (
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
                         <span className="text-[8px] text-foreground font-headline font-black">+ Agendar</span>
@@ -302,29 +379,38 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
                   key={hour}
                   onClick={() => !isBlockedHour && !outsideWorkHours && !booking && openDayModal(currentDate, hour)}
                   className={cn(
-                    'flex items-center gap-4 group rounded-xl border transition-all',
+                    'flex items-center gap-4 group rounded-xl border transition-all p-4',
                     booking
-                      ? 'bg-muted border-border cursor-default p-4'
+                      ? (() => {
+                          const theme = getBookingStatusTheme(booking.status);
+                          return cn(theme.badgeBg, theme.ringClass, 'cursor-pointer');
+                        })()
                       : isBlockedHour
-                      ? 'bg-destructive/5 border-destructive/10 opacity-60 cursor-not-allowed p-4'
+                      ? 'bg-destructive/5 border-destructive/10 opacity-60 cursor-not-allowed'
                       : outsideWorkHours
-                      ? 'bg-muted/10 border-border/30 opacity-40 cursor-not-allowed p-4'
-                      : 'bg-card border-border hover:bg-muted/40 cursor-pointer p-4'
+                      ? 'bg-muted/10 border-border/30 opacity-40 cursor-not-allowed'
+                      : 'bg-card border-border hover:bg-muted/40 cursor-pointer'
                   )}
                 >
                   <span className="w-12 text-[10px] text-muted-foreground font-headline font-bold shrink-0">{hourPrefix}00</span>
                   <div className="flex-1">
-                    {booking ? (
-                      <div className="flex items-center justify-between cursor-pointer" onClick={() => setSelectedBookingDetails(booking)}>
-                        <div>
-                          <p className="text-xs font-black text-foreground uppercase tracking-widest">{booking.userName}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase">{booking.time} · {booking.size} · R$ {booking.priceEstimated}</p>
+                    {booking ? (() => {
+                      const theme = getBookingStatusTheme(booking.status);
+                      return (
+                        <div className="flex items-center justify-between cursor-pointer" onClick={() => setSelectedBookingDetails(booking)}>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className={cn("w-2 h-2 rounded-full", theme.dotColor)} />
+                              <p className="text-xs font-black uppercase tracking-widest">{booking.userName}</p>
+                            </div>
+                            <p className="text-[10px] opacity-80 uppercase mt-0.5">{booking.time} · {booking.size} · R$ {booking.priceEstimated}</p>
+                          </div>
+                          <span className={cn("text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-wider", theme.badgeBg)}>
+                            {theme.label}
+                          </span>
                         </div>
-                        <span className="text-[8px] bg-foreground text-background px-2 py-1 rounded font-black uppercase tracking-tighter">
-                          {booking.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    ) : (
+                      );
+                    })() : (
                       <span className="text-[10px] text-muted-foreground font-headline uppercase tracking-widest group-hover:text-foreground flex items-center gap-2 transition-colors">
                         {isBlockedHour
                           ? <><Ban className="w-3 h-3 text-destructive" /> {specificBlock?.label || 'Bloqueado'}</>
@@ -362,21 +448,31 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
           <div className="glass-panel p-6 rounded-2xl border border-white/5">
             <h4 className="text-[10px] font-headline font-black text-zinc-500 uppercase tracking-widest mb-4">Agenda do Dia</h4>
             <div className="space-y-3">
-              {dayBookings.sort((a, b) => a.time.localeCompare(b.time)).map(b => (
-                <div 
-                  key={b.id} 
-                  className="flex items-center gap-3 p-3 bg-black/40 rounded-xl border border-white/5 cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => setSelectedBookingDetails(b)}
-                >
-                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-black text-primary-fixed">
-                    {b.userName?.charAt(0) || '?'}
+              {dayBookings.sort((a, b) => a.time.localeCompare(b.time)).map(b => {
+                const theme = getBookingStatusTheme(b.status);
+                return (
+                  <div 
+                    key={b.id} 
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border",
+                      theme.badgeBg,
+                      theme.ringClass
+                    )}
+                    onClick={() => setSelectedBookingDetails(b)}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-[10px] font-black border border-white/10 shrink-0">
+                      {b.userName?.charAt(0) || '?'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-[10px] font-black uppercase truncate">{b.userName}</p>
+                        <span className="text-[8px] font-bold uppercase">{theme.label}</span>
+                      </div>
+                      <p className="text-[8px] opacity-70 uppercase">{b.time} · {b.size}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-white uppercase">{b.userName}</p>
-                    <p className="text-[8px] text-zinc-500 uppercase">{b.time} · {b.size}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {dayBookings.length === 0 && (
                 <p className="text-[10px] text-zinc-600 font-headline text-center py-4">
                   {isDayOff ? 'Dia de folga.' : 'Nenhum agendamento.'}
@@ -412,6 +508,40 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
             onBookingCreated?.(); // Refresh view
           }}
         />
+
+        {/* MODAL COM TODAS AS CONFIGURAÇÕES DA AGENDA */}
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
+            <div className="bg-zinc-950 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl relative my-6 max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+              <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-zinc-950">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-primary-fixed/20 text-primary-fixed flex items-center justify-center font-bold">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white uppercase font-headline tracking-wide">Configurações Completas da Agenda</h3>
+                    <p className="text-[10px] text-zinc-400 font-headline">Dias, horários de funcionamento e bloqueios de intervalo</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 scrollbar-thin">
+                <AgendaScheduleSettings
+                  settings={localSettings}
+                  setSettings={setLocalSettings}
+                  handleUpdateSettings={handleSaveSettings}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   };
