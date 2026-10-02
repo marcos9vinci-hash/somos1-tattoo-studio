@@ -17,24 +17,24 @@ interface DetalhesAgendamentoModalProps {
 }
 
 const STATUS_COLORS = {
-  [BookingStatus.APPROVED]: "bg-blue-500",
-  [BookingStatus.DEPOSIT_PAID]: "bg-green-500",
-  [BookingStatus.PENDING_APPROVAL]: "bg-yellow-500",
-  [BookingStatus.COMPLETED]: "bg-gray-400",
-  [BookingStatus.REJECTED]: "bg-red-500",
-  [BookingStatus.RESCHEDULED]: "bg-orange-500",
-  [BookingStatus.DEPOSIT_PENDING]: "bg-orange-300",
-  [BookingStatus.NO_SHOW]: "bg-red-700",
+  [BookingStatus.COMPLETED]: "bg-emerald-500 text-white",
+  [BookingStatus.DEPOSIT_PAID]: "bg-purple-600 text-white",
+  [BookingStatus.APPROVED]: "bg-sky-500 text-white",
+  [BookingStatus.RESCHEDULED]: "bg-amber-500 text-black",
+  [BookingStatus.PENDING_APPROVAL]: "bg-orange-500 text-white",
+  [BookingStatus.DEPOSIT_PENDING]: "bg-orange-400 text-white",
+  [BookingStatus.NO_SHOW]: "bg-rose-600 text-white",
+  [BookingStatus.REJECTED]: "bg-zinc-600 text-white",
 };
 
 const statusOptions = [
-  { value: BookingStatus.APPROVED, label: '🟢 Confirmado / Aprovado', icon: CheckCircle2 },
-  { value: BookingStatus.DEPOSIT_PAID, label: '🟢 Sinal Pago', icon: CheckCircle2 },
-  { value: BookingStatus.PENDING_APPROVAL, label: '🟡 Agendado / Pendente', icon: Loader2 },
-  { value: BookingStatus.NO_SHOW, label: '🔴 Faltou (Não Compareceu)', icon: AlertTriangle },
-  { value: BookingStatus.COMPLETED, label: '✅ Concluído', icon: CheckCircle2, color: 'text-green-500' },
-  { value: BookingStatus.REJECTED, label: '❌ Cancelado / Recusado', icon: AlertTriangle },
-  { value: BookingStatus.RESCHEDULED, label: '🗓️ Reagendado', icon: List }
+  { value: BookingStatus.APPROVED, label: '🔵 Agendado (Data Reservada)', icon: Calendar, color: 'text-sky-400' },
+  { value: BookingStatus.DEPOSIT_PAID, label: '🟣 Sinal Pago (Confirmado VIP)', icon: CheckCircle2, color: 'text-purple-400' },
+  { value: BookingStatus.RESCHEDULED, label: '🟡 Reagendado (Nova Data)', icon: List, color: 'text-amber-400' },
+  { value: BookingStatus.PENDING_APPROVAL, label: '🟠 Aguardando Aprovação', icon: Loader2, color: 'text-orange-400' },
+  { value: BookingStatus.COMPLETED, label: '🟢 Concluído (Trabalho Realizado)', icon: CheckCircle2, color: 'text-emerald-400' },
+  { value: BookingStatus.NO_SHOW, label: '🔴 Faltou (Não Compareceu)', icon: AlertTriangle, color: 'text-rose-400' },
+  { value: BookingStatus.REJECTED, label: '⚫ Desmarcou / Cancelado', icon: AlertTriangle, color: 'text-zinc-400' }
 ];
 
 const MESSAGE_TYPES = [
