@@ -9,7 +9,8 @@ import {
   Clock, 
   Flame, 
   MoreVertical,
-  Plus
+  Plus,
+  BellRing
 } from 'lucide-react';
 
 interface LeadKanbanBoardProps {
@@ -20,11 +21,11 @@ interface LeadKanbanBoardProps {
 }
 
 const STAGES: { id: LeadStage; title: string; color: string; badge: string; icon: any }[] = [
-  { id: 'novo', title: 'Novo Lead', color: 'border-blue-500/40 bg-blue-500/5', badge: 'bg-blue-500/20 text-blue-300', icon: UserPlus },
-  { id: 'qualificacao', title: 'Em Qualificação (SPIN)', color: 'border-amber-500/40 bg-amber-500/5', badge: 'bg-amber-500/20 text-amber-300', icon: Sparkles },
-  { id: 'pronto', title: 'Pronto p/ Agendar', color: 'border-purple-500/40 bg-purple-500/5', badge: 'bg-purple-500/20 text-purple-300', icon: Clock },
-  { id: 'agendado', title: 'Sessão Agendada', color: 'border-emerald-500/40 bg-emerald-500/5', badge: 'bg-emerald-500/20 text-emerald-300', icon: Calendar },
-  { id: 'concluido', title: 'Tattoo Concluída', color: 'border-zinc-500/40 bg-zinc-500/5', badge: 'bg-zinc-500/20 text-zinc-300', icon: CheckCircle2 }
+  { id: 'novo',        title: 'Novo Contato',         color: 'border-blue-500/40 bg-blue-500/5',     badge: 'bg-blue-500/20 text-blue-300',     icon: UserPlus },
+  { id: 'qualificacao',title: 'Qualificação (SPIN)',   color: 'border-amber-500/40 bg-amber-500/5',   badge: 'bg-amber-500/20 text-amber-300',   icon: Sparkles },
+  { id: 'negociacao',  title: '💬 Negociação',         color: 'border-purple-500/40 bg-purple-500/5', badge: 'bg-purple-500/20 text-purple-300', icon: MessageCircle },
+  { id: 'agendado',    title: '📅 Sessão Agendada',    color: 'border-emerald-500/40 bg-emerald-500/5',badge: 'bg-emerald-500/20 text-emerald-300', icon: Calendar },
+  { id: 'followup',    title: '🔕 Follow-up (Resgate)',color: 'border-orange-500/40 bg-orange-500/5', badge: 'bg-orange-500/20 text-orange-300', icon: BellRing }
 ];
 
 export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
@@ -70,7 +71,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
         {STAGES.map((stage) => {
           const stageLeads = leads.filter((l) => l.estagio === stage.id);
           const Icon = stage.icon;
@@ -80,7 +81,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
               key={stage.id}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, stage.id)}
-              className={`flex flex-col rounded-xl border border-dashed ${stage.color} p-3 min-w-[260px] min-h-[500px] transition-colors`}
+            className={`flex flex-col rounded-xl border border-dashed ${stage.color} p-3 min-w-[260px] min-h-[500px] transition-colors`}
             >
               {/* Header da Coluna */}
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-800">

@@ -149,10 +149,11 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               >
                 <option value="novo">Novo Lead</option>
                 <option value="qualificacao">Em Qualificação (SPIN)</option>
-                <option value="pronto">Pronto p/ Agendar</option>
-                <option value="agendado">Sessão Agendada</option>
-                <option value="concluido">Tattoo Concluída</option>
-                <option value="perdido">Perdido / Desistiu</option>
+                <option value="negociacao">💬 Em Negociação</option>
+                <option value="agendado">📅 Sessão Agendada</option>
+                <option value="followup">🔕 Follow-up / Resgate</option>
+                <option value="concluido">✅ Tattoo Concluída</option>
+                <option value="perdido">❌ Perdido / Desistiu</option>
               </select>
             </div>
 

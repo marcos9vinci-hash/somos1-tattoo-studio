@@ -1,14 +1,52 @@
-export type LeadStage = 'novo' | 'qualificacao' | 'pronto' | 'agendado' | 'concluido' | 'perdido';
+// ==========================================
+// FUNIL 1 — COMERCIAL (pré-tattoo)
+// ==========================================
+
+/** Etapas do Funil Comercial de Leads */
+export type LeadStage =
+  | 'novo'          // Chegou mas ainda não foi qualificado
+  | 'qualificacao'  // IA coletando referências, estilo, tamanho
+  | 'negociacao'    // Qualificado — negociando orçamento/valor
+  | 'agendado'      // Sessão marcada na agenda
+  | 'concluido'     // Tattoo realizada → promovido para Carteira (transição automática)
+  | 'followup'      // Sumiu sem fechar ou faltou → resgate
+  | 'perdido';      // Definitivamente perdido (oculto por padrão)
 
 export type LeadSource = 'whatsapp' | 'instagram' | 'indicacao' | 'site' | 'manual' | 'n8n_agente';
 
-export type ClienteLifecycleStage = 
-  | 'novo' | 'novos' 
-  | 'negociacao' 
-  | 'ativo' | 'ativos' 
-  | 'recorrente' | 'recorrentes' 
-  | 'desmarcaram' 
-  | 'inativo' | 'inativos';
+// ==========================================
+// FUNIL 2 — CARTEIRA DE CLIENTES (pós-tattoo)
+// ==========================================
+
+/**
+ * Temperatura do cliente na Carteira — baseada em diasSemContato.
+ * Quente   0–7d   → Cicatrização (Evolution dispara automático)
+ * Morno    8–30d  → Pedir review, lançar no IndicaAi
+ * Esfriando 31–90d → Reengajamento, Galeria IA, promoções
+ * Alerta   91–179d → Créditos IndicaAi vencem em 180d — urgente
+ * Expirado >180d  → Créditos expirados — campanha especial
+ */
+export type ClienteCarteiraTempStage =
+  | 'quente'
+  | 'morno'
+  | 'esfriando'
+  | 'alerta'
+  | 'expirado'
+  | 'emReativacao';  // Lead reaberto no Funil Comercial — temporário até fechar de novo
+
+/** @deprecated Usar ClienteCarteiraTempStage. Mantido para compatibilidade temporária. */
+export type ClienteLifecycleStage =
+  | 'novo' | 'novos'
+  | 'negociacao'
+  | 'ativo' | 'ativos'
+  | 'recorrente' | 'recorrentes'
+  | 'desmarcaram'
+  | 'inativo' | 'inativos'
+  | ClienteCarteiraTempStage;
+
+// ==========================================
+// TIPOS COMPARTILHADOS
+// ==========================================
 
 export interface CRMMessage {
   id: string;
@@ -28,6 +66,10 @@ export interface SPINAnalysis {
   urgencia?: 'baixa' | 'media' | 'alta';
   ticketEstimado?: number;
 }
+
+// ==========================================
+// ENTIDADE: LEAD (Funil Comercial)
+// ==========================================
 
 export interface Lead {
   id: string;
@@ -55,6 +97,10 @@ export interface Lead {
   ultimoContatoEm?: any;
 }
 
+// ==========================================
+// ENTIDADE: CLIENTE CRM (Carteira pós-tattoo)
+// ==========================================
+
 export interface ClienteCRM {
   id: string;
   nome: string;
@@ -62,7 +108,13 @@ export interface ClienteCRM {
   email?: string;
   instagram?: string;
   origem?: string;
-  estagioCiclo: ClienteLifecycleStage;
+
+  /** Temperatura na Carteira de Clientes — calculada a partir de diasSemContato */
+  bucketTemperatura: ClienteCarteiraTempStage;
+
+  /** @deprecated Usar bucketTemperatura */
+  estagioCiclo?: ClienteLifecycleStage;
+
   totalGasto: number;
   totalSessoes: number;
   ultimaSessaoEm?: any;
@@ -75,9 +127,42 @@ export interface ClienteCRM {
   mensagens?: CRMMessage[];
   alertaFollowUpAtivo?: boolean;
   ultimoDisparoFollowUpEm?: any;
+
+  /** True se o cliente tem sessão agendada mas ainda não concluída */
+  temSessaoAgendada?: boolean;
+
+  /** Data em que o cliente desmarcou a última sessão — gera badge no card */
+  desmarcouEm?: any;
+
+  /** Se em reativação, ID do lead criado no Funil Comercial */
+  emReativacaoLeadId?: string;
+
   createdAt: any;
   updatedAt: any;
 }
+
+// ==========================================
+// UTILITÁRIO: Calcular temperatura por diasSemContato
+// ==========================================
+
+export function calcularBucketTemperatura(
+  diasSemContato: number | undefined,
+  totalSessoes: number
+): ClienteCarteiraTempStage {
+  // Sem sessão concluída — não tem temperatura ainda (tratamos como morno por padrão)
+  if (!totalSessoes || totalSessoes === 0) return 'morno';
+
+  const dias = diasSemContato ?? 999;
+  if (dias <= 7)   return 'quente';
+  if (dias <= 30)  return 'morno';
+  if (dias <= 90)  return 'esfriando';
+  if (dias <= 179) return 'alerta';
+  return 'expirado';
+}
+
+// ==========================================
+// TAREFAS CRM
+// ==========================================
 
 export interface CRMTask {
   id: string;
@@ -94,6 +179,10 @@ export interface CRMTask {
   createdAt: any;
 }
 
+// ==========================================
+// MÉTRICAS DE DASHBOARD
+// ==========================================
+
 export interface CRMDashboardMetrics {
   totalLeads: number;
   leadsNovos: number;
@@ -103,4 +192,13 @@ export interface CRMDashboardMetrics {
   totalClientes: number;
   clientesInativos: number;
   totalFollowUpsPendentes: number;
+  /** Distribuição de temperatura da Carteira */
+  temperaturaCounts?: {
+    quente: number;
+    morno: number;
+    esfriando: number;
+    alerta: number;
+    expirado: number;
+    emReativacao: number;
+  };
 }

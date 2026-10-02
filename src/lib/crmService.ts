@@ -7,11 +7,19 @@ import {
   updateDoc, 
   deleteDoc, 
   query, 
+  where,
   orderBy, 
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Lead, ClienteCRM, LeadStage, ClienteLifecycleStage, CRMDashboardMetrics } from '../types/crm';
+import { 
+  Lead, 
+  ClienteCRM, 
+  LeadStage, 
+  ClienteCarteiraTempStage,
+  CRMDashboardMetrics,
+  calcularBucketTemperatura
+} from '../types/crm';
 import { UserProfile, Booking, BookingStatus } from '../types';
 import { whatsappService } from './whatsappService';
 
@@ -21,11 +29,11 @@ const BOOKINGS_COLLECTION = 'bookings';
 
 export const crmService = {
   // ==========================================
-  // LEADS DO CRM (Alimentado por IA e Agendamentos)
+  // LEADS DO FUNIL COMERCIAL
   // ==========================================
   async getLeads(): Promise<Lead[]> {
     try {
-      // 1. Busca leads cadastrados manualmente ou por robô IA
+      // 1. Leads cadastrados manualmente ou por robô IA
       let leadsManuais: Lead[] = [];
       try {
         const q = query(collection(db, LEADS_COLLECTION), orderBy('createdAt', 'desc'));
@@ -36,20 +44,20 @@ export const crmService = {
         leadsManuais = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Lead));
       }
 
-      // 2. Busca todos os agendamentos reais da Agenda para povoar automaticamente o funil!
+      // 2. Agendamentos reais da Agenda → alimentam o funil automaticamente
       const bookingsSnap = await getDocs(collection(db, BOOKINGS_COLLECTION));
       const allBookings = bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Booking));
 
       const leadsFromBookings: Lead[] = allBookings.map(b => {
         let estagio: LeadStage = 'agendado';
         if (b.status === BookingStatus.COMPLETED) {
-          estagio = 'concluido';
+          estagio = 'concluido'; // → promovido para Carteira de Clientes
         } else if (b.status === BookingStatus.APPROVED || b.status === BookingStatus.DEPOSIT_PAID) {
           estagio = 'agendado';
         } else if (b.status === BookingStatus.PENDING_APPROVAL) {
-          estagio = 'pronto';
+          estagio = 'negociacao';
         } else if (b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW) {
-          estagio = 'perdido';
+          estagio = 'followup'; // Desmarcou ou faltou → entra no follow-up de resgate
         }
 
         return {
@@ -74,7 +82,7 @@ export const crmService = {
         } as Lead;
       });
 
-      // Mescla os dois, evitando duplicidade pelo telefone
+      // Mescla, evitando duplicidade pelo telefone
       const mapTelefones = new Set(leadsManuais.map(l => (l.telefone || '').replace(/\D/g, '')));
       const bookingsNaoDuplicados = leadsFromBookings.filter(lb => {
         const clean = (lb.telefone || '').replace(/\D/g, '');
@@ -83,7 +91,7 @@ export const crmService = {
 
       return [...leadsManuais, ...bookingsNaoDuplicados];
     } catch (error) {
-      console.warn('Erro ao montar leads com bookings:', error);
+      console.warn('Fallback leads sem índice:', error);
       return [];
     }
   },
@@ -148,12 +156,11 @@ export const crmService = {
 
   async deleteLead(id: string): Promise<void> {
     if (id.startsWith('booking_')) return;
-    const docRef = doc(db, LEADS_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteDoc(doc(db, LEADS_COLLECTION, id));
   },
 
   // ==========================================
-  // CLIENTES REAIS (Conectados à coleção users + bookings do Somos 1)
+  // CARTEIRA DE CLIENTES (pós-tattoo, temperatura)
   // ==========================================
   async getClientes(): Promise<ClienteCRM[]> {
     const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
@@ -163,20 +170,20 @@ export const crmService = {
     const agora = Date.now();
     const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
-    return usersSnap.docs.map(uDoc => {
+    const clientes: ClienteCRM[] = usersSnap.docs.map(uDoc => {
       const u = uDoc.data() as UserProfile;
       const userBookings = allBookings.filter(b => b.userId === uDoc.id || b.userPhone === u.phone);
 
       const concluidas = userBookings.filter(b => b.status === BookingStatus.COMPLETED);
-      const agendadas = userBookings.filter(b => 
-        b.status === BookingStatus.APPROVED || 
-        b.status === BookingStatus.DEPOSIT_PAID || 
+      const agendadas = userBookings.filter(b =>
+        b.status === BookingStatus.APPROVED ||
+        b.status === BookingStatus.DEPOSIT_PAID ||
         b.status === BookingStatus.PENDING_APPROVAL
       );
 
       const totalGasto = concluidas.reduce((acc, b) => acc + (b.priceEstimated || b.valor_estimado || 0), 0);
-      
-      let ultimaDataMs: number = 0;
+
+      let ultimaDataMs = 0;
       let fotosTattoos: string[] = [];
       let estilos: string[] = [];
 
@@ -187,7 +194,6 @@ export const crmService = {
         if (b.estilo && !estilos.includes(b.estilo)) {
           estilos.push(b.estilo);
         }
-
         if (b.date) {
           const [ano, mes, dia] = b.date.split('-').map(Number);
           const dataMs = new Date(ano, mes - 1, dia).getTime();
@@ -195,23 +201,21 @@ export const crmService = {
         }
       });
 
-      const diasSemContato = ultimaDataMs > 0 ? Math.floor((agora - ultimaDataMs) / MS_POR_DIA) : undefined;
-      const canceladasOuNoShow = userBookings.filter(b => b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW);
+      const diasSemContato = ultimaDataMs > 0
+        ? Math.floor((agora - ultimaDataMs) / MS_POR_DIA)
+        : undefined;
 
-      let estagioCiclo: ClienteLifecycleStage = 'novos';
-      if (canceladasOuNoShow.length > 0 && agendadas.length === 0 && concluidas.length === 0) {
-        estagioCiclo = 'desmarcaram';
-      } else if (agendadas.length > 0) {
-        estagioCiclo = 'negociacao';
-      } else if (concluidas.length > 1) {
-        estagioCiclo = 'recorrentes';
-      } else if (diasSemContato !== undefined && diasSemContato > 30) {
-        estagioCiclo = 'inativos';
-      } else if (concluidas.length >= 1) {
-        estagioCiclo = 'ativos';
-      } else {
-        estagioCiclo = 'novos';
-      }
+      // Identifica se desmarcou recentemente (rejeitado ou no_show)
+      const desmarcadas = userBookings.filter(b => 
+        b.status === BookingStatus.REJECTED || 
+        b.status === BookingStatus.NO_SHOW
+      );
+      const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
+
+      // ─── NOVA LÓGICA: Temperatura da Carteira ───
+      let bucketTemperatura: ClienteCarteiraTempStage = (u as any).bucketTemperatura === 'emReativacao'
+        ? 'emReativacao'
+        : calcularBucketTemperatura(diasSemContato, concluidas.length);
 
       return {
         id: uDoc.id,
@@ -219,35 +223,78 @@ export const crmService = {
         telefone: u.phone,
         email: u.email || '',
         instagram: u.instagram || '',
-        estagioCiclo,
+        bucketTemperatura,
+        // legado (removido futuramente)
+        estagioCiclo: bucketTemperatura as any,
         totalGasto,
         totalSessoes: concluidas.length,
         diasSemContato,
         estilosFavoritos: estilos,
         fotosTatuagensFeitas: fotosTattoos,
         agendamentos: userBookings,
+        temSessaoAgendada: agendadas.length > 0,
+        desmarcouEm,
+        emReativacaoLeadId: (u as any).emReativacaoLeadId,
         observacoesInternas: (u as any).observacoesInternas || '',
-        alertaFollowUpAtivo: estagioCiclo === 'inativos' || (diasSemContato !== undefined && diasSemContato >= 7 && diasSemContato <= 30),
+        alertaFollowUpAtivo: bucketTemperatura === 'quente' || bucketTemperatura === 'alerta',
         createdAt: u.createdAt,
         updatedAt: u.lastSeenAt || u.createdAt
       } as ClienteCRM;
     });
+
+    return clientes;
+  },
+
+  /** Busca clientes por bucket de temperatura — ideal para queries do bot de IA */
+  async getClientesPorBucket(bucket: ClienteCarteiraTempStage): Promise<ClienteCRM[]> {
+    const todos = await this.getClientes();
+    return todos.filter(c => c.bucketTemperatura === bucket);
   },
 
   async getInactiveClientes(diasInatividade: number = 30): Promise<ClienteCRM[]> {
     const clientes = await this.getClientes();
-    return clientes.filter(c => c.estagioCiclo === 'inativos' || c.estagioCiclo === 'inativo' || (c.diasSemContato !== undefined && c.diasSemContato >= diasInatividade));
+    return clientes.filter(c =>
+      c.diasSemContato !== undefined && c.diasSemContato >= diasInatividade
+    );
+  },
+
+  async createCliente(data: Omit<ClienteCRM, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    const docRef = await addDoc(collection(db, USERS_COLLECTION), {
+      name: data.nome,
+      phone: data.telefone,
+      email: data.email || '',
+      instagram: data.instagram || '',
+      bucketTemperatura: data.bucketTemperatura || 'morno',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    return docRef.id;
+  },
+
+  async updateCliente(id: string, data: Partial<ClienteCRM>): Promise<void> {
+    const docRef = doc(db, USERS_COLLECTION, id);
+    const payload: Record<string, any> = { updatedAt: serverTimestamp() };
+    if (data.nome) payload.name = data.nome;
+    if (data.telefone) payload.phone = data.telefone;
+    if (data.email !== undefined) payload.email = data.email;
+    if (data.instagram !== undefined) payload.instagram = data.instagram;
+    if (data.observacoesInternas !== undefined) payload.observacoesInternas = data.observacoesInternas;
+    if (data.bucketTemperatura) payload.bucketTemperatura = data.bucketTemperatura;
+    await updateDoc(docRef, payload);
+  },
+
+  async deleteCliente(id: string): Promise<void> {
+    await deleteDoc(doc(db, USERS_COLLECTION, id));
   },
 
   async salvarObservacoesCliente(clienteId: string, observacoes: string): Promise<void> {
     try {
-      const docRef = doc(db, USERS_COLLECTION, clienteId);
-      await updateDoc(docRef, {
+      await updateDoc(doc(db, USERS_COLLECTION, clienteId), {
         observacoesInternas: observacoes,
         updatedAt: serverTimestamp()
       });
     } catch (e) {
-      console.warn("Aviso ao salvar observações do cliente:", e);
+      console.warn('Aviso ao salvar observações do cliente:', e);
     }
   },
 
@@ -262,8 +309,13 @@ export const crmService = {
     }
   },
 
-  async enviarMensagemChat(clienteId: string, mensagem: string, remetente: 'cliente' | 'ia' | 'tatuador', telefone?: string): Promise<any> {
-    const msgPayload = {
+  async enviarMensagemChat(
+    clienteId: string,
+    mensagem: string,
+    remetente: 'cliente' | 'ia' | 'tatuador',
+    telefone?: string
+  ): Promise<any> {
+    const msgPayload: any = {
       clienteId,
       remetente,
       mensagem,
@@ -272,46 +324,54 @@ export const crmService = {
     };
 
     try {
-      // 1. Grava no histórico do Firestore se possível
       const subCol = collection(db, USERS_COLLECTION, clienteId, 'crm_messages');
-      const docRef = await addDoc(subCol, {
-        ...msgPayload,
-        timestamp: serverTimestamp()
-      });
+      await addDoc(subCol, { ...msgPayload, timestamp: serverTimestamp() });
       msgPayload.status = 'entregue';
     } catch (e) {
-      console.warn("Aviso ao salvar mensagem no Firestore:", e);
+      console.warn('Aviso ao salvar mensagem no Firestore:', e);
     }
 
-    // 2. Se for tatuador ou IA e tiver telefone, dispara via Evolution WhatsApp
     if ((remetente === 'tatuador' || remetente === 'ia') && telefone) {
       try {
         whatsappService.sendTextMessage(telefone, mensagem).catch(err => {
-          console.warn("Aviso no disparo via WhatsApp Evolution:", err);
+          console.warn('Aviso no disparo via WhatsApp Evolution:', err);
         });
       } catch (err) {
-        console.warn("Falha no disparo whatsappService:", err);
+        console.warn('Falha no disparo whatsappService:', err);
       }
     }
 
     return msgPayload;
   },
 
-  async syncBookingToCRM(booking: Booking, novoStatus: BookingStatus): Promise<void> {
-    // Sincronização automática em tempo real
-  },
-
   // ==========================================
-  // DISPARO DE MENSAGENS (WHATSAPP / N8N)
+  // DISPARO DE MENSAGENS (WHATSAPP)
   // ==========================================
-  async dispararFollowUpCliente(cliente: ClienteCRM, mensagemCustom?: string): Promise<{ success: boolean; message: string }> {
+  async dispararFollowUpCliente(
+    cliente: ClienteCRM,
+    mensagemCustom?: string
+  ): Promise<{ success: boolean; message: string }> {
     const telefone = cliente.telefone;
     if (!telefone) {
       return { success: false, message: 'Cliente sem telefone cadastrado.' };
     }
 
-    const texto = mensagemCustom || 
-      `Olá ${cliente.nome}! Tudo bem? Passando para saber como está sua cicatrização e se já está pensando no seu próximo projeto aqui no Somos 1 Tattoo! 🎨`;
+    // Mensagem varia por temperatura
+    let texto = mensagemCustom;
+    if (!texto) {
+      const bucket = cliente.bucketTemperatura;
+      if (bucket === 'quente') {
+        texto = `Oi ${cliente.nome}! 😊\n\nPassando aqui pelo Somos 1 Studio para saber como está sua tattoo e se a cicatrização está 100% perfeita!\n\nSe precisar de qualquer dica de cuidados ou quiser dar uma olhada em novas ideias, só me chamar! 🎨`;
+      } else if (bucket === 'morno') {
+        texto = `Oi ${cliente.nome}! Tudo certo por aí? 🌟\n\nQueremos te ouvir! Como ficou sua tattoo? Poderia nos deixar um review e marcar a gente no Instagram? Conta muito pra nós! ❤️`;
+      } else if (bucket === 'esfriando') {
+        texto = `Oi ${cliente.nome}! Sentimos a sua falta aqui no Somos 1! 🎨\n\nTemos novidades incríveis chegando e pensamos em você! Quer ver as referências novas? Só dar um oi! 😊`;
+      } else if (bucket === 'alerta') {
+        texto = `Oi ${cliente.nome}! Passando com uma novidade importante: seus créditos no IndicaAI estão prestes a vencer!\n\nNão perca a oportunidade. Quando podemos agendar sua próxima tattoo? 🔥`;
+      } else {
+        texto = `Oi ${cliente.nome}! Faz tempo que não te vemos aqui no Somos 1 Studio!\n\nTemos uma promoção especial para clientes que voltam. Bora conversar? 🎉`;
+      }
+    }
 
     try {
       await whatsappService.sendViaN8n({
@@ -319,7 +379,7 @@ export const crmService = {
         text: texto,
         action: 'followup'
       });
-      return { success: true, message: 'Follow-up disparado com sucesso via WhatsApp/n8n!' };
+      return { success: true, message: 'Follow-up disparado com sucesso via WhatsApp!' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Falha ao enviar mensagem.' };
     }
@@ -343,6 +403,44 @@ export const crmService = {
     }
   },
 
+  /**
+   * REATIVAÇÃO: Envia cliente da Carteira de volta para o Funil Comercial na coluna Negociação
+   * para fechar um novo trampo. Mantém histórico e vínculo.
+   */
+  async reativarClienteParaLead(cliente: ClienteCRM): Promise<string> {
+    const leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> = {
+      nome: cliente.nome,
+      telefone: cliente.telefone,
+      email: cliente.email,
+      instagram: cliente.instagram,
+      origem: 'manual',
+      estagio: 'negociacao',
+      temperatura: 'quente',
+      ideiaProjeto: `Reativação: Cliente já realizou ${cliente.totalSessoes} sessão(ões). Total gasto: R$ ${cliente.totalGasto}.`,
+      estiloTatuagem: (cliente.estilosFavoritos && cliente.estilosFavoritos[0]) || '',
+      notasInternas: [
+        `Cliente reativado da Carteira em ${new Date().toLocaleDateString('pt-BR')}.`,
+        cliente.observacoesInternas || ''
+      ].filter(Boolean),
+      responsavelAtendimento: 'Tatuador'
+    };
+
+    const leadId = await this.createLead(leadData);
+
+    // Marca o cliente na Carteira como "emReativacao" e vincula o lead
+    try {
+      await updateDoc(doc(db, USERS_COLLECTION, cliente.id), {
+        bucketTemperatura: 'emReativacao',
+        emReativacaoLeadId: leadId,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.warn('Aviso ao atualizar status de reativação do cliente:', e);
+    }
+
+    return leadId;
+  },
+
   // ==========================================
   // MÉTRICAS EM TEMPO REAL
   // ==========================================
@@ -353,10 +451,18 @@ export const crmService = {
     ]);
 
     const leadsNovos = leads.filter(l => l.estagio === 'novo').length;
-    const leadsQualificados = leads.filter(l => l.estagio === 'qualificacao' || l.estagio === 'pronto').length;
+    const leadsQualificados = leads.filter(l => l.estagio === 'qualificacao' || l.estagio === 'negociacao').length;
     const leadsAgendados = leads.filter(l => l.estagio === 'agendado' || l.estagio === 'concluido').length;
     const taxaConversao = leads.length > 0 ? (leadsAgendados / leads.length) * 100 : 0;
-    const inativos = clientes.filter(c => c.estagioCiclo === 'inativo');
+
+    const temperaturaCounts = {
+      quente: clientes.filter(c => c.bucketTemperatura === 'quente').length,
+      morno: clientes.filter(c => c.bucketTemperatura === 'morno').length,
+      esfriando: clientes.filter(c => c.bucketTemperatura === 'esfriando').length,
+      alerta: clientes.filter(c => c.bucketTemperatura === 'alerta').length,
+      expirado: clientes.filter(c => c.bucketTemperatura === 'expirado').length,
+      emReativacao: clientes.filter(c => c.bucketTemperatura === 'emReativacao').length
+    };
 
     return {
       totalLeads: leads.length,
@@ -365,8 +471,9 @@ export const crmService = {
       leadsAgendados,
       taxaConversao: Math.round(taxaConversao * 10) / 10,
       totalClientes: clientes.length,
-      clientesInativos: inativos.length,
-      totalFollowUpsPendentes: inativos.length
+      clientesInativos: temperaturaCounts.esfriando + temperaturaCounts.alerta + temperaturaCounts.expirado,
+      totalFollowUpsPendentes: temperaturaCounts.alerta + temperaturaCounts.quente,
+      temperaturaCounts
     };
   }
 };

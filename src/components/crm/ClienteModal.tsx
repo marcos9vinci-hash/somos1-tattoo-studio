@@ -45,6 +45,7 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
         email,
         instagram,
         estagioCiclo,
+        bucketTemperatura: (cliente?.bucketTemperatura || estagioCiclo) as any,
         totalGasto: Number(totalGasto) || 0,
         totalSessoes: Number(totalSessoes) || 1,
         estilosFavoritos: estilosFavoritos.split(',').map(s => s.trim()).filter(Boolean)
@@ -120,11 +121,12 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
                 onChange={(e) => setEstagioCiclo(e.target.value as ClienteLifecycleStage)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
               >
-                <option value="novo">1ª Sessão Concluída</option>
-                <option value="negociacao">Cicatrização / Feedback</option>
-                <option value="ativo">Cliente Ativo</option>
-                <option value="recorrente">Fã / Recorrente (VIP)</option>
-                <option value="inativo">Inativo (&gt;30 dias)</option>
+                <option value="quente">🔥 Quente (0–7 dias pós-tattoo)</option>
+                <option value="morno">☀️ Morno (8–30 dias)</option>
+                <option value="esfriando">❄️ Esfriando (31–90 dias)</option>
+                <option value="alerta">🧊 Alerta (91–179 dias)</option>
+                <option value="expirado">⌛ Expirado (&gt;180 dias)</option>
+                <option value="emReativacao">🔄 Em Reativação</option>
               </select>
             </div>
 
