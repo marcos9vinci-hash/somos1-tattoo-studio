@@ -2,7 +2,22 @@ export type LeadStage = 'novo' | 'qualificacao' | 'pronto' | 'agendado' | 'concl
 
 export type LeadSource = 'whatsapp' | 'instagram' | 'indicacao' | 'site' | 'manual' | 'n8n_agente';
 
-export type ClienteLifecycleStage = 'novo' | 'negociacao' | 'ativo' | 'recorrente' | 'inativo';
+export type ClienteLifecycleStage = 
+  | 'novo' | 'novos' 
+  | 'negociacao' 
+  | 'ativo' | 'ativos' 
+  | 'recorrente' | 'recorrentes' 
+  | 'desmarcaram' 
+  | 'inativo' | 'inativos';
+
+export interface CRMMessage {
+  id: string;
+  clienteId: string;
+  remetente: 'cliente' | 'ia' | 'tatuador';
+  mensagem: string;
+  timestamp: any;
+  status: 'enviado' | 'entregue' | 'lido';
+}
 
 export interface SPINAnalysis {
   situacao?: string;
@@ -55,6 +70,9 @@ export interface ClienteCRM {
   estilosFavoritos?: string[];
   fotosTatuagensFeitas?: string[];
   notasInternas?: string[];
+  observacoesInternas?: string;
+  agendamentos?: any[];
+  mensagens?: CRMMessage[];
   alertaFollowUpAtivo?: boolean;
   ultimoDisparoFollowUpEm?: any;
   createdAt: any;

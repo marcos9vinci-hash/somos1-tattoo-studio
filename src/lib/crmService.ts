@@ -196,29 +196,38 @@ export const crmService = {
       });
 
       const diasSemContato = ultimaDataMs > 0 ? Math.floor((agora - ultimaDataMs) / MS_POR_DIA) : undefined;
+      const canceladasOuNoShow = userBookings.filter(b => b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW);
 
-      let estagioCiclo: ClienteLifecycleStage = 'novo';
-      if (agendadas.length > 0) {
+      let estagioCiclo: ClienteLifecycleStage = 'novos';
+      if (canceladasOuNoShow.length > 0 && agendadas.length === 0 && concluidas.length === 0) {
+        estagioCiclo = 'desmarcaram';
+      } else if (agendadas.length > 0) {
         estagioCiclo = 'negociacao';
-      } else if (concluidas.length > 2) {
-        estagioCiclo = 'recorrente';
+      } else if (concluidas.length > 1) {
+        estagioCiclo = 'recorrentes';
       } else if (diasSemContato !== undefined && diasSemContato > 30) {
-        estagioCiclo = 'inativo';
+        estagioCiclo = 'inativos';
       } else if (concluidas.length >= 1) {
-        estagioCiclo = 'ativo';
+        estagioCiclo = 'ativos';
+      } else {
+        estagioCiclo = 'novos';
       }
 
       return {
         id: uDoc.id,
         nome: u.name || 'Cliente Cadastrado',
         telefone: u.phone,
+        email: u.email || '',
+        instagram: u.instagram || '',
         estagioCiclo,
         totalGasto,
         totalSessoes: concluidas.length,
         diasSemContato,
         estilosFavoritos: estilos,
         fotosTatuagensFeitas: fotosTattoos,
-        alertaFollowUpAtivo: estagioCiclo === 'inativo',
+        agendamentos: userBookings,
+        observacoesInternas: (u as any).observacoesInternas || '',
+        alertaFollowUpAtivo: estagioCiclo === 'inativos' || (diasSemContato !== undefined && diasSemContato >= 7 && diasSemContato <= 30),
         createdAt: u.createdAt,
         updatedAt: u.lastSeenAt || u.createdAt
       } as ClienteCRM;
@@ -227,7 +236,65 @@ export const crmService = {
 
   async getInactiveClientes(diasInatividade: number = 30): Promise<ClienteCRM[]> {
     const clientes = await this.getClientes();
-    return clientes.filter(c => c.estagioCiclo === 'inativo' || (c.diasSemContato !== undefined && c.diasSemContato >= diasInatividade));
+    return clientes.filter(c => c.estagioCiclo === 'inativos' || c.estagioCiclo === 'inativo' || (c.diasSemContato !== undefined && c.diasSemContato >= diasInatividade));
+  },
+
+  async salvarObservacoesCliente(clienteId: string, observacoes: string): Promise<void> {
+    try {
+      const docRef = doc(db, USERS_COLLECTION, clienteId);
+      await updateDoc(docRef, {
+        observacoesInternas: observacoes,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.warn("Aviso ao salvar observações do cliente:", e);
+    }
+  },
+
+  async getMensagensChat(clienteId: string): Promise<any[]> {
+    try {
+      const subCol = collection(db, USERS_COLLECTION, clienteId, 'crm_messages');
+      const q = query(subCol, orderBy('timestamp', 'asc'));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async enviarMensagemChat(clienteId: string, mensagem: string, remetente: 'cliente' | 'ia' | 'tatuador', telefone?: string): Promise<any> {
+    const msgPayload = {
+      clienteId,
+      remetente,
+      mensagem,
+      timestamp: new Date(),
+      status: 'enviado'
+    };
+
+    try {
+      // 1. Grava no histórico do Firestore se possível
+      const subCol = collection(db, USERS_COLLECTION, clienteId, 'crm_messages');
+      const docRef = await addDoc(subCol, {
+        ...msgPayload,
+        timestamp: serverTimestamp()
+      });
+      msgPayload.status = 'entregue';
+    } catch (e) {
+      console.warn("Aviso ao salvar mensagem no Firestore:", e);
+    }
+
+    // 2. Se for tatuador ou IA e tiver telefone, dispara via Evolution WhatsApp
+    if ((remetente === 'tatuador' || remetente === 'ia') && telefone) {
+      try {
+        whatsappService.sendTextMessage(telefone, mensagem).catch(err => {
+          console.warn("Aviso no disparo via WhatsApp Evolution:", err);
+        });
+      } catch (err) {
+        console.warn("Falha no disparo whatsappService:", err);
+      }
+    }
+
+    return msgPayload;
   },
 
   async syncBookingToCRM(booking: Booking, novoStatus: BookingStatus): Promise<void> {
