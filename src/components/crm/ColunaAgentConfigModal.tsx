@@ -183,7 +183,7 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
                   <span className="text-xs font-bold text-white">Co-Piloto (Aprovar no Zap)</span>
                 </div>
                 <p className="text-[10px] text-zinc-400 leading-tight">
-                  Chama o Marquinhos no WhatsApp: <em>"Posso enviar essa resposta?"</em> com botões Sim/Não.
+                  Chama você no WhatsApp. Entende <strong>1, 2, "sim", "pode mandar", "não manda nada"</strong> ou <strong>áudio gravado</strong> na correria!
                 </p>
               </button>
 
