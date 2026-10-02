@@ -1,0 +1,72 @@
+import { EstrategiaCampanha } from '../types/crm';
+
+export const DEFAULT_ESTRATEGIAS: EstrategiaCampanha[] = [
+  {
+    id: 'cicatrizacao_inicial',
+    titulo: '🌿 Cicatrização Inicial',
+    descricao: 'Acompanhamento nos primeiros dias pós-tattoo (cuidados, lavagem e hidratação).',
+    emoji: '🌿',
+    criterioTipo: 'dias',
+    diasMin: 0,
+    diasMax: 15,
+    temperaturaAlvo: ['quente'],
+    mensagemTemplate: 'Fala [Nome]! Passando pra saber como tá a cicatrização da sua tattoo. Já começou a descascar? Lembra de manter a camada fina de pomada e não coçar. Qualquer dúvida me chama aqui no Whats!',
+    especialistaAssinatura: '🌿 [Pós-Venda · Cuidados Juliana]',
+    ativa: true,
+    limiteDiario: 25
+  },
+  {
+    id: 'foto_retoque',
+    titulo: '📸 Foto & Retoque',
+    descricao: 'Tattoo já assentada na pele (16 a 45 dias). Solicita foto do resultado e oferece retoque grátis.',
+    emoji: '📸',
+    criterioTipo: 'dias',
+    diasMin: 16,
+    diasMax: 45,
+    temperaturaAlvo: ['morno'],
+    mensagemTemplate: 'Opa [Nome]! Já deu tempo da sua tattoo assentar na pele! Consegue mandar uma foto aí na luz natural pra eu ver como ficou o resultado final? E se precisar de algum retoquezinho de leve a gente já marca!',
+    especialistaAssinatura: '🌿 [Pós-Venda · Cuidados Juliana]',
+    ativa: true,
+    limiteDiario: 25
+  },
+  {
+    id: 'segunda_tattoo',
+    titulo: '💉 2ª Tattoo / Novo Projeto',
+    descricao: 'Clientes esfriando (46 a 90 dias). Momento ideal para dar continuidade ao projeto ou nova arte.',
+    emoji: '💉',
+    criterioTipo: 'dias',
+    diasMin: 46,
+    diasMax: 90,
+    temperaturaAlvo: ['esfriando'],
+    mensagemTemplate: 'Fala [Nome], beleza? Lembrei de você aqui no estúdio! Aquela sua tattoo já tá 100% cicatrizada. Já pensou no próximo rabisco ou em continuar aquele projeto? Separei uma condição especial pra você esse mês!',
+    especialistaAssinatura: '🤖 [Clone do Dono · Marquinhos]',
+    ativa: true,
+    limiteDiario: 20
+  },
+  {
+    id: 'resgate_noshow',
+    titulo: '❄️ Resgate de No-Shows',
+    descricao: 'Clientes que desmarcaram ou reagendaram mas ainda não definiram a nova data.',
+    emoji: '❄️',
+    criterioTipo: 'desmarcou',
+    temperaturaAlvo: ['alerta', 'esfriando'],
+    mensagemTemplate: 'Fala [Nome]! Vi aqui no sistema que a gente não conseguiu fechar a data daquela sua tattoo. Ficou alguma dúvida sobre o valor ou sobre a arte? Se quiser, consigo um encaixe VIP pra essa semana pra gente fazer!',
+    especialistaAssinatura: '❄️ [Resgate · Agente Avalanche]',
+    ativa: true,
+    limiteDiario: 15
+  },
+  {
+    id: 'creditos_indicacao',
+    titulo: '💎 Resgate de Créditos & Indicação',
+    descricao: 'Clientes há mais de 90 dias sem tatuar ou com créditos ativos no programa de indicação.',
+    emoji: '💎',
+    criterioTipo: 'dias',
+    diasMin: 91,
+    diasMax: 999,
+    temperaturaAlvo: ['alerta', 'expirado'],
+    mensagemTemplate: 'Opa [Nome]! Passando pra te avisar que seus créditos do programa de indicação no app Somos 1 continuam ativos. Que tal aproveitar para fazer uma tattoo nova ou indicar um amigo e dobrar seu bônus?',
+    especialistaAssinatura: '💬 [Fidelidade · Jonathan]',
+    ativa: true,
+    limiteDiario: 20
+  }
+];

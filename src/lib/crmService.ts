@@ -20,8 +20,10 @@ import {
   ClienteCarteiraTempStage,
   CRMDashboardMetrics,
   ColunaAIAgentConfig,
-  calcularBucketTemperatura
+  calcularBucketTemperatura,
+  EstrategiaCampanha
 } from '../types/crm';
+import { DEFAULT_ESTRATEGIAS } from './defaultEstrategias';
 import { STAGE_AGENTS_NAIA } from './naiaAgentsConfig';
 import { UserProfile, Booking, BookingStatus } from '../types';
 import { whatsappService } from './whatsappService';
@@ -183,11 +185,28 @@ export const crmService = {
     const agora = Date.now();
     const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
+    // Função utilitária para extrair timestamp seguro mesmo com data no formato "YYYY-MM-DD HH:mm"
+    const extrairMsDeData = (dateStr?: string): number => {
+      if (!dateStr || typeof dateStr !== 'string') return 0;
+      const clean = dateStr.trim().split(' ')[0]; // isola YYYY-MM-DD
+      const parts = clean.split('-');
+      if (parts.length < 3) return 0;
+      const a = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (isNaN(a) || isNaN(m) || isNaN(d)) return 0;
+      return new Date(a, m - 1, d, 12, 0, 0).getTime();
+    };
+
     const clientes: ClienteCRM[] = usersSnap.docs.map(uDoc => {
       const u = uDoc.data() as UserProfile;
       const userBookings = allBookings.filter(b => b.userId === uDoc.id || b.userPhone === u.phone);
 
-      const concluidas = userBookings.filter(b => b.status === BookingStatus.COMPLETED);
+      const concluidas = userBookings.filter(b => 
+        b.status === BookingStatus.COMPLETED || 
+        b.status === BookingStatus.APPROVED || 
+        b.status === BookingStatus.DEPOSIT_PAID
+      );
       const agendadas = userBookings.filter(b =>
         b.status === BookingStatus.APPROVED ||
         b.status === BookingStatus.DEPOSIT_PAID ||
@@ -207,28 +226,24 @@ export const crmService = {
         if (b.estilo && !estilos.includes(b.estilo)) {
           estilos.push(b.estilo);
         }
-        if (b.date) {
-          const [ano, mes, dia] = b.date.split('-').map(Number);
-          const dataMs = new Date(ano, mes - 1, dia).getTime();
-          if (dataMs > ultimaDataMs) ultimaDataMs = dataMs;
-        }
+        const dataMs = extrairMsDeData(b.date);
+        if (dataMs > ultimaDataMs) ultimaDataMs = dataMs;
       });
 
       const diasSemContato = ultimaDataMs > 0
-        ? Math.floor((agora - ultimaDataMs) / MS_POR_DIA)
+        ? Math.max(0, Math.floor((agora - ultimaDataMs) / MS_POR_DIA))
         : undefined;
 
-      // Identifica se desmarcou recentemente (rejeitado ou no_show)
       const desmarcadas = userBookings.filter(b => 
         b.status === BookingStatus.REJECTED || 
         b.status === BookingStatus.NO_SHOW
       );
       const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
 
-      // ─── NOVA LÓGICA: Temperatura da Carteira ───
+      const totalSessoes = concluidas.length || (userBookings.length > 0 ? 1 : 0);
       let bucketTemperatura: ClienteCarteiraTempStage = (u as any).bucketTemperatura === 'emReativacao'
         ? 'emReativacao'
-        : calcularBucketTemperatura(diasSemContato, concluidas.length);
+        : calcularBucketTemperatura(diasSemContato, totalSessoes);
 
       return {
         id: uDoc.id,
@@ -237,10 +252,9 @@ export const crmService = {
         email: u.email || '',
         instagram: u.instagram || '',
         bucketTemperatura,
-        // legado (removido futuramente)
         estagioCiclo: bucketTemperatura as any,
         totalGasto,
-        totalSessoes: concluidas.length,
+        totalSessoes,
         diasSemContato,
         estilosFavoritos: estilos,
         fotosTatuagensFeitas: fotosTattoos,
@@ -263,7 +277,6 @@ export const crmService = {
     allBookings.forEach(b => {
       const cleanPhone = (b.userPhone || '').replace(/\D/g, '');
       const cleanName = (b.userName || '').trim().toLowerCase();
-      // Se não está coberto nem por telefone nem por nome exato
       const isAlreadyCovered = (cleanPhone && mapTelefones.has(cleanPhone)) || (cleanName && mapNomes.has(cleanName));
       if (!isAlreadyCovered) {
         const groupKey = cleanPhone || cleanName || b.id;
@@ -276,7 +289,11 @@ export const crmService = {
       const first = bList[0];
       const nome = first.userName || 'Cliente Estúdio';
       const telefone = first.userPhone || '';
-      const concluidas = bList.filter(b => b.status === BookingStatus.COMPLETED);
+      const concluidas = bList.filter(b => 
+        b.status === BookingStatus.COMPLETED || 
+        b.status === BookingStatus.APPROVED || 
+        b.status === BookingStatus.DEPOSIT_PAID
+      );
       const agendadas = bList.filter(b =>
         b.status === BookingStatus.APPROVED ||
         b.status === BookingStatus.DEPOSIT_PAID ||
@@ -295,15 +312,12 @@ export const crmService = {
         if (b.estilo && !estilos.includes(b.estilo)) {
           estilos.push(b.estilo);
         }
-        if (b.date) {
-          const [ano, mes, dia] = b.date.split('-').map(Number);
-          const dataMs = new Date(ano, mes - 1, dia).getTime();
-          if (dataMs > ultimaDataMs) ultimaDataMs = dataMs;
-        }
+        const dataMs = extrairMsDeData(b.date);
+        if (dataMs > ultimaDataMs) ultimaDataMs = dataMs;
       });
 
       const diasSemContato = ultimaDataMs > 0
-        ? Math.floor((agora - ultimaDataMs) / MS_POR_DIA)
+        ? Math.max(0, Math.floor((agora - ultimaDataMs) / MS_POR_DIA))
         : undefined;
 
       const desmarcadas = bList.filter(b => 
@@ -312,7 +326,8 @@ export const crmService = {
       );
       const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
 
-      const bucketTemperatura = calcularBucketTemperatura(diasSemContato, concluidas.length);
+      const totalSessoes = concluidas.length || (bList.length > 0 ? 1 : 0);
+      const bucketTemperatura = calcularBucketTemperatura(diasSemContato, totalSessoes);
 
       clientes.push({
         id: `booking_client_${key}`,
@@ -323,7 +338,7 @@ export const crmService = {
         bucketTemperatura,
         estagioCiclo: bucketTemperatura as any,
         totalGasto,
-        totalSessoes: concluidas.length,
+        totalSessoes,
         diasSemContato,
         estilosFavoritos: estilos,
         fotosTatuagensFeitas: fotosTattoos,
@@ -603,6 +618,44 @@ export const crmService = {
       }, { merge: true });
     } catch (err) {
       console.error('Erro ao salvar crm_stage_agent:', err);
+      throw err;
+    }
+  },
+
+  // ==========================================
+  // ESTRATÉGIAS DE CAMPANHA & REATIVAÇÃO (CRUD)
+  // ==========================================
+  async getEstrategias(): Promise<EstrategiaCampanha[]> {
+    try {
+      const snap = await getDocs(collection(db, 'crm_estrategias'));
+      if (snap.empty) {
+        return DEFAULT_ESTRATEGIAS;
+      }
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as EstrategiaCampanha));
+    } catch (err) {
+      console.warn('Aviso ao carregar crm_estrategias do Firestore, usando fallback:', err);
+      return DEFAULT_ESTRATEGIAS;
+    }
+  },
+
+  async saveEstrategia(estrategia: EstrategiaCampanha): Promise<void> {
+    try {
+      const docRef = doc(db, 'crm_estrategias', estrategia.id);
+      await setDoc(docRef, {
+        ...estrategia,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Erro ao salvar crm_estrategia:', err);
+      throw err;
+    }
+  },
+
+  async deleteEstrategia(id: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'crm_estrategias', id));
+    } catch (err) {
+      console.error('Erro ao excluir crm_estrategia:', err);
       throw err;
     }
   }

@@ -170,15 +170,37 @@ export function calcularBucketTemperatura(
   diasSemContato: number | undefined,
   totalSessoes: number
 ): ClienteCarteiraTempStage {
-  // Sem sessão concluída — não tem temperatura ainda (tratamos como morno por padrão)
-  if (!totalSessoes || totalSessoes === 0) return 'morno';
+  if (diasSemContato === undefined) {
+    return totalSessoes > 0 ? 'morno' : 'quente';
+  }
 
-  const dias = diasSemContato ?? 999;
-  if (dias <= 7)   return 'quente';
-  if (dias <= 30)  return 'morno';
-  if (dias <= 90)  return 'esfriando';
-  if (dias <= 179) return 'alerta';
-  return 'expirado';
+  const dias = diasSemContato;
+  if (dias <= 7)   return 'quente';      // 0–7 dias pós-sessão (cicatrização ativa)
+  if (dias <= 30)  return 'morno';       // 8–30 dias (cicatrização final/cuidados)
+  if (dias <= 90)  return 'esfriando';   // 31–90 dias (tempo ideal para nova tattoo)
+  if (dias <= 179) return 'alerta';      // 91–179 dias (risco de perder o cliente)
+  return 'expirado';                     // >180 dias (cliente inativo há mais de 6 meses)
+}
+
+// ==========================================
+// ESTRATÉGIAS DE CAMPANHA & REATIVAÇÃO
+// ==========================================
+
+export interface EstrategiaCampanha {
+  id: string;
+  titulo: string;
+  descricao: string;
+  emoji: string;
+  criterioTipo: 'dias' | 'temperatura' | 'desmarcou' | 'saldo_indicacao';
+  diasMin?: number;
+  diasMax?: number;
+  temperaturaAlvo?: ClienteCarteiraTempStage[];
+  mensagemTemplate: string;
+  especialistaAssinatura?: string;
+  ativa: boolean;
+  limiteDiario?: number;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 // ==========================================

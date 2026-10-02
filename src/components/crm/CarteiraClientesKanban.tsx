@@ -141,7 +141,6 @@ export const CarteiraClientesKanban: React.FC<CarteiraClientesKanbanProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const clientesFiltrados = clientes.filter(c => {
-    if (!c.totalSessoes || c.totalSessoes === 0) return false; // só pós-tattoo
     if (!busca.trim()) return true;
     const termo = busca.toLowerCase();
     return (
