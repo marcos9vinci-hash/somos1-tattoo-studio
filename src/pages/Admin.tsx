@@ -155,17 +155,47 @@ export default function Admin() {
     }
   });
 
+  const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
+
+  const contagemPorLetra = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    (users || []).forEach(u => {
+      const letra = (u.name || '').trim().charAt(0).toUpperCase();
+      if (/^[A-Z]$/.test(letra)) {
+        mapa[letra] = (mapa[letra] || 0) + 1;
+      } else {
+        mapa['#'] = (mapa['#'] || 0) + 1;
+      }
+    });
+    return mapa;
+  }, [users]);
+
   const filteredUsers = useMemo(() => {
     const q = (searchQuery || '').toLowerCase().trim();
+    const cleanQ = q.replace(/\D/g, '');
+
     return (users || [])
       .filter(u => {
-        if (!q) return true;
-        const nameMatch = (u.name || '').toLowerCase().includes(q);
-        const phoneMatch = (u.phone || '').replace(/\D/g, '').includes(q.replace(/\D/g, ''));
-        return nameMatch || phoneMatch;
+        // Se houver busca textual, pesquisa por nome OU telefone
+        if (q) {
+          const nameMatch = (u.name || '').toLowerCase().includes(q);
+          const phoneMatch = cleanQ.length > 0 && (u.phone || '').replace(/\D/g, '').includes(cleanQ);
+          return nameMatch || phoneMatch;
+        }
+
+        // Se houver letra de A a Z selecionada
+        if (selectedLetter) {
+          const firstChar = (u.name || '').trim().charAt(0).toUpperCase();
+          if (selectedLetter === '#') {
+            return !/^[A-Z]$/.test(firstChar);
+          }
+          return firstChar === selectedLetter;
+        }
+
+        return true;
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }));
-  }, [users, searchQuery]);
+  }, [users, searchQuery, selectedLetter]);
 
   const runAutomationSync = async (currentBookings: Booking[]) => {
     // Automação em lote desativada por segurança
@@ -1496,6 +1526,87 @@ export default function Admin() {
                           <div className="text-[10px] uppercase font-headline font-black text-zinc-500 flex items-center justify-end px-1">
                             {filteredUsers.length} de {users.length} cadastrados (A-Z)
                           </div>
+                        </div>
+
+                        {/* ── BARRA SELETORA ALFABÉTICA (A a Z) ── */}
+                        <div className="bg-zinc-900/60 p-2 rounded-2xl border border-white/5 space-y-1">
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar scroll-smooth">
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedLetter(null); setSearchQuery(''); }}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-headline font-black transition-all shrink-0 uppercase tracking-wider ${
+                                selectedLetter === null && !searchQuery
+                                  ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20 scale-105'
+                                  : 'bg-zinc-950/80 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-white/5'
+                              }`}
+                            >
+                              TODOS ({users.length})
+                            </button>
+
+                            {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letra => {
+                              const qtd = contagemPorLetra[letra] || 0;
+                              const isAtiva = selectedLetter === letra && !searchQuery;
+
+                              return (
+                                <button
+                                  key={letra}
+                                  type="button"
+                                  disabled={qtd === 0}
+                                  onClick={() => {
+                                    setSelectedLetter(letra);
+                                    setSearchQuery('');
+                                  }}
+                                  className={`w-8 h-8 rounded-xl text-xs font-headline font-black flex items-center justify-center transition-all shrink-0 relative ${
+                                    isAtiva
+                                      ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20 scale-110'
+                                      : qtd > 0
+                                      ? 'bg-zinc-950/80 text-zinc-200 hover:text-amber-400 hover:bg-zinc-800 border border-white/10 active:scale-95'
+                                      : 'bg-zinc-950/30 text-zinc-700 border border-white/5 cursor-not-allowed opacity-30'
+                                  }`}
+                                  title={qtd > 0 ? `${qtd} cliente(s) com a letra ${letra}` : `Nenhum cliente cadastrado com a letra ${letra}`}
+                                >
+                                  {letra}
+                                  {qtd > 0 && !isAtiva && (
+                                    <span className="w-1 h-1 rounded-full bg-amber-400 absolute bottom-1" />
+                                  )}
+                                </button>
+                              );
+                            })}
+
+                            {/* Caracteres Especiais / Números */}
+                            <button
+                              type="button"
+                              disabled={(contagemPorLetra['#'] || 0) === 0}
+                              onClick={() => {
+                                setSelectedLetter('#');
+                                setSearchQuery('');
+                              }}
+                              className={`w-8 h-8 rounded-xl text-xs font-headline font-black flex items-center justify-center transition-all shrink-0 ${
+                                selectedLetter === '#' && !searchQuery
+                                  ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20 scale-110'
+                                  : (contagemPorLetra['#'] || 0) > 0
+                                  ? 'bg-zinc-950/80 text-zinc-200 hover:text-white hover:bg-zinc-800 border border-white/10'
+                                  : 'bg-zinc-950/30 text-zinc-700 border border-white/5 cursor-not-allowed opacity-30'
+                              }`}
+                              title={`${contagemPorLetra['#'] || 0} cliente(s) com outros caracteres`}
+                            >
+                              #
+                            </button>
+                          </div>
+                          {selectedLetter && (
+                            <div className="flex items-center justify-between px-2 pt-1 text-[11px] text-zinc-400 font-headline">
+                              <span>
+                                Mostrando clientes com a letra <strong className="text-amber-400">{selectedLetter}</strong> ({filteredUsers.length})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLetter(null)}
+                                className="text-zinc-500 hover:text-white text-[10px] uppercase font-bold underline"
+                              >
+                                Limpar filtro
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {filteredUsers.length > 0 ? (

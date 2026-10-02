@@ -221,7 +221,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                         </button>
 
                         {/* Botão WhatsApp Web Direto */}
-                        {lead.telefone && (
+                        {lead.telefone ? (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -233,6 +233,18 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                             title="Abrir WhatsApp Web"
                           >
                             <Send className="w-3 h-3" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectLead(lead);
+                            }}
+                            className="p-1 bg-zinc-800 text-zinc-500 hover:text-amber-400 border border-zinc-700/60 rounded-lg transition-all"
+                            title="Sem telefone: clique para cadastrar WhatsApp"
+                          >
+                            <Send className="w-3 h-3 opacity-40" />
                           </button>
                         )}
 

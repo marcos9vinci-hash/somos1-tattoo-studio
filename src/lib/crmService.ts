@@ -45,8 +45,16 @@ export const crmService = {
       }
 
       // 2. Agendamentos reais da Agenda → alimentam o funil automaticamente
-      const bookingsSnap = await getDocs(collection(db, BOOKINGS_COLLECTION));
+      const [bookingsSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db, BOOKINGS_COLLECTION)),
+        getDocs(collection(db, USERS_COLLECTION))
+      ]);
       const allBookings = bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Booking));
+      const userPhoneMap = new Map<string, string>();
+      usersSnap.docs.forEach(d => {
+        const uData = d.data();
+        if (uData.phone) userPhoneMap.set(d.id, uData.phone);
+      });
 
       const leadsFromBookings: Lead[] = allBookings.map(b => {
         let estagio: LeadStage = 'agendado';
@@ -60,10 +68,12 @@ export const crmService = {
           estagio = 'followup'; // Desmarcou ou faltou → entra no follow-up de resgate
         }
 
+        const resolvedPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
+
         return {
           id: `booking_${b.id}`,
           nome: b.userName || 'Cliente da Agenda',
-          telefone: b.userPhone || '',
+          telefone: resolvedPhone,
           origem: 'site',
           estagio,
           temperatura: b.status === BookingStatus.COMPLETED ? 'morno' : 'quente',

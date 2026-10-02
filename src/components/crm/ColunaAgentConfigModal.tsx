@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ColunaAIAgentConfig } from '../../types/crm';
 import { 
   Bot, 
@@ -21,26 +21,52 @@ interface ColunaAgentConfigModalProps {
   onSave: (novaConfig: ColunaAIAgentConfig) => void;
 }
 
+const STAGE_TITLES: Record<string, string> = {
+  novo: 'Novo Contato',
+  qualificacao: 'Qualificação (SPIN)',
+  negociacao: '💬 Negociação',
+  agendado: '📅 Sessão Agendada',
+  concluido: '✅ Trabalho Realizado',
+  pos_venda: '✨ Pós-Venda (Cicatrização)',
+  followup: '🔕 Follow-up (Resgate)',
+  perdido: '❌ Perdido'
+};
+
 export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
   isOpen,
   onClose,
   config,
   onSave
 }) => {
+  const [nomeAgente, setNomeAgente] = useState('');
+  const [papel, setPapel] = useState('');
+  const [tomDeVoz, setTomDeVoz] = useState<any>('casual_estudio');
+  const [promptBase, setPromptBase] = useState('');
+  const [skillsAtivas, setSkillsAtivas] = useState<string[]>([]);
+  const [novaSkill, setNovaSkill] = useState('');
+  const [ativo, setAtivo] = useState(true);
+  const [tempoEsperaMinutos, setTempoEsperaMinutos] = useState(15);
+
+  useEffect(() => {
+    if (config) {
+      setNomeAgente(config.nomeAgente);
+      setPapel(config.papel);
+      setTomDeVoz(config.tomDeVoz);
+      setPromptBase(config.promptBase);
+      setSkillsAtivas([...config.skillsAtivas]);
+      setAtivo(config.ativo);
+      setTempoEsperaMinutos(config.tempoEsperaMinutos || 15);
+      setNovaSkill('');
+    }
+  }, [config]);
+
   if (!isOpen || !config) return null;
 
-  const [nomeAgente, setNomeAgente] = useState(config.nomeAgente);
-  const [papel, setPapel] = useState(config.papel);
-  const [tomDeVoz, setTomDeVoz] = useState(config.tomDeVoz);
-  const [promptBase, setPromptBase] = useState(config.promptBase);
-  const [skillsAtivas, setSkillsAtivas] = useState<string[]>([...config.skillsAtivas]);
-  const [novaSkill, setNovaSkill] = useState('');
-  const [ativo, setAtivo] = useState(config.ativo);
-  const [tempoEsperaMinutos, setTempoEsperaMinutos] = useState(config.tempoEsperaMinutos || 15);
-
-  const handleAddSkill = () => {
-    if (!novaSkill.trim()) return;
-    setSkillsAtivas(prev => [...prev, novaSkill.trim()]);
+  const handleAddSkill = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) e.preventDefault();
+    const texto = novaSkill.trim();
+    if (!texto) return;
+    setSkillsAtivas(prev => [...prev, texto]);
     setNovaSkill('');
   };
 
@@ -63,27 +89,31 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
     onClose();
   };
 
+  const nomeDaEtapa = STAGE_TITLES[config.stageId] || config.stageId;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
       <div className="bg-zinc-900 border border-zinc-700/60 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl my-8 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-white text-base">
-                  Agente de IA — Etapa do Funil
+                  Agente de IA — Funil Comercial: <span className="text-amber-400">{nomeDaEtapa}</span>
                 </h3>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-mono">
-                  {config.origemNaia}
+                  Base: {config.origemNaia}
+                </span>
+                <span className="text-[10px] text-zinc-400">
+                  Personalidade &amp; Skills da Etapa
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">
-                Personalidade, instruções e habilidades ativas desta coluna
-              </p>
             </div>
           </div>
           <button
@@ -103,7 +133,7 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
               <div>
                 <span className="text-xs font-bold text-white block">Status da Automação de IA</span>
                 <span className="text-[11px] text-zinc-400">
-                  {ativo ? 'O agente atua e sugere respostas nesta etapa' : 'Automação pausada nesta coluna'}
+                  {ativo ? `O agente atua e sugere respostas na etapa de ${nomeDaEtapa}` : 'Automação pausada nesta coluna'}
                 </span>
               </div>
             </div>
@@ -160,7 +190,7 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
           <div>
             <label className="block text-xs font-semibold text-zinc-300 mb-1 flex items-center justify-between">
               <span>Instruções Centrais (Prompt Base)</span>
-              <span className="text-[10px] text-zinc-500">Framework NAIA</span>
+              <span className="text-[10px] text-zinc-500 font-mono">Framework NAIA</span>
             </label>
             <textarea
               rows={4}
@@ -175,10 +205,10 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
             <label className="block text-xs font-semibold text-zinc-300 mb-2">
               Habilidades &amp; Skills Ativas desta Etapa
             </label>
-            <div className="space-y-1.5 mb-2.5">
+            <div className="space-y-1.5 mb-2.5 max-h-48 overflow-y-auto pr-1">
               {skillsAtivas.map((skill, idx) => (
                 <div 
-                  key={idx} 
+                  key={`${skill}-${idx}`} 
                   className="flex items-center justify-between bg-zinc-950 border border-zinc-800/80 px-3 py-1.5 rounded-lg text-xs text-zinc-300"
                 >
                   <span className="flex items-center gap-2">
@@ -189,6 +219,7 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
                     type="button"
                     onClick={() => handleRemoveSkill(idx)}
                     className="text-zinc-500 hover:text-rose-400 transition-colors p-1"
+                    title="Remover habilidade"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -199,18 +230,25 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="Adicionar nova habilidade (ex: calcular desconto PIX)..."
+                placeholder="Digitar nova habilidade (ex: calcular desconto PIX) e clicar em +..."
                 value={novaSkill}
                 onChange={e => setNovaSkill(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSkill(); } }}
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSkill();
+                  }
+                }}
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
               />
               <button
                 type="button"
                 onClick={handleAddSkill}
-                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold transition-all"
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-xs font-bold transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+                title="Adicionar esta habilidade"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>Adicionar</span>
               </button>
             </div>
           </div>
