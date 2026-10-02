@@ -240,10 +240,15 @@ export const crmService = {
       );
       const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
 
+      // Identifica o agendamento mais recente do cliente para verificar se ele faltou ou desmarcou
+      const sortedBookings = [...userBookings].sort((a, b) => extrairMsDeData(b.date) - extrairMsDeData(a.date));
+      const ultimoBooking = sortedBookings[0];
+      const ultimoStatus = ultimoBooking ? (ultimoBooking.status as string) : undefined;
+
       const totalSessoes = concluidas.length || (userBookings.length > 0 ? 1 : 0);
       let bucketTemperatura: ClienteCarteiraTempStage = (u as any).bucketTemperatura === 'emReativacao'
         ? 'emReativacao'
-        : calcularBucketTemperatura(diasSemContato, totalSessoes);
+        : calcularBucketTemperatura(diasSemContato, totalSessoes, ultimoStatus);
 
       return {
         id: uDoc.id,
@@ -326,8 +331,13 @@ export const crmService = {
       );
       const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
 
+      // Identifica o agendamento mais recente da lista do cliente
+      const sortedBList = [...bList].sort((a, b) => extrairMsDeData(b.date) - extrairMsDeData(a.date));
+      const ultimoBooking = sortedBList[0];
+      const ultimoStatus = ultimoBooking ? (ultimoBooking.status as string) : undefined;
+
       const totalSessoes = concluidas.length || (bList.length > 0 ? 1 : 0);
-      const bucketTemperatura = calcularBucketTemperatura(diasSemContato, totalSessoes);
+      const bucketTemperatura = calcularBucketTemperatura(diasSemContato, totalSessoes, ultimoStatus);
 
       clientes.push({
         id: `booking_client_${key}`,
@@ -570,7 +580,8 @@ export const crmService = {
       esfriando: clientes.filter(c => c.bucketTemperatura === 'esfriando').length,
       alerta: clientes.filter(c => c.bucketTemperatura === 'alerta').length,
       expirado: clientes.filter(c => c.bucketTemperatura === 'expirado').length,
-      emReativacao: clientes.filter(c => c.bucketTemperatura === 'emReativacao').length
+      emReativacao: clientes.filter(c => c.bucketTemperatura === 'emReativacao').length,
+      desmarcou: clientes.filter(c => c.bucketTemperatura === 'desmarcou').length
     };
 
     return {

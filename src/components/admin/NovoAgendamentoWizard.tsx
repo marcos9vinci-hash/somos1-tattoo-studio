@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, UserPlus, ChevronUp, ChevronDown, Upload, FileText, Search, ArrowLeft, Check, RotateCcw, Phone, UserCheck, Loader2 } from 'lucide-react';
+import { X, UserPlus, ChevronUp, ChevronDown, Upload, FileText, Search, ArrowLeft, Check, RotateCcw, Phone, UserCheck, Loader2, CheckCircle2, Send, Calendar } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, getDocs, serverTimestamp, query, where, doc, updateDoc } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
@@ -56,6 +56,8 @@ export default function NovoAgendamentoWizard({
   const [criandoCliente, setCriandoCliente] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [showConfirmOrAdjustModal, setShowConfirmOrAdjustModal] = useState(false);
+  const [clienteJaTatuou, setClienteJaTatuou] = useState(false);
 
   useEffect(() => {
     const fetchClientes = async () => {
@@ -202,10 +204,20 @@ export default function NovoAgendamentoWizard({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.cliente_id || !form.data_agendamento) {
+      alert("Por favor, selecione o cliente e o horário do agendamento.");
+      return;
+    }
+    // Abre modal de escolha inteligente entre Confirmar (com Zap) vs Ajustar (sem Zap)
+    setShowConfirmOrAdjustModal(true);
+  };
+
+  const handleExecuteSave = async (modo: 'confirmar' | 'ajustar', clienteJaTatuouFlag?: boolean) => {
     if (!form.cliente_id || !form.data_agendamento) return;
     setIsLoading(true);
+    setShowConfirmOrAdjustModal(false);
 
     try {
       const selectedUser = clientesLocais.find(c => c.id === form.cliente_id);
@@ -258,12 +270,35 @@ export default function NovoAgendamentoWizard({
           updatedAt: serverTimestamp()
         };
 
-        // Se mudou data/hora, marca como REAGENDADO e reseta flags de envio
+        if (modo === 'ajustar') {
+          // ================= MODO AJUSTAR (SILENCIOSO - SEM WHATSAPP) =================
+          if (clienteJaTatuouFlag) {
+            updateData.status = BookingStatus.COMPLETED;
+          } else {
+            // Mantém o status original (ex: APPROVED) sem forçar RESCHEDULED para não disparar zap
+            updateData.status = agendamentoParaEditar.status || BookingStatus.APPROVED;
+          }
+
+          await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), updateData);
+
+          alert(
+            clienteJaTatuouFlag
+              ? "✅ Horário ajustado e marcado como CONCLUÍDO na esteira (sem disparar WhatsApp ao cliente)!"
+              : "✅ Horário ajustado na agenda com sucesso (sem disparar WhatsApp ao cliente)!"
+          );
+          onSuccess();
+          onClose();
+          return;
+        }
+
+        // ================= MODO CONFIRMAR (COM WHATSAPP) =================
         if (isDateTimeChanged) {
           updateData.status = BookingStatus.RESCHEDULED;
           updateData.rescheduleSent = false;
           updateData.reminderSent = false;
           updateData.followUpSent = false;
+        } else {
+          updateData.status = agendamentoParaEditar.status || BookingStatus.APPROVED;
         }
 
         await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), updateData);
@@ -298,52 +333,60 @@ export default function NovoAgendamentoWizard({
           });
         }
 
-        alert(isDateTimeChanged ? "Agendamento reagendado e atualizado com sucesso!" : "Tattoo atualizada com sucesso!");
+        alert(isDateTimeChanged ? "Agendamento reagendado e confirmação enviada no WhatsApp!" : "Tattoo atualizada e confirmação enviada com sucesso!");
         onSuccess();
         onClose();
         return;
       }
 
+      // ================= NOVO AGENDAMENTO =================
       payload.size = 'Média';
       payload.creditsUsed = 0;
-      payload.status = BookingStatus.APPROVED;
+      payload.status = (modo === 'ajustar' && clienteJaTatuouFlag) ? BookingStatus.COMPLETED : BookingStatus.APPROVED;
       payload.createdAt = serverTimestamp();
 
       const docRef = await addDoc(collection(db, 'bookings'), payload);
-      alert("Agendamento realizado com sucesso!");
 
-      if (selectedUser) {
-        // Configurações personalizadas definidas diretamente neste agendamento
-        const dynamicSettings = {
-          automation: {
-            enabled: true,
-            confirmationEnabled: form.enviarConfirmacao,
-            reminderEnabled: form.enviarLembrete,
-            reminderValue: Number(form.tempoLembreteValor) || 2,
-            reminderUnit: form.tempoLembreteUnidade,
-            followUpEnabled: form.enviarFollowUp,
-            followUpValue: Number(form.tempoFollowUpValor) || 2,
-            followUpUnit: form.tempoFollowUpUnidade,
-            evolutionInstance: 'wats'
-          }
-        };
+      if (modo === 'ajustar') {
+        alert(
+          clienteJaTatuouFlag
+            ? "✅ Agendamento registrado como CONCLUÍDO na esteira (sem disparar WhatsApp ao cliente)!"
+            : "✅ Agendamento registrado silenciosamente na agenda (sem disparar WhatsApp ao cliente)!"
+        );
+      } else {
+        alert("Agendamento realizado e confirmado com sucesso!");
 
-        const bookingData = {
-          id: docRef.id,
-          userName: selectedUser.name || 'Cliente',
-          userPhone: selectedUser.phone || selectedUser.telefone || '',
-          date: dataParte,
-          time: horaParte,
-          descricao_servico: form.descricao_servico,
-          artistId: form.profissional_id,
-          priceEstimated: payload.priceEstimated,
-          depositPaid: payload.depositPaid
-        };
+        if (selectedUser) {
+          const dynamicSettings = {
+            automation: {
+              enabled: true,
+              confirmationEnabled: form.enviarConfirmacao,
+              reminderEnabled: form.enviarLembrete,
+              reminderValue: Number(form.tempoLembreteValor) || 2,
+              reminderUnit: form.tempoLembreteUnidade,
+              followUpEnabled: form.enviarFollowUp,
+              followUpValue: Number(form.tempoFollowUpValor) || 2,
+              followUpUnit: form.tempoFollowUpUnidade,
+              evolutionInstance: 'wats'
+            }
+          };
 
-        // Aciona o ciclo completo: Envia Confirmação + agenda Lembrete e Follow-up com tempos definidos
-        whatsappService.triggerBookingLifecycle(bookingData, false, dynamicSettings as any).catch(err => {
-          console.warn("Aviso no disparo do ciclo de automação:", err);
-        });
+          const bookingData = {
+            id: docRef.id,
+            userName: selectedUser.name || 'Cliente',
+            userPhone: selectedUser.phone || selectedUser.telefone || '',
+            date: dataParte,
+            time: horaParte,
+            descricao_servico: form.descricao_servico,
+            artistId: form.profissional_id,
+            priceEstimated: payload.priceEstimated,
+            depositPaid: payload.depositPaid
+          };
+
+          whatsappService.triggerBookingLifecycle(bookingData, false, dynamicSettings as any).catch(err => {
+            console.warn("Aviso no disparo do ciclo de automação:", err);
+          });
+        }
       }
 
       onSuccess();
@@ -915,18 +958,168 @@ export default function NovoAgendamentoWizard({
 
           </div>
 
-          {/* FOOTER FIXO COM BOTÃO DE CONFIRMAR */}
-          <div className="p-4 sm:p-5 border-t border-white/10 shrink-0 bg-zinc-950/95 backdrop-blur-sm z-10">
+          {/* FOOTER FIXO COM BOTÕES DE AÇÃO: AJUSTAR (SEM ZAP) OU CONFIRMAR (COM ZAP) */}
+          <div className="p-4 sm:p-5 border-t border-white/10 shrink-0 bg-zinc-950/95 backdrop-blur-sm z-10 flex flex-col sm:flex-row gap-2.5">
+            <button 
+              type="button"
+              onClick={() => {
+                if (!form.cliente_id || !form.data_agendamento) {
+                  alert("Por favor, selecione o cliente e a data/horário do agendamento.");
+                  return;
+                }
+                setShowConfirmOrAdjustModal(true);
+              }}
+              className="flex-1 bg-zinc-900 border border-amber-500/40 hover:bg-amber-500/10 text-amber-300 font-headline font-bold py-3.5 px-3 rounded-xl uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 active:scale-98"
+              disabled={isLoading || !form.cliente_id || !form.data_agendamento}
+              title="Ajustar agenda internamente sem disparar WhatsApp ao cliente"
+            >
+              <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Apenas Ajustar Agenda (Sem Zap)</span>
+            </button>
+
             <button 
               type="submit" 
-              className="w-full bg-primary-fixed text-black font-headline font-black py-3.5 rounded-xl uppercase tracking-widest text-xs disabled:opacity-50 hover:bg-primary-fixed/90 transition-all shadow-lg shadow-primary-fixed/20 active:scale-98"
+              className="flex-1 bg-primary-fixed text-black font-headline font-black py-3.5 px-3 rounded-xl uppercase tracking-wider text-xs disabled:opacity-50 hover:bg-primary-fixed/90 transition-all shadow-lg shadow-primary-fixed/20 active:scale-98 flex items-center justify-center gap-2"
               disabled={isLoading || !form.cliente_id || !form.data_agendamento}
             >
-              {isLoading ? "Salvando..." : (agendamentoParaEditar ? "Salvar Alterações" : "Confirmar Agendamento")}
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  <span>Salvando...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 shrink-0" />
+                  <span>{agendamentoParaEditar ? "Confirmar / Ajustar" : "Confirmar Agendamento"}</span>
+                </>
+              )}
             </button>
           </div>
         </form>
       </div>
+
+      {/* MODAL INTELIGENTE DE DECISÃO: CONFIRMAR (ZAP) OU AJUSTAR (SILENCIOSO) */}
+      {showConfirmOrAdjustModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in">
+          <div className="bg-zinc-950 border border-white/10 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl space-y-5 animate-in zoom-in-95 relative">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-headline font-bold text-white text-base uppercase leading-snug">
+                  Como deseja salvar este horário?
+                </h3>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Cliente: <strong className="text-white">{clientesLocais.find(c => c.id === form.cliente_id)?.name || 'Cliente'}</strong>
+                  <br />
+                  Data: <span className="text-amber-400 font-bold">{dataParte ? dataParte.split('-').reverse().join('/') : ''}</span> às <span className="text-amber-400 font-bold">{horaParte}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfirmOrAdjustModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* OPÇÃO 1: APENAS AJUSTAR AGENDA (SILENCIOSO / CLIENTE JÁ TATUOU) */}
+              <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] hover:bg-amber-500/[0.12] transition-all space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-headline font-bold text-amber-300 text-xs uppercase tracking-wide">
+                        📝 Apenas Ajustar Agenda
+                      </span>
+                      <span className="text-[9px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                        Silencioso (Sem Zap)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-300 mt-1 leading-relaxed">
+                      Atualiza a agenda interna <strong>sem enviar nada no WhatsApp</strong> do cliente. Ideal para ajustes internos ou quando você esqueceu de marcar na hora.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Opção se o cliente já tatuou */}
+                <div className="pt-2.5 border-t border-amber-500/20 flex items-center gap-2.5 bg-black/40 p-2.5 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="clienteJaTatuouCheck"
+                    checked={clienteJaTatuou}
+                    onChange={(e) => setClienteJaTatuou(e.target.checked)}
+                    className="w-4 h-4 rounded accent-emerald-500 cursor-pointer"
+                  />
+                  <label 
+                    htmlFor="clienteJaTatuouCheck" 
+                    className="text-xs text-zinc-200 font-medium cursor-pointer select-none"
+                  >
+                    Cliente já fez a tattoo? (Marcar como <strong className="text-emerald-400">🟢 Concluído / Trabalho Realizado</strong>)
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleExecuteSave('ajustar', clienteJaTatuou)}
+                  disabled={isLoading}
+                  className="w-full py-2.5 bg-amber-500 text-black font-headline font-black text-xs uppercase tracking-wider rounded-lg hover:bg-amber-400 transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>Confirmar Apenas Ajuste (Sem WhatsApp)</span>
+                </button>
+              </div>
+
+              {/* OPÇÃO 2: CONFIRMAR E AVISAR NO WHATSAPP */}
+              <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] hover:bg-sky-500/[0.10] transition-all space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-sky-500/20 text-sky-400 shrink-0 mt-0.5">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-headline font-bold text-white text-xs uppercase tracking-wide">
+                        📱 Confirmar & Notificar no WhatsApp
+                      </span>
+                      <span className="text-[9px] bg-sky-500/20 text-sky-400 font-bold px-2 py-0.5 rounded-full border border-sky-500/30">
+                        Dispara Zap
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                      Salva o horário e dispara notificação automática no WhatsApp do cliente avisando do agendamento ou nova data/hora.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleExecuteSave('confirmar', false)}
+                  disabled={isLoading}
+                  className="w-full py-2.5 bg-sky-500 text-white font-headline font-black text-xs uppercase tracking-wider rounded-lg hover:bg-sky-400 transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Salvar & Enviar Mensagem no Zap</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-1 text-center">
+              <button
+                type="button"
+                onClick={() => setShowConfirmOrAdjustModal(false)}
+                className="text-xs text-zinc-400 hover:text-white font-headline uppercase tracking-wider transition-colors py-1"
+              >
+                Voltar e continuar editando
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

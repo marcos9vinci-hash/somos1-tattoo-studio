@@ -304,18 +304,20 @@ export default function Admin() {
       // Sincroniza automaticamente a esteira do CRM (lead/cliente)
       crmService.syncBookingToCRM(booking, nextStatus);
 
-      if (isReschedule) {
-        whatsappService.triggerBookingLifecycle({
-          ...booking,
-          ...customData,
-          status: nextStatus
-        }, true, settings, { explicitUserClick: true });
-      } else if (nextStatus === BookingStatus.APPROVED) {
-        whatsappService.triggerBookingLifecycle({
-          ...booking,
-          ...customData,
-          status: nextStatus
-        }, false, settings, { explicitUserClick: true });
+      if (!customData?.silent) {
+        if (isReschedule) {
+          whatsappService.triggerBookingLifecycle({
+            ...booking,
+            ...customData,
+            status: nextStatus
+          }, true, settings, { explicitUserClick: true });
+        } else if (nextStatus === BookingStatus.APPROVED) {
+          whatsappService.triggerBookingLifecycle({
+            ...booking,
+            ...customData,
+            status: nextStatus
+          }, false, settings, { explicitUserClick: true });
+        }
       }
 
       fetchData(true);

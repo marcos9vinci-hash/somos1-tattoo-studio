@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EstrategiaCampanha, ClienteCRM, ClienteCarteiraTempStage } from '../../types/crm';
-import { X, Sparkles, Save, Trash2, Users, Clock, AlertTriangle } from 'lucide-react';
+import { X, Sparkles, Save, Trash2, Users, Clock, AlertTriangle, Plus, Timer, Zap } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -29,6 +29,11 @@ export const EstrategiaModal: React.FC<Props> = ({
   const [mensagemTemplate, setMensagemTemplate] = useState('');
   const [especialistaAssinatura, setEspecialistaAssinatura] = useState('🌿 [Pós-Venda · Cuidados Juliana]');
   const [limiteDiario, setLimiteDiario] = useState(25);
+  const [modoCadencia, setModoCadencia] = useState<'fixo' | 'sequencial' | 'aleatorio'>('sequencial');
+  const [intervaloMinutosFixo, setIntervaloMinutosFixo] = useState(5);
+  const [sequenciaTimers, setSequenciaTimers] = useState<number[]>([5, 10, 15, 10]);
+  const [novoTimerMinutos, setNovoTimerMinutos] = useState(10);
+  const [mostrarAddTimer, setMostrarAddTimer] = useState(false);
   const [saving, setSaving] = useState(false);
   const [gerandoIA, setGerandoIA] = useState(false);
 
@@ -44,6 +49,13 @@ export const EstrategiaModal: React.FC<Props> = ({
       setMensagemTemplate(estrategia.mensagemTemplate);
       setEspecialistaAssinatura(estrategia.especialistaAssinatura || '🌿 [Pós-Venda · Cuidados Juliana]');
       setLimiteDiario(estrategia.limiteDiario ?? 25);
+      setModoCadencia(estrategia.modoCadencia || 'sequencial');
+      setIntervaloMinutosFixo(estrategia.intervaloMinutosFixo ?? 5);
+      setSequenciaTimers(
+        estrategia.sequenciaTimersMinutos && estrategia.sequenciaTimersMinutos.length > 0
+          ? estrategia.sequenciaTimersMinutos
+          : [5, 10, 15, 10]
+      );
     } else {
       setTitulo('Nova Campanha de Reativação');
       setDescricao('Estratégia personalizada para despertar clientes da base.');
@@ -55,6 +67,9 @@ export const EstrategiaModal: React.FC<Props> = ({
       setMensagemTemplate('Fala [Nome]! Tudo bem? Lembrei de você aqui no estúdio Somos 1. Como tá sua tattoo? Separei uma condição especial se quiser rabiscar esse mês!');
       setEspecialistaAssinatura('🤖 [Clone do Dono · Marquinhos]');
       setLimiteDiario(20);
+      setModoCadencia('sequencial');
+      setIntervaloMinutosFixo(5);
+      setSequenciaTimers([5, 10, 15, 10]);
     }
   }, [estrategia, isOpen]);
 
@@ -127,7 +142,10 @@ export const EstrategiaModal: React.FC<Props> = ({
         temperaturaAlvo: criterioTipo === 'temperatura' ? temperaturasAlvo : undefined,
         mensagemTemplate: mensagemTemplate.trim(),
         especialistaAssinatura,
-        limiteDiario: Number(limiteDiario) || 25,
+        limiteDiario: Number(limiteDiario) || 20,
+        modoCadencia,
+        intervaloMinutosFixo: Number(intervaloMinutosFixo) || 5,
+        sequenciaTimersMinutos: sequenciaTimers.length > 0 ? sequenciaTimers : [5, 10, 15, 10],
         ativa: estrategia ? estrategia.ativa : true,
         updatedAt: new Date().toISOString()
       };
@@ -303,7 +321,8 @@ export const EstrategiaModal: React.FC<Props> = ({
                   { id: 'morno', label: '☀️ Morno (8-30d)' },
                   { id: 'esfriando', label: '❄️ Esfriando (31-90d)' },
                   { id: 'alerta', label: '🧊 Alerta (91-179d)' },
-                  { id: 'expirado', label: '⌛ Expirado (>180d)' }
+                  { id: 'expirado', label: '⌛ Expirado (>180d)' },
+                  { id: 'desmarcou', label: '🔴 Faltou / No-Show' }
                 ].map(t => (
                   <button
                     key={t.id}
@@ -363,33 +382,252 @@ export const EstrategiaModal: React.FC<Props> = ({
             </p>
           </div>
 
-          {/* Assinatura do Especialista & Limite Diário */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
-                Assinatura do Especialista
-              </label>
-              <input
-                type="text"
-                value={especialistaAssinatura}
-                onChange={e => setEspecialistaAssinatura(e.target.value)}
-                placeholder="Ex: 🌿 [Pós-Venda · Cuidados Juliana]"
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
-              />
+          {/* Painel Completo de Cadência, Limite Diário e Timers Sequenciais (Anti-Bloqueio Meta) */}
+          <div className="p-4 bg-zinc-950/80 border border-zinc-800 rounded-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span className="font-headline font-black text-xs uppercase tracking-wider text-white">
+                    Cadência & Sequência de Disparos (Anti-Ban Meta)
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  Defina o limite diário e os tempos de espera entre cada mensagem para proteger seu WhatsApp.
+                </p>
+              </div>
+
+              {/* Seletor de Modo */}
+              <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-700/80 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setModoCadencia('sequencial')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-1 ${
+                    modoCadencia === 'sequencial'
+                      ? 'bg-amber-500 text-black shadow-sm font-black'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Timer className="w-3 h-3" />
+                  <span>Sequência Dinâmica</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoCadencia('fixo')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-1 ${
+                    modoCadencia === 'fixo'
+                      ? 'bg-amber-500 text-black shadow-sm font-black'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Clock className="w-3 h-3" />
+                  <span>Tempo Fixo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoCadencia('aleatorio')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-1 ${
+                    modoCadencia === 'aleatorio'
+                      ? 'bg-amber-500 text-black shadow-sm font-black'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>Aleatório</span>
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
-                Limite Diário Seguro (Anti-Ban)
-              </label>
-              <input
-                type="number"
-                min="5"
-                max="50"
-                value={limiteDiario}
-                onChange={e => setLimiteDiario(Math.max(1, parseInt(e.target.value) || 20))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-              />
+
+            {/* Configuração de Limite Diário e Assinatura */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                  Limite Máximo de Disparos por Dia:
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={limiteDiario}
+                    onChange={e => setLimiteDiario(Math.max(1, parseInt(e.target.value) || 20))}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white font-bold"
+                  />
+                  <span className="text-xs text-zinc-500 whitespace-nowrap">mensagens/dia</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                  Assinatura do Especialista:
+                </label>
+                <input
+                  type="text"
+                  value={especialistaAssinatura}
+                  onChange={e => setEspecialistaAssinatura(e.target.value)}
+                  placeholder="Ex: 🌿 [Pós-Venda · Cuidados Juliana]"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                />
+              </div>
             </div>
+
+            {/* Detalhe do Modo Sequencial de Timers com Botão de Relógio */}
+            {modoCadencia === 'sequencial' && (
+              <div className="space-y-3 pt-2 border-t border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                    <Timer className="w-3.5 h-3.5 text-amber-400" />
+                    Sequência de Espera entre Mensagens:
+                  </span>
+                  
+                  {/* Botão com Ícone de Relógio para abrir novo timer */}
+                  <button
+                    type="button"
+                    onClick={() => setMostrarAddTimer(!mostrarAddTimer)}
+                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-all active:scale-95"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>+ Novo Timer ⏱️</span>
+                  </button>
+                </div>
+
+                {/* Popover / Input para Adicionar Timer */}
+                {mostrarAddTimer && (
+                  <div className="p-3 bg-zinc-900 border border-amber-500/30 rounded-xl flex items-center gap-2 flex-wrap animate-in fade-in">
+                    <span className="text-xs text-zinc-300 font-medium">Novo intervalo:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={novoTimerMinutos}
+                      onChange={e => setNovoTimerMinutos(Math.max(1, parseInt(e.target.value) || 5))}
+                      className="w-16 bg-black border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white text-center font-bold"
+                    />
+                    <span className="text-xs text-zinc-400">minutos</span>
+                    
+                    {/* Presets Rápidos */}
+                    <div className="flex items-center gap-1 ml-auto">
+                      {[3, 5, 10, 15, 20].map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            setSequenciaTimers(prev => [...prev, m]);
+                            setMostrarAddTimer(false);
+                          }}
+                          className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold"
+                        >
+                          +{m}m
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSequenciaTimers(prev => [...prev, novoTimerMinutos]);
+                          setMostrarAddTimer(false);
+                        }}
+                        className="px-3 py-1 bg-amber-500 text-black rounded-lg text-xs font-bold hover:bg-amber-400 ml-1"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Trilha visual dos chips de timer */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-wrap">
+                  {sequenciaTimers.map((min, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700/80 hover:border-amber-500/40 px-2.5 py-1.5 rounded-xl text-xs text-zinc-200 transition-all shadow-xs"
+                    >
+                      <span className="text-[10px] text-zinc-500 font-mono">#{idx + 1}</span>
+                      <Clock className="w-3 h-3 text-amber-400" />
+                      <strong className="text-amber-300">{min} min</strong>
+                      {sequenciaTimers.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setSequenciaTimers(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-zinc-500 hover:text-rose-400 ml-0.5 p-0.5"
+                          title="Remover este timer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => setMostrarAddTimer(true)}
+                    className="flex items-center gap-1 border border-dashed border-zinc-700 hover:border-amber-400 text-zinc-400 hover:text-amber-400 px-3 py-1.5 rounded-xl text-xs transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Timer</span>
+                  </button>
+                </div>
+
+                {/* Presets Rápidos de Sequência */}
+                <div className="flex items-center gap-2 text-[10px] text-zinc-400 flex-wrap pt-1">
+                  <span>Presets Prontos:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSequenciaTimers([5, 10, 15, 10])}
+                    className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 hover:border-amber-400 text-zinc-300 font-bold"
+                  >
+                    ⚡ Marquinhos (5m ➔ 10m ➔ 15m ➔ 10m)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSequenciaTimers([5, 5, 5, 5])}
+                    className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 hover:border-amber-400 text-zinc-300"
+                  >
+                    ⏳ De 5 em 5 min
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSequenciaTimers([10, 10, 10])}
+                    className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 hover:border-amber-400 text-zinc-300"
+                  >
+                    ⏳ De 10 em 10 min
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSequenciaTimers([6, 12, 8, 15])}
+                    className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 hover:border-amber-400 text-zinc-300"
+                  >
+                    🛡️ Humanizado (6m, 12m, 8m, 15m)
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-zinc-500 leading-relaxed bg-black/30 p-2.5 rounded-xl border border-white/5">
+                  💡 <strong>Como funciona o fluxo:</strong> O robô faz o 1º disparo, aguarda <strong>{sequenciaTimers[0] || 5} min</strong>, faz o 2º disparo, aguarda <strong>{sequenciaTimers[1] || 10} min</strong>, e segue a sequência de timers até bater o limite diário de <strong>{limiteDiario} mensagens</strong>. Ao terminar a lista, ele reinicia o ciclo ordenadamente.
+                </p>
+              </div>
+            )}
+
+            {/* Detalhe do Modo Fixo */}
+            {modoCadencia === 'fixo' && (
+              <div className="pt-2 border-t border-zinc-800 flex items-center gap-3">
+                <span className="text-xs text-zinc-300">Tempo de espera fixo entre cada disparo:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={intervaloMinutosFixo}
+                  onChange={e => setIntervaloMinutosFixo(Math.max(1, parseInt(e.target.value) || 5))}
+                  className="w-20 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white text-center font-bold"
+                />
+                <span className="text-xs text-zinc-400">minutos (Ex: de 5 em 5 min)</span>
+              </div>
+            )}
+
+            {/* Detalhe do Modo Aleatório */}
+            {modoCadencia === 'aleatorio' && (
+              <div className="pt-2 border-t border-zinc-800 text-xs text-zinc-300 leading-relaxed bg-black/30 p-2.5 rounded-xl border border-white/5">
+                🎲 <strong>Modo Randômico Natural:</strong> O robô sorteia um intervalo imprevisível entre 4 e 15 minutos para cada mensagem, imitando com perfeição o ritmo de digitação e pausa de um atendente humano.
+              </div>
+            )}
           </div>
 
           {/* Ações do Footer */}

@@ -13,7 +13,10 @@ export const DEFAULT_ESTRATEGIAS: EstrategiaCampanha[] = [
     mensagemTemplate: 'Fala [Nome]! Passando pra saber como tá a cicatrização da sua tattoo. Já começou a descascar? Lembra de manter a camada fina de pomada e não coçar. Qualquer dúvida me chama aqui no Whats!',
     especialistaAssinatura: '🌿 [Pós-Venda · Cuidados Juliana]',
     ativa: true,
-    limiteDiario: 25
+    limiteDiario: 25,
+    modoCadencia: 'sequencial',
+    intervaloMinutosFixo: 5,
+    sequenciaTimersMinutos: [5, 10, 15, 10]
   },
   {
     id: 'foto_retoque',
@@ -27,7 +30,10 @@ export const DEFAULT_ESTRATEGIAS: EstrategiaCampanha[] = [
     mensagemTemplate: 'Opa [Nome]! Já deu tempo da sua tattoo assentar na pele! Consegue mandar uma foto aí na luz natural pra eu ver como ficou o resultado final? E se precisar de algum retoquezinho de leve a gente já marca!',
     especialistaAssinatura: '🌿 [Pós-Venda · Cuidados Juliana]',
     ativa: true,
-    limiteDiario: 25
+    limiteDiario: 25,
+    modoCadencia: 'sequencial',
+    intervaloMinutosFixo: 5,
+    sequenciaTimersMinutos: [5, 10, 15, 10]
   },
   {
     id: 'segunda_tattoo',
@@ -41,19 +47,25 @@ export const DEFAULT_ESTRATEGIAS: EstrategiaCampanha[] = [
     mensagemTemplate: 'Fala [Nome], beleza? Lembrei de você aqui no estúdio! Aquela sua tattoo já tá 100% cicatrizada. Já pensou no próximo rabisco ou em continuar aquele projeto? Separei uma condição especial pra você esse mês!',
     especialistaAssinatura: '🤖 [Clone do Dono · Marquinhos]',
     ativa: true,
-    limiteDiario: 20
+    limiteDiario: 20,
+    modoCadencia: 'sequencial',
+    intervaloMinutosFixo: 5,
+    sequenciaTimersMinutos: [5, 10, 15, 10]
   },
   {
     id: 'resgate_noshow',
     titulo: '❄️ Resgate de No-Shows',
-    descricao: 'Clientes que desmarcaram ou reagendaram mas ainda não definiram a nova data.',
+    descricao: 'Clientes que desmarcaram ou faltaram à sessão e precisam de novo agendamento.',
     emoji: '❄️',
     criterioTipo: 'desmarcou',
-    temperaturaAlvo: ['alerta', 'esfriando'],
-    mensagemTemplate: 'Fala [Nome]! Vi aqui no sistema que a gente não conseguiu fechar a data daquela sua tattoo. Ficou alguma dúvida sobre o valor ou sobre a arte? Se quiser, consigo um encaixe VIP pra essa semana pra gente fazer!',
+    temperaturaAlvo: ['desmarcou', 'alerta', 'esfriando'],
+    mensagemTemplate: 'Fala [Nome]! Vi aqui no sistema que a gente não conseguiu realizar aquela sua tattoo. Ficou alguma dúvida sobre o valor ou sobre a arte? Se quiser, consigo um encaixe VIP pra essa semana pra gente fazer!',
     especialistaAssinatura: '❄️ [Resgate · Agente Avalanche]',
     ativa: true,
-    limiteDiario: 15
+    limiteDiario: 15,
+    modoCadencia: 'sequencial',
+    intervaloMinutosFixo: 5,
+    sequenciaTimersMinutos: [5, 10, 15, 10]
   },
   {
     id: 'creditos_indicacao',
@@ -67,6 +79,9 @@ export const DEFAULT_ESTRATEGIAS: EstrategiaCampanha[] = [
     mensagemTemplate: 'Opa [Nome]! Passando pra te avisar que seus créditos do programa de indicação no app Somos 1 continuam ativos. Que tal aproveitar para fazer uma tattoo nova ou indicar um amigo e dobrar seu bônus?',
     especialistaAssinatura: '💬 [Fidelidade · Jonathan]',
     ativa: true,
-    limiteDiario: 20
+    limiteDiario: 20,
+    modoCadencia: 'sequencial',
+    intervaloMinutosFixo: 5,
+    sequenciaTimersMinutos: [5, 10, 15, 10]
   }
 ];

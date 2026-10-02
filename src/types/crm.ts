@@ -53,7 +53,8 @@ export type ClienteCarteiraTempStage =
   | 'esfriando'
   | 'alerta'
   | 'expirado'
-  | 'emReativacao';  // Lead reaberto no Funil Comercial — temporário até fechar de novo
+  | 'emReativacao'  // Lead reaberto no Funil Comercial — temporário até fechar de novo
+  | 'desmarcou';    // Cliente faltou (No-Show) ou desmarcou a sessão
 
 /** @deprecated Usar ClienteCarteiraTempStage. Mantido para compatibilidade temporária. */
 export type ClienteLifecycleStage =
@@ -168,8 +169,14 @@ export interface ClienteCRM {
 
 export function calcularBucketTemperatura(
   diasSemContato: number | undefined,
-  totalSessoes: number
+  totalSessoes: number,
+  ultimoStatus?: string
 ): ClienteCarteiraTempStage {
+  // Se o último agendamento do cliente foi falta (No-Show) ou cancelamento, ele entra na coluna de No-Show/Desmarcou
+  if (ultimoStatus === 'no_show' || ultimoStatus === 'rejected') {
+    return 'desmarcou';
+  }
+
   if (diasSemContato === undefined) {
     return totalSessoes > 0 ? 'morno' : 'quente';
   }
@@ -199,6 +206,10 @@ export interface EstrategiaCampanha {
   especialistaAssinatura?: string;
   ativa: boolean;
   limiteDiario?: number;
+  // Sequência e cadência de disparos (Anti-Bloqueio Meta)
+  modoCadencia?: 'fixo' | 'sequencial' | 'aleatorio';
+  intervaloMinutosFixo?: number;
+  sequenciaTimersMinutos?: number[]; // Ex: [5, 10, 15, 10]
   createdAt?: any;
   updatedAt?: any;
 }
@@ -243,5 +254,6 @@ export interface CRMDashboardMetrics {
     alerta: number;
     expirado: number;
     emReativacao: number;
+    desmarcou: number;
   };
 }

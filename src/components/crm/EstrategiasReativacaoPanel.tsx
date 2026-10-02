@@ -180,18 +180,25 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Parâmetros da Trava */}
+        {/* Parâmetros da Trava e Cadência */}
         {antiBanProtecaoAtiva && (
           <div className="mt-4 pt-3 border-t border-emerald-500/20 flex flex-wrap items-center gap-6 text-xs text-zinc-300 font-headline">
             <div className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Intervalo de Segurança:</span>
-              <strong className="text-emerald-400">{intervaloSegundos} a {intervaloSegundos + 15} segundos</strong>
+              <span>Cadência de Disparo:</span>
+              <strong className="text-emerald-400">
+                {estrategiaAtiva.modoCadencia === 'sequencial' 
+                  ? `Sequência: [${(estrategiaAtiva.sequenciaTimersMinutos || [5, 10, 15, 10]).join('m ➔ ')}m]`
+                  : estrategiaAtiva.modoCadencia === 'fixo'
+                  ? `Fixo a cada ${estrategiaAtiva.intervaloMinutosFixo || 5} min`
+                  : 'Randômico (4 a 15 min)'
+                }
+              </strong>
             </div>
             <div className="flex items-center gap-2">
               <Users className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Limite Diário Seguro:</span>
-              <strong className="text-emerald-400">Até {estrategiaAtiva.limiteDiario || 25} envios/dia</strong>
+              <span>Limite Diário:</span>
+              <strong className="text-emerald-400">Até {estrategiaAtiva.limiteDiario || 20} envios/dia</strong>
             </div>
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />

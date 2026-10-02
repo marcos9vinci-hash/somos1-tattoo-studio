@@ -112,6 +112,20 @@ const COLUNAS_CARTEIRA: ColunaDef[] = [
     }
   },
   {
+    id: 'desmarcou',
+    titulo: '🚨 Faltou / No-Show',
+    subtitulo: 'Não compareceu à sessão',
+    emoji: '🔴',
+    Icon: AlertTriangle,
+    cor: {
+      border: 'border-rose-600/40',
+      badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      icon: 'text-rose-400',
+      header: 'bg-rose-950/20',
+      avatar: 'from-rose-600/30 to-rose-900/30 text-rose-300 border-rose-600/40'
+    }
+  },
+  {
     id: 'emReativacao',
     titulo: 'Em Reativação',
     subtitulo: 'Tentando fechar novamente',
