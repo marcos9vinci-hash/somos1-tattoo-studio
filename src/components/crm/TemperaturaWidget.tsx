@@ -115,6 +115,21 @@ const BUCKETS: BucketConfig[] = [
       btn: 'bg-zinc-700 hover:bg-zinc-600 text-white',
       pulse: false
     }
+  },
+  {
+    id: 'desmarcou',
+    label: 'No-Show / Faltou',
+    emoji: '🔴',
+    Icon: AlertTriangle,
+    faixa: 'Faltou à sessão',
+    acao: 'Resgate de Cliente',
+    cor: {
+      badge: 'bg-rose-600/20 text-rose-300 border-rose-600/40',
+      border: 'border-rose-600/40',
+      header: 'bg-rose-950/20',
+      btn: 'bg-rose-600 hover:bg-rose-500 text-white',
+      pulse: true
+    }
   }
 ];
 
@@ -136,7 +151,8 @@ export const TemperaturaWidget: React.FC<TemperaturaWidgetProps> = ({
       esfriando: [],
       alerta: [],
       expirado: [],
-      emReativacao: []
+      emReativacao: [],
+      desmarcou: []
     };
     clientes
       .filter(c => c.totalSessoes > 0 && !dispensados.has(c.id))
@@ -146,7 +162,7 @@ export const TemperaturaWidget: React.FC<TemperaturaWidgetProps> = ({
     return mapa;
   }, [clientes, dispensados]);
 
-  const totalAlertas = porBucket.alerta.length + porBucket.quente.length;
+  const totalAlertas = porBucket.alerta.length + porBucket.quente.length + (porBucket.desmarcou?.length || 0);
 
   const toggleBucket = (id: ClienteCarteiraTempStage) => {
     setExpandido(prev => (prev === id ? null : id));
