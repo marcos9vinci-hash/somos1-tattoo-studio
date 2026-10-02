@@ -255,6 +255,87 @@ export const crmService = {
       } as ClienteCRM;
     });
 
+    // ─── POPULAR CARTEIRA COM CLIENTES REAIS DE BOOKINGS ───
+    const mapTelefones = new Set(clientes.map(c => (c.telefone || '').replace(/\D/g, '')).filter(Boolean));
+    const mapNomes = new Set(clientes.map(c => (c.nome || '').trim().toLowerCase()).filter(Boolean));
+
+    const bookingsByClient: Record<string, Booking[]> = {};
+    allBookings.forEach(b => {
+      const cleanPhone = (b.userPhone || '').replace(/\D/g, '');
+      const cleanName = (b.userName || '').trim().toLowerCase();
+      // Se não está coberto nem por telefone nem por nome exato
+      const isAlreadyCovered = (cleanPhone && mapTelefones.has(cleanPhone)) || (cleanName && mapNomes.has(cleanName));
+      if (!isAlreadyCovered) {
+        const groupKey = cleanPhone || cleanName || b.id;
+        if (!bookingsByClient[groupKey]) bookingsByClient[groupKey] = [];
+        bookingsByClient[groupKey].push(b);
+      }
+    });
+
+    Object.entries(bookingsByClient).forEach(([key, bList]) => {
+      const first = bList[0];
+      const nome = first.userName || 'Cliente Estúdio';
+      const telefone = first.userPhone || '';
+      const concluidas = bList.filter(b => b.status === BookingStatus.COMPLETED);
+      const agendadas = bList.filter(b =>
+        b.status === BookingStatus.APPROVED ||
+        b.status === BookingStatus.DEPOSIT_PAID ||
+        b.status === BookingStatus.PENDING_APPROVAL
+      );
+      const totalGasto = concluidas.reduce((acc, b) => acc + (b.priceEstimated || b.valor_estimado || 0), 0);
+
+      let ultimaDataMs = 0;
+      let fotosTattoos: string[] = [];
+      let estilos: string[] = [];
+
+      bList.forEach(b => {
+        if (b.fotos_referencia && Array.isArray(b.fotos_referencia)) {
+          fotosTattoos.push(...b.fotos_referencia);
+        }
+        if (b.estilo && !estilos.includes(b.estilo)) {
+          estilos.push(b.estilo);
+        }
+        if (b.date) {
+          const [ano, mes, dia] = b.date.split('-').map(Number);
+          const dataMs = new Date(ano, mes - 1, dia).getTime();
+          if (dataMs > ultimaDataMs) ultimaDataMs = dataMs;
+        }
+      });
+
+      const diasSemContato = ultimaDataMs > 0
+        ? Math.floor((agora - ultimaDataMs) / MS_POR_DIA)
+        : undefined;
+
+      const desmarcadas = bList.filter(b => 
+        b.status === BookingStatus.REJECTED || 
+        b.status === BookingStatus.NO_SHOW
+      );
+      const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
+
+      const bucketTemperatura = calcularBucketTemperatura(diasSemContato, concluidas.length);
+
+      clientes.push({
+        id: `booking_client_${key}`,
+        nome,
+        telefone,
+        email: '',
+        instagram: '',
+        bucketTemperatura,
+        estagioCiclo: bucketTemperatura as any,
+        totalGasto,
+        totalSessoes: concluidas.length,
+        diasSemContato,
+        estilosFavoritos: estilos,
+        fotosTatuagensFeitas: fotosTattoos,
+        agendamentos: bList,
+        temSessaoAgendada: agendadas.length > 0,
+        desmarcouEm,
+        alertaFollowUpAtivo: bucketTemperatura === 'quente' || bucketTemperatura === 'alerta',
+        createdAt: first.createdAt || new Date().toISOString(),
+        updatedAt: first.createdAt || new Date().toISOString()
+      });
+    });
+
     return clientes;
   },
 

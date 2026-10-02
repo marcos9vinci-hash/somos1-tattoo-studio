@@ -9,6 +9,8 @@ import { Somos1MassMessageModal } from '../components/crm/Somos1MassMessageModal
 import { ChatInterfaceModal } from '../components/crm/ChatInterfaceModal';
 import { LeadModal } from '../components/crm/LeadModal';
 import { ClienteModal } from '../components/crm/ClienteModal';
+import { EstrategiasReativacaoPanel } from '../components/crm/EstrategiasReativacaoPanel';
+import { SimuladorFluxoWhatsAppModal } from '../components/crm/SimuladorFluxoWhatsAppModal';
 import {
   Users,
   Sparkles,
@@ -23,10 +25,12 @@ import {
   Flame,
   Sun,
   Snowflake,
-  AlertTriangle
+  AlertTriangle,
+  Zap,
+  Play
 } from 'lucide-react';
 
-type ActiveTab = 'carteira' | 'funil';
+type ActiveTab = 'carteira' | 'funil' | 'estrategias';
 
 export const CRMDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('carteira');
@@ -43,10 +47,11 @@ export const CRMDashboardPage: React.FC = () => {
   const [selectedCliente, setSelectedCliente] = useState<ClienteCRM | null>(null);
   const [isClienteModalOpen, setIsClienteModalOpen] = useState(false);
 
-  // Painéis laterais
+  // Painéis laterais e Simulador
   const [clienteParaChat, setClienteParaChat] = useState<{ id: string; nome: string; telefone: string } | null>(null);
   const [clienteParaFicha, setClienteParaFicha] = useState<ClienteCRM | null>(null);
   const [isMassMessageOpen, setIsMassMessageOpen] = useState(false);
+  const [isSimuladorOpen, setIsSimuladorOpen] = useState(false);
 
   // Toast
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -230,6 +235,14 @@ export const CRMDashboardPage: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setIsSimuladorOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm"
+          >
+            <Play className="w-3.5 h-3.5 fill-amber-400" />
+            Simulador Sandbox
+          </button>
+
+          <button
             onClick={() => setIsMassMessageOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-headline font-bold transition-all active:scale-95"
           >
@@ -327,7 +340,7 @@ export const CRMDashboardPage: React.FC = () => {
           <Users className="w-4 h-4" />
           Carteira de Clientes
           <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black">
-            {clientes.filter(c => c.totalSessoes > 0).length}
+            {clientes.length}
           </span>
         </button>
 
@@ -343,6 +356,21 @@ export const CRMDashboardPage: React.FC = () => {
           Funil Comercial
           <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black">
             {leads.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('estrategias')}
+          className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-colors ${
+            activeTab === 'estrategias'
+              ? 'border-purple-500 text-purple-400 font-headline'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Zap className="w-4 h-4 text-purple-400" />
+          Estratégias de Reativação
+          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black">
+            Anti-Ban Meta
           </span>
         </button>
       </div>
@@ -361,7 +389,7 @@ export const CRMDashboardPage: React.FC = () => {
           onDispararFollowUp={handleDispararFollowUp}
           onReativarCliente={handleReativarCliente}
         />
-      ) : (
+      ) : activeTab === 'funil' ? (
         <LeadKanbanBoard
           leads={leads}
           onStageChange={handleLeadStageChange}
@@ -369,7 +397,23 @@ export const CRMDashboardPage: React.FC = () => {
           onNewLeadClick={() => { setSelectedLead(null); setIsLeadModalOpen(true); }}
           onAbrirChat={(l) => setClienteParaChat({ id: l.id, nome: l.nome, telefone: l.telefone })}
         />
+      ) : (
+        <EstrategiasReativacaoPanel
+          clientes={clientes}
+          onOpenSimulador={() => setIsSimuladorOpen(true)}
+          onOpenChatCliente={(c) => setClienteParaChat(c)}
+        />
       )}
+
+      {/* ── Simulador Sandbox ── */}
+      <SimuladorFluxoWhatsAppModal
+        isOpen={isSimuladorOpen}
+        onClose={() => setIsSimuladorOpen(false)}
+        onLeadSimuladoCriado={(lead) => {
+          setLeads(prev => [lead, ...prev]);
+          showToast('success', 'Lead fictício adicionado ao Kanban para testes!');
+        }}
+      />
 
       {/* ── Chat direto ── */}
       <ChatInterfaceModal
