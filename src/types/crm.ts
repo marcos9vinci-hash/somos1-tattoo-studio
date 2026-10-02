@@ -8,11 +8,26 @@ export type LeadStage =
   | 'qualificacao'  // IA coletando referências, estilo, tamanho
   | 'negociacao'    // Qualificado — negociando orçamento/valor
   | 'agendado'      // Sessão marcada na agenda
-  | 'concluido'     // Tattoo realizada → promovido para Carteira (transição automática)
+  | 'concluido'     // Tattoo realizada no estúdio
+  | 'pos_venda'     // Pós-venda e cicatrização pós-sessão
   | 'followup'      // Sumiu sem fechar ou faltou → resgate
   | 'perdido';      // Definitivamente perdido (oculto por padrão)
 
 export type LeadSource = 'whatsapp' | 'instagram' | 'indicacao' | 'site' | 'manual' | 'n8n_agente';
+
+/** Configuração dos Agentes de IA por Coluna (Base NAIA) */
+export interface ColunaAIAgentConfig {
+  id: string;
+  stageId: LeadStage;
+  nomeAgente: string;
+  papel: string;
+  origemNaia: string;
+  tomDeVoz: 'casual_estudio' | 'consultivo_spin' | 'acolhedor_posvenda' | 'persuasivo_copy';
+  promptBase: string;
+  skillsAtivas: string[];
+  ativo: boolean;
+  tempoEsperaMinutos?: number;
+}
 
 // ==========================================
 // FUNIL 2 — CARTEIRA DE CLIENTES (pós-tattoo)

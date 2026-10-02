@@ -452,7 +452,7 @@ export const crmService = {
 
     const leadsNovos = leads.filter(l => l.estagio === 'novo').length;
     const leadsQualificados = leads.filter(l => l.estagio === 'qualificacao' || l.estagio === 'negociacao').length;
-    const leadsAgendados = leads.filter(l => l.estagio === 'agendado' || l.estagio === 'concluido').length;
+    const leadsAgendados = leads.filter(l => l.estagio === 'agendado' || l.estagio === 'concluido' || l.estagio === 'pos_venda').length;
     const taxaConversao = leads.length > 0 ? (leadsAgendados / leads.length) * 100 : 0;
 
     const temperaturaCounts = {

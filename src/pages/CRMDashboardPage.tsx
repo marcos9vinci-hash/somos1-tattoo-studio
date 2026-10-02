@@ -367,6 +367,7 @@ export const CRMDashboardPage: React.FC = () => {
           onStageChange={handleLeadStageChange}
           onSelectLead={(l) => { setSelectedLead(l); setIsLeadModalOpen(true); }}
           onNewLeadClick={() => { setSelectedLead(null); setIsLeadModalOpen(true); }}
+          onAbrirChat={(l) => setClienteParaChat({ id: l.id, nome: l.nome, telefone: l.telefone })}
         />
       )}
 

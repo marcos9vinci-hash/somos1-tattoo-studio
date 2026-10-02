@@ -151,8 +151,9 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                 <option value="qualificacao">Em Qualificação (SPIN)</option>
                 <option value="negociacao">💬 Em Negociação</option>
                 <option value="agendado">📅 Sessão Agendada</option>
+                <option value="concluido">✅ Trabalho Realizado</option>
+                <option value="pos_venda">✨ Pós-Venda (Cicatrização)</option>
                 <option value="followup">🔕 Follow-up / Resgate</option>
-                <option value="concluido">✅ Tattoo Concluída</option>
                 <option value="perdido">❌ Perdido / Desistiu</option>
               </select>
             </div>
