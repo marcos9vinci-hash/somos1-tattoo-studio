@@ -327,52 +327,60 @@ export const CRMDashboardPage: React.FC = () => {
         />
       )}
 
-      {/* ── Tabs ── */}
-      <div className="flex items-center gap-1 border-b border-zinc-800">
-        <button
-          onClick={() => setActiveTab('carteira')}
-          className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-colors ${
-            activeTab === 'carteira'
-              ? 'border-amber-500 text-amber-400 font-headline'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Carteira de Clientes
-          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black">
-            {clientes.length}
-          </span>
-        </button>
+      {/* ── Tabs (Mobile Swipe & Scroll Responsivo) ── */}
+      <div className="relative border-b border-zinc-800">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none pb-0.5 -mx-3 px-3 sm:mx-0 sm:px-0 touch-pan-x flex-nowrap">
+          <button
+            type="button"
+            onClick={() => setActiveTab('carteira')}
+            className={`flex items-center gap-2 px-4 py-3 font-bold text-xs sm:text-sm border-b-2 transition-colors shrink-0 whitespace-nowrap ${
+              activeTab === 'carteira'
+                ? 'border-amber-500 text-amber-400 font-headline'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Users className="w-4 h-4 shrink-0" />
+            <span>Carteira de Clientes</span>
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black">
+              {clientes.length}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('funil')}
-          className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-colors ${
-            activeTab === 'funil'
-              ? 'border-amber-500 text-amber-400 font-headline'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          Funil Comercial
-          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black">
-            {leads.length}
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('funil')}
+            className={`flex items-center gap-2 px-4 py-3 font-bold text-xs sm:text-sm border-b-2 transition-colors shrink-0 whitespace-nowrap ${
+              activeTab === 'funil'
+                ? 'border-blue-500 text-blue-400 font-headline'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>Funil Comercial</span>
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black">
+              {leads.length}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('estrategias')}
-          className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-colors ${
-            activeTab === 'estrategias'
-              ? 'border-purple-500 text-purple-400 font-headline'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <Zap className="w-4 h-4 text-purple-400" />
-          Estratégias de Reativação
-          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black">
-            Anti-Ban Meta
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('estrategias')}
+            className={`flex items-center gap-2 px-4 py-3 font-bold text-xs sm:text-sm border-b-2 transition-colors shrink-0 whitespace-nowrap ${
+              activeTab === 'estrategias'
+                ? 'border-purple-500 text-purple-400 font-headline shadow-xs'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-purple-400 shrink-0" />
+            <span>Estratégias de Reativação</span>
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black">
+              Anti-Ban Meta
+            </span>
+          </button>
+        </div>
+
+        {/* Gradiente indicador de rolagem para mobile */}
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0.5 w-6 bg-gradient-to-l from-background to-transparent sm:hidden opacity-80" />
       </div>
 
       {/* ── Conteúdo ── */}

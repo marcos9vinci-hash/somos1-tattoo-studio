@@ -26,6 +26,134 @@ import {
 } from 'lucide-react';
 import { toast } from '../../lib/toast';
 
+export interface EstrategiaVisualTheme {
+  key: string;
+  stageName: string;
+  emoji: string;
+  badge: string;
+  borderActive: string;
+  borderHover: string;
+  borderBase: string;
+  bgActive: string;
+  ring: string;
+  textAccent: string;
+  buttonDispatch: string;
+  topStrip: string;
+  glowShadow: string;
+}
+
+export const getEstrategiaVisualTheme = (est: EstrategiaCampanha): EstrategiaVisualTheme => {
+  // 1. Resgate de No-Show / Faltou
+  if (
+    est.criterioTipo === 'desmarcou' ||
+    est.temperaturaAlvo?.includes('desmarcou') ||
+    est.id.includes('noshow') ||
+    est.id.includes('desmarcou')
+  ) {
+    return {
+      key: 'desmarcou',
+      stageName: 'Faltou / No-Show',
+      emoji: '🔴',
+      badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      borderActive: 'border-rose-500 shadow-lg shadow-rose-500/20 ring-1 ring-rose-500',
+      borderHover: 'hover:border-rose-500/50',
+      borderBase: 'border-rose-500/30',
+      bgActive: 'bg-rose-950/25',
+      ring: 'ring-rose-500',
+      textAccent: 'text-rose-400',
+      buttonDispatch: 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30',
+      topStrip: 'bg-rose-500',
+      glowShadow: 'shadow-rose-500/10'
+    };
+  }
+
+  // 2. Quente / Cicatrização Inicial (0 a 15 dias)
+  if (
+    est.temperaturaAlvo?.includes('quente') ||
+    (est.criterioTipo === 'dias' && (est.diasMax ?? 999) <= 15) ||
+    est.id.includes('cicatrizacao')
+  ) {
+    return {
+      key: 'quente',
+      stageName: 'Quente (0-15d)',
+      emoji: '🔥',
+      badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      borderActive: 'border-rose-500 shadow-lg shadow-rose-500/20 ring-1 ring-rose-500',
+      borderHover: 'hover:border-rose-500/50',
+      borderBase: 'border-rose-500/30',
+      bgActive: 'bg-rose-950/25',
+      ring: 'ring-rose-500',
+      textAccent: 'text-rose-400',
+      buttonDispatch: 'bg-rose-500 hover:bg-rose-400 text-white shadow-lg shadow-rose-500/30',
+      topStrip: 'bg-rose-500',
+      glowShadow: 'shadow-rose-500/10'
+    };
+  }
+
+  // 3. Morno / Foto & Retoque (16 a 45 dias)
+  if (
+    est.temperaturaAlvo?.includes('morno') ||
+    (est.criterioTipo === 'dias' && (est.diasMax ?? 999) <= 45) ||
+    est.id.includes('retoque')
+  ) {
+    return {
+      key: 'morno',
+      stageName: 'Morno (16-45d)',
+      emoji: '☀️',
+      badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      borderActive: 'border-amber-500 shadow-lg shadow-amber-500/20 ring-1 ring-amber-500',
+      borderHover: 'hover:border-amber-500/50',
+      borderBase: 'border-amber-500/30',
+      bgActive: 'bg-amber-950/25',
+      ring: 'ring-amber-500',
+      textAccent: 'text-amber-400',
+      buttonDispatch: 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/30',
+      topStrip: 'bg-amber-500',
+      glowShadow: 'shadow-amber-500/10'
+    };
+  }
+
+  // 4. Esfriando / 2ª Tattoo (46 a 90 dias)
+  if (
+    est.temperaturaAlvo?.includes('esfriando') ||
+    (est.criterioTipo === 'dias' && (est.diasMax ?? 999) <= 90) ||
+    est.id.includes('segunda_tattoo')
+  ) {
+    return {
+      key: 'esfriando',
+      stageName: 'Esfriando (46-90d)',
+      emoji: '❄️',
+      badge: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+      borderActive: 'border-blue-500 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500',
+      borderHover: 'hover:border-blue-500/50',
+      borderBase: 'border-blue-500/30',
+      bgActive: 'bg-blue-950/25',
+      ring: 'ring-blue-500',
+      textAccent: 'text-blue-400',
+      buttonDispatch: 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30',
+      topStrip: 'bg-blue-500',
+      glowShadow: 'shadow-blue-500/10'
+    };
+  }
+
+  // 5. Alerta & Expirado / Créditos / Indicação (91d+)
+  return {
+    key: 'alerta',
+    stageName: 'Alerta & Créditos (91d+)',
+    emoji: '💎',
+    badge: 'bg-violet-500/20 text-violet-300 border-violet-500/40',
+    borderActive: 'border-violet-500 shadow-lg shadow-violet-500/20 ring-1 ring-violet-500',
+    borderHover: 'hover:border-violet-500/50',
+    borderBase: 'border-violet-500/30',
+    bgActive: 'bg-violet-950/25',
+    ring: 'ring-violet-500',
+    textAccent: 'text-violet-400',
+    buttonDispatch: 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/30',
+    topStrip: 'bg-violet-500',
+    glowShadow: 'shadow-purple-500/10'
+  };
+};
+
 interface Props {
   clientes: ClienteCRM[];
   onOpenSimulador: () => void;
@@ -245,26 +373,35 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Grade de Cards das Estratégias */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        {/* Grade / Carrossel Mobile de Cards das Estratégias */}
+        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 overflow-x-auto sm:overflow-visible pb-2 sm:pb-0 no-scrollbar touch-pan-x -mx-1 px-1 sm:mx-0 sm:px-0">
           {estrategias.map(est => {
             const count = filtrarClientesPorEstrategia(est).length;
             const isAtiva = est.id === selectedEstrategiaId;
+            const theme = getEstrategiaVisualTheme(est);
 
             return (
               <button
                 key={est.id}
                 type="button"
                 onClick={() => setSelectedEstrategiaId(est.id)}
-                className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
+                className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between min-w-[220px] sm:min-w-0 shrink-0 sm:shrink ${
                   isAtiva
-                    ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500'
-                    : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
+                    ? `${theme.bgActive} ${theme.borderActive}`
+                    : `bg-zinc-900/60 ${theme.borderBase} ${theme.borderHover} text-zinc-400`
                 }`}
               >
+                {/* Faixa colorida no topo indicando a temperatura */}
+                <div className={`absolute top-0 left-0 right-0 h-1.5 ${theme.topStrip} ${isAtiva ? 'opacity-100' : 'opacity-40'}`} />
+
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xl">{est.emoji || '🎯'}</span>
+                  <div className="flex items-center justify-between mb-2 pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xl">{est.emoji || '🎯'}</span>
+                      <span className={`text-[9px] font-headline font-black px-1.5 py-0.5 rounded-full border uppercase tracking-wider ${theme.badge}`}>
+                        {theme.stageName}
+                      </span>
+                    </div>
                     <span className={`text-[10px] font-headline font-black px-2 py-0.5 rounded-full border ${
                       count > 0 
                         ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
@@ -273,7 +410,7 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
                       {count} clientes
                     </span>
                   </div>
-                  <h4 className="text-xs font-headline font-black text-white uppercase tracking-wider mb-1 line-clamp-1">
+                  <h4 className={`text-xs font-headline font-black uppercase tracking-wider mb-1 line-clamp-1 ${isAtiva ? 'text-white' : 'text-zinc-200'}`}>
                     {est.titulo}
                   </h4>
                   <p className="text-[11px] text-zinc-400 leading-tight line-clamp-2">
@@ -285,7 +422,14 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
                   <span>
                     {est.criterioTipo === 'dias' ? `${est.diasMin ?? 0}–${est.diasMax ?? 999}d` : est.criterioTipo}
                   </span>
-                  {isAtiva && <span className="text-amber-400 font-bold uppercase text-[9px]">Ativa</span>}
+                  {isAtiva ? (
+                    <span className={`${theme.textAccent} font-bold uppercase text-[9px] flex items-center gap-1`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${theme.topStrip} animate-pulse`} />
+                      Ativa
+                    </span>
+                  ) : (
+                    <span className="text-zinc-600 text-[9px] uppercase">Selecionar</span>
+                  )}
                 </div>
               </button>
             );
@@ -293,109 +437,122 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* ── DETALHES DA ESTRATÉGIA SELECIONADA & CLIENTES APTOS ── */}
-      <div className="bg-zinc-950 rounded-3xl border border-zinc-800 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">
-                Estratégia Selecionada:
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setEstrategiaParaEditar(estrategiaAtiva);
-                  setIsModalOpen(true);
-                }}
-                className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1"
-              >
-                <Pencil className="w-3 h-3" />
-                <span>Editar Regras desta Estratégia</span>
-              </button>
-            </div>
-            <h3 className="text-sm font-headline font-black text-white uppercase tracking-wider mt-0.5">
-              {estrategiaAtiva.emoji} {estrategiaAtiva.titulo}
-            </h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Critério: <strong>{estrategiaAtiva.criterioTipo === 'dias' ? `Clientes entre ${estrategiaAtiva.diasMin} e ${estrategiaAtiva.diasMax} dias sem tatuar` : estrategiaAtiva.criterioTipo === 'temperatura' ? `Colunas ${estrategiaAtiva.temperaturaAlvo?.join(', ')}` : estrategiaAtiva.criterioTipo}</strong> • {listaAtual.length} cliente(s) qualificado(s).
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={handleDispararCampanha}
-              disabled={listaAtual.length === 0}
-              className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-headline font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50"
-            >
-              <Send className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Disparar Campanha via Co-Piloto</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Modelo da Mensagem que o Agente vai Propor */}
-        <div className="bg-zinc-900/80 border border-white/5 rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block">
-              Template da Mensagem com Personalização Dinâmica:
-            </span>
-            <span className="text-[10px] text-amber-400 font-mono">
-              {estrategiaAtiva.especialistaAssinatura || '🤖 [Clone do Dono]'}
-            </span>
-          </div>
-          <p className="text-xs text-zinc-200 italic font-sans leading-relaxed">
-            "{estrategiaAtiva.mensagemTemplate}"
-          </p>
-        </div>
-
-        {/* Lista dos Clientes Reais Identificados para Esta Campanha */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-              Clientes Aptos ({listaAtual.length}):
-            </span>
-            <span className="text-[10px] text-zinc-500">
-              Limite diário seguro: até {estrategiaAtiva.limiteDiario || 25} envios
-            </span>
-          </div>
-
-          {listaAtual.length === 0 ? (
-            <div className="p-8 text-center text-zinc-500 font-headline uppercase text-xs tracking-wider bg-zinc-900/40 rounded-2xl border border-white/5">
-              Nenhum cliente atende aos critérios exatos desta estratégia no momento.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto pr-1">
-              {listaAtual.map(c => (
-                <div
-                  key={c.id}
-                  className="p-3 rounded-xl bg-zinc-900/90 border border-white/5 hover:border-amber-500/30 flex items-center justify-between transition-all"
-                >
-                  <div className="min-w-0 pr-2">
-                    <p className="text-xs font-bold text-white truncate">{c.nome}</p>
-                    <p className="text-[10px] text-zinc-400 font-mono">{c.telefone || 'Sem WhatsApp'}</p>
-                    {c.diasSemContato !== undefined && (
-                      <span className="text-[9px] text-amber-400/90 font-mono">
-                        Última sessão há {c.diasSemContato} dias • {c.bucketTemperatura}
-                      </span>
-                    )}
-                  </div>
-
+      {/* ── DETALHES DA ESTRATÉGIA SELECIONADA & CLIENTES APTOS (SINCRONIZADO COM A COR DA TEMPERATURA) ── */}
+      {(() => {
+        const temaAtivo = getEstrategiaVisualTheme(estrategiaAtiva);
+        return (
+          <div className={`bg-zinc-950 rounded-3xl border ${temaAtivo.borderBase} p-5 space-y-4 shadow-xl ${temaAtivo.glowShadow} transition-all`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${temaAtivo.textAccent}`}>
+                    Estratégia Selecionada:
+                  </span>
+                  <span className={`text-[9px] font-headline font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${temaAtivo.badge}`}>
+                    {temaAtivo.stageName}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => onOpenChatCliente({ id: c.id, nome: c.nome, telefone: c.telefone })}
-                    className="p-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 rounded-lg text-xs transition-all shrink-0"
-                    title="Conversar com este cliente"
+                    onClick={() => {
+                      setEstrategiaParaEditar(estrategiaAtiva);
+                      setIsModalOpen(true);
+                    }}
+                    className={`text-[10px] ${temaAtivo.textAccent} hover:underline font-bold flex items-center gap-1 ml-1`}
                   >
-                    <MessageSquare className="w-3.5 h-3.5" />
+                    <Pencil className="w-3 h-3" />
+                    <span>Editar Regras desta Estratégia</span>
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <h3 className="text-sm font-headline font-black text-white uppercase tracking-wider mt-1">
+                  {estrategiaAtiva.emoji} {estrategiaAtiva.titulo}
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Critério: <strong>{estrategiaAtiva.criterioTipo === 'dias' ? `Clientes entre ${estrategiaAtiva.diasMin} e ${estrategiaAtiva.diasMax} dias sem tatuar` : estrategiaAtiva.criterioTipo === 'temperatura' ? `Colunas ${estrategiaAtiva.temperaturaAlvo?.join(', ')}` : estrategiaAtiva.criterioTipo}</strong> • {listaAtual.length} cliente(s) qualificado(s).
+                </p>
+              </div>
 
-      </div>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleDispararCampanha}
+                  disabled={listaAtual.length === 0}
+                  className={`flex items-center gap-2 px-5 py-2.5 ${temaAtivo.buttonDispatch} font-headline font-black text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95 disabled:opacity-50`}
+                >
+                  <Send className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disparar Campanha via Co-Piloto</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modelo da Mensagem que o Agente vai Propor */}
+            <div className={`bg-zinc-900/80 border ${temaAtivo.borderBase} rounded-2xl p-4`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block">
+                  Template da Mensagem com Personalização Dinâmica:
+                </span>
+                <span className={`text-[10px] ${temaAtivo.textAccent} font-mono font-bold`}>
+                  {estrategiaAtiva.especialistaAssinatura || '🤖 [Clone do Dono]'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-200 italic font-sans leading-relaxed">
+                "{estrategiaAtiva.mensagemTemplate}"
+              </p>
+            </div>
+
+            {/* Lista dos Clientes Reais Identificados para Esta Campanha */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
+                  Clientes Aptos ({listaAtual.length}):
+                </span>
+                <span className="text-[10px] text-zinc-500">
+                  Limite diário seguro: até {estrategiaAtiva.limiteDiario || 25} envios
+                </span>
+              </div>
+
+              {listaAtual.length === 0 ? (
+                <div className="p-8 text-center text-zinc-500 font-headline uppercase text-xs tracking-wider bg-zinc-900/40 rounded-2xl border border-white/5">
+                  Nenhum cliente atende aos critérios exatos desta estratégia no momento.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto pr-1">
+                  {listaAtual.map(c => (
+                    <div
+                      key={c.id}
+                      className="p-3 rounded-xl bg-zinc-900/90 border border-white/5 hover:border-zinc-700 flex items-center justify-between transition-all"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-bold text-white truncate">{c.nome}</p>
+                          <span className={`text-[8px] font-headline font-bold px-1.5 py-0.2 rounded-full border uppercase ${temaAtivo.badge}`}>
+                            {c.bucketTemperatura}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{c.telefone || 'Sem WhatsApp'}</p>
+                        {c.diasSemContato !== undefined && (
+                          <span className={`text-[9px] ${temaAtivo.textAccent} font-mono block mt-0.5`}>
+                            Última sessão há {c.diasSemContato} dias
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onOpenChatCliente({ id: c.id, nome: c.nome, telefone: c.telefone })}
+                        className="p-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 rounded-lg text-xs transition-all shrink-0"
+                        title="Conversar com este cliente"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* Modal de Criação / Edição de Estratégia */}
       <EstrategiaModal

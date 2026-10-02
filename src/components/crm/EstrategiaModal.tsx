@@ -317,26 +317,29 @@ export const EstrategiaModal: React.FC<Props> = ({
             {criterioTipo === 'temperatura' && (
               <div className="pt-2 border-t border-zinc-800/80 flex flex-wrap gap-2">
                 {[
-                  { id: 'quente', label: '🔥 Quente (0-7d)' },
-                  { id: 'morno', label: '☀️ Morno (8-30d)' },
-                  { id: 'esfriando', label: '❄️ Esfriando (31-90d)' },
-                  { id: 'alerta', label: '🧊 Alerta (91-179d)' },
-                  { id: 'expirado', label: '⌛ Expirado (>180d)' },
-                  { id: 'desmarcou', label: '🔴 Faltou / No-Show' }
-                ].map(t => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => handleToggleTemperatura(t.id as any)}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
-                      temperaturasAlvo.includes(t.id as any)
-                        ? 'bg-amber-500 text-black border-amber-400'
-                        : 'bg-zinc-900 text-zinc-400 border-zinc-800'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+                  { id: 'quente', label: '🔥 Quente (0-7d)', activeClass: 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20', hoverClass: 'hover:border-rose-500/40' },
+                  { id: 'morno', label: '☀️ Morno (8-30d)', activeClass: 'bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-500/20', hoverClass: 'hover:border-amber-500/40' },
+                  { id: 'esfriando', label: '❄️ Esfriando (31-90d)', activeClass: 'bg-blue-500 text-white border-blue-400 shadow-md shadow-blue-500/20', hoverClass: 'hover:border-blue-500/40' },
+                  { id: 'alerta', label: '🧊 Alerta (91-179d)', activeClass: 'bg-violet-500 text-white border-violet-400 shadow-md shadow-violet-500/20', hoverClass: 'hover:border-violet-500/40' },
+                  { id: 'expirado', label: '⌛ Expirado (>180d)', activeClass: 'bg-zinc-700 text-zinc-100 border-zinc-500 shadow-md', hoverClass: 'hover:border-zinc-600' },
+                  { id: 'desmarcou', label: '🔴 Faltou / No-Show', activeClass: 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/20', hoverClass: 'hover:border-rose-500/40' }
+                ].map(t => {
+                  const isSelected = temperaturasAlvo.includes(t.id as any);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => handleToggleTemperatura(t.id as any)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                        isSelected
+                          ? t.activeClass
+                          : `bg-zinc-900 text-zinc-400 border-zinc-800 ${t.hoverClass}`
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
