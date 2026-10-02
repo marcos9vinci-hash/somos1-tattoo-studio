@@ -67,6 +67,20 @@ export const Somos1ClientDetailPanel: React.FC<Somos1ClientDetailPanelProps> = (
     }
   };
 
+  const handleMudarTemperatura = async (novaTemp: any) => {
+    if (!cliente) return;
+    try {
+      await crmService.updateCliente(cliente.id, { bucketTemperatura: novaTemp });
+      if (onUpdateCliente) {
+        onUpdateCliente({ ...cliente, bucketTemperatura: novaTemp });
+      }
+      setFeedback(`Cliente movido para ${novaTemp}!`);
+      setTimeout(() => setFeedback(null), 3000);
+    } catch (e) {
+      console.warn("Aviso ao atualizar temperatura:", e);
+    }
+  };
+
   const abrirNoWhatsApp = () => {
     if (!cliente.telefone) return;
     const limpo = cliente.telefone.replace(/\D/g, '');
@@ -131,6 +145,26 @@ export const Somos1ClientDetailPanel: React.FC<Somos1ClientDetailPanelProps> = (
                 {cliente.diasSemContato !== undefined ? `${cliente.diasSemContato}d atrás` : 'Recente'}
               </span>
             </div>
+          </div>
+
+          {/* Seletor de Temperatura da Carteira */}
+          <div className="mt-3.5 bg-zinc-950 p-2.5 rounded-xl border border-white/5 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-zinc-400 font-headline uppercase tracking-wider shrink-0">
+              Esteira de Temperatura:
+            </span>
+            <select
+              value={cliente.bucketTemperatura || 'morno'}
+              onChange={e => handleMudarTemperatura(e.target.value)}
+              className="bg-zinc-900 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
+            >
+              <option value="quente">🔥 Quente (0–7d pós-tattoo)</option>
+              <option value="morno">☀️ Morno (8–30d)</option>
+              <option value="esfriando">❄️ Esfriando (31–90d)</option>
+              <option value="alerta">🧊 Alerta (91–179d)</option>
+              <option value="expirado">⌛ Expirado (&gt;180d)</option>
+              <option value="desmarcou">🚨 Faltou / No-Show</option>
+              <option value="emReativacao">🔄 Em Reativação</option>
+            </select>
           </div>
 
           {/* Botões de Ação Imediata */}

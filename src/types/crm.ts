@@ -56,6 +56,8 @@ export type ClienteCarteiraTempStage =
   | 'emReativacao'  // Lead reaberto no Funil Comercial — temporário até fechar de novo
   | 'desmarcou';    // Cliente faltou (No-Show) ou desmarcou a sessão
 
+export type BucketTemperatura = ClienteCarteiraTempStage;
+
 /** @deprecated Usar ClienteCarteiraTempStage. Mantido para compatibilidade temporária. */
 export type ClienteLifecycleStage =
   | 'novo' | 'novos'
@@ -170,19 +172,23 @@ export interface ClienteCRM {
 export function calcularBucketTemperatura(
   diasSemContato: number | undefined,
   totalSessoes: number,
-  ultimoStatus?: string
+  ultimoStatus?: string,
+  temNoShow?: boolean
 ): ClienteCarteiraTempStage {
-  // Se o último agendamento do cliente foi falta (No-Show) ou cancelamento, ele entra na coluna de No-Show/Desmarcou
-  if (ultimoStatus === 'no_show' || ultimoStatus === 'rejected') {
+  const normStatus = (ultimoStatus || '').toLowerCase().replace('-', '_').trim();
+  // Se o cliente faltou (No-Show) ou desmarcou/cancelou, ele vai direto para a coluna de Faltou / No-Show
+  if (temNoShow || normStatus === 'no_show' || normStatus === 'rejected') {
     return 'desmarcou';
   }
 
+  // Se não tem contato registrado, assume "morno" por padrão
   if (diasSemContato === undefined) {
-    return totalSessoes > 0 ? 'morno' : 'quente';
+    return 'morno';
   }
 
   const dias = diasSemContato;
-  if (dias <= 7)   return 'quente';      // 0–7 dias pós-sessão (cicatrização ativa)
+  // "quente" é EXCLUSIVO para cicatrização pós-tattoo (0-7 dias COM sessão concluída)
+  if (dias <= 7)   return totalSessoes > 0 ? 'quente' : 'morno';
   if (dias <= 30)  return 'morno';       // 8–30 dias (cicatrização final/cuidados)
   if (dias <= 90)  return 'esfriando';   // 31–90 dias (tempo ideal para nova tattoo)
   if (dias <= 179) return 'alerta';      // 91–179 dias (risco de perder o cliente)
@@ -241,8 +247,13 @@ export interface CRMDashboardMetrics {
   totalLeads: number;
   leadsNovos: number;
   leadsQualificados: number;
+  leadsNegociacao?: number;
   leadsAgendados: number;
+  leadsConcluidos?: number;
   taxaConversao: number;
+  taxaQualificacao?: number;
+  taxaFechamento?: number;
+  pipelineEstimado?: number;
   totalClientes: number;
   clientesInativos: number;
   totalFollowUpsPendentes: number;

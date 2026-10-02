@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { crmService } from '../lib/crmService';
-import { Lead, ClienteCRM, LeadStage, CRMDashboardMetrics } from '../types/crm';
+import { Lead, ClienteCRM, LeadStage, CRMDashboardMetrics, EstrategiaCampanha } from '../types/crm';
 import { LeadKanbanBoard } from '../components/crm/LeadKanbanBoard';
 import { CarteiraClientesKanban } from '../components/crm/CarteiraClientesKanban';
 import { TemperaturaWidget } from '../components/crm/TemperaturaWidget';
@@ -52,6 +52,7 @@ export const CRMDashboardPage: React.FC = () => {
   const [clienteParaFicha, setClienteParaFicha] = useState<ClienteCRM | null>(null);
   const [isMassMessageOpen, setIsMassMessageOpen] = useState(false);
   const [isSimuladorOpen, setIsSimuladorOpen] = useState(false);
+  const [estrategiaParaSimular, setEstrategiaParaSimular] = useState<EstrategiaCampanha | null>(null);
 
   // Toast
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -398,17 +399,101 @@ export const CRMDashboardPage: React.FC = () => {
           onReativarCliente={handleReativarCliente}
         />
       ) : activeTab === 'funil' ? (
-        <LeadKanbanBoard
-          leads={leads}
-          onStageChange={handleLeadStageChange}
-          onSelectLead={(l) => { setSelectedLead(l); setIsLeadModalOpen(true); }}
-          onNewLeadClick={() => { setSelectedLead(null); setIsLeadModalOpen(true); }}
-          onAbrirChat={(l) => setClienteParaChat({ id: l.id, nome: l.nome, telefone: l.telefone })}
-        />
+        <div className="space-y-4">
+          {/* ── Régua de Conversão de Vendas do Funil ── */}
+          <div className="bg-zinc-950 p-4 rounded-2xl border border-blue-500/20 shadow-md">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-headline font-black text-white uppercase tracking-wider">
+                    Conversão do Funil de Vendas
+                  </h3>
+                  <p className="text-[11px] text-zinc-400">
+                    Acompanhe a eficiência de cada etapa para calibrar suas estratégias comerciais.
+                  </p>
+                </div>
+              </div>
+
+              {/* Indicadores de Conversão */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                <div className="bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800">
+                  <span className="text-[10px] text-zinc-400 block font-headline">Taxa Geral de Conversão</span>
+                  <span className="text-sm font-headline font-black text-emerald-400">
+                    {metrics?.taxaConversao ?? 0}%
+                  </span>
+                </div>
+
+                <div className="bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800">
+                  <span className="text-[10px] text-zinc-400 block font-headline">Pipeline em Negociação</span>
+                  <span className="text-sm font-headline font-black text-amber-400">
+                    R$ {(metrics?.pipelineEstimado ?? 0).toLocaleString('pt-BR')}
+                  </span>
+                </div>
+
+                <div className="bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800">
+                  <span className="text-[10px] text-zinc-400 block font-headline">Taxa de Fechamento</span>
+                  <span className="text-sm font-headline font-black text-purple-400">
+                    {metrics?.taxaFechamento ?? 0}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Esteira Visual de Passagem do Funil */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3 text-center">
+              <div className="bg-zinc-900/60 p-2 rounded-xl border border-white/5">
+                <span className="text-[10px] text-blue-300 font-headline font-bold block">1. Novos</span>
+                <span className="text-base font-headline font-black text-white">{metrics?.leadsNovos ?? 0}</span>
+                <span className="text-[9px] text-zinc-500 block">Entrada WhatsApp</span>
+              </div>
+              <div className="bg-zinc-900/60 p-2 rounded-xl border border-white/5">
+                <span className="text-[10px] text-amber-300 font-headline font-bold block">2. Qualificação</span>
+                <span className="text-base font-headline font-black text-white">{metrics?.leadsQualificados ?? 0}</span>
+                <span className="text-[9px] text-zinc-500 block">Ideia &amp; Estilo</span>
+              </div>
+              <div className="bg-zinc-900/60 p-2 rounded-xl border border-white/5">
+                <span className="text-[10px] text-purple-300 font-headline font-bold block">3. Negociação</span>
+                <span className="text-base font-headline font-black text-white">{metrics?.leadsNegociacao ?? 0}</span>
+                <span className="text-[9px] text-zinc-500 block">Orçamento &amp; Valor</span>
+              </div>
+              <div className="bg-zinc-900/60 p-2 rounded-xl border border-white/5">
+                <span className="text-[10px] text-emerald-300 font-headline font-bold block">4. Agendados</span>
+                <span className="text-base font-headline font-black text-white">{metrics?.leadsAgendados ?? 0}</span>
+                <span className="text-[9px] text-zinc-500 block">Data Marcada</span>
+              </div>
+              <div className="bg-zinc-900/60 p-2 rounded-xl border border-white/5">
+                <span className="text-[10px] text-zinc-300 font-headline font-bold block">5. Concluídos</span>
+                <span className="text-base font-headline font-black text-emerald-400">{metrics?.leadsConcluidos ?? 0}</span>
+                <span className="text-[9px] text-zinc-500 block">Tattoo Feita</span>
+              </div>
+            </div>
+          </div>
+
+          <LeadKanbanBoard
+            leads={leads}
+            onStageChange={handleLeadStageChange}
+            onSelectLead={(l) => { setSelectedLead(l); setIsLeadModalOpen(true); }}
+            onNewLeadClick={() => { setSelectedLead(null); setIsLeadModalOpen(true); }}
+            onAbrirChat={(l) => setClienteParaChat({ 
+              id: l.id, 
+              nome: l.nome, 
+              telefone: l.telefone,
+              estagio: l.estagio,
+              ideiaProjeto: l.ideiaProjeto,
+              temperatura: l.temperatura
+            })}
+          />
+        </div>
       ) : (
         <EstrategiasReativacaoPanel
           clientes={clientes}
-          onOpenSimulador={() => setIsSimuladorOpen(true)}
+          onOpenSimulador={(est) => {
+            setEstrategiaParaSimular(est || null);
+            setIsSimuladorOpen(true);
+          }}
           onOpenChatCliente={(c) => setClienteParaChat(c)}
         />
       )}
@@ -416,18 +501,26 @@ export const CRMDashboardPage: React.FC = () => {
       {/* ── Simulador Sandbox ── */}
       <SimuladorFluxoWhatsAppModal
         isOpen={isSimuladorOpen}
-        onClose={() => setIsSimuladorOpen(false)}
+        onClose={() => {
+          setIsSimuladorOpen(false);
+          setEstrategiaParaSimular(null);
+        }}
+        estrategia={estrategiaParaSimular}
         onLeadSimuladoCriado={(lead) => {
           setLeads(prev => [lead, ...prev]);
           showToast('success', 'Lead fictício adicionado ao Kanban para testes!');
         }}
       />
 
-      {/* ── Chat direto ── */}
+      {/* ── Chat direto estilo Meta Inbox com Co-Piloto IA ── */}
       <ChatInterfaceModal
         isOpen={!!clienteParaChat}
         onClose={() => setClienteParaChat(null)}
         cliente={clienteParaChat}
+        onStageChange={(id, novoEstagio) => {
+          handleLeadStageChange(id, novoEstagio);
+          setClienteParaChat((prev: any) => prev ? { ...prev, estagio: novoEstagio } : null);
+        }}
       />
 
       {/* ── Ficha detalhada ── */}

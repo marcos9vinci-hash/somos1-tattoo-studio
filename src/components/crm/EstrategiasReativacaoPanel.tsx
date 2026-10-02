@@ -156,7 +156,7 @@ export const getEstrategiaVisualTheme = (est: EstrategiaCampanha): EstrategiaVis
 
 interface Props {
   clientes: ClienteCRM[];
-  onOpenSimulador: () => void;
+  onOpenSimulador: (estrategia?: EstrategiaCampanha) => void;
   onOpenChatCliente: (cliente: { id: string; nome: string; telefone: string }) => void;
 }
 
@@ -249,7 +249,7 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
 
     const limite = estrategiaAtiva.limiteDiario || 25;
     toast.info(`Iniciando "${estrategiaAtiva.titulo}" via Co-Piloto para ${Math.min(listaAtual.length, limite)} clientes em fila segura!`);
-    onOpenSimulador();
+    onOpenSimulador(estrategiaAtiva);
   };
 
   return (
@@ -364,7 +364,7 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
 
             <button
               type="button"
-              onClick={onOpenSimulador}
+              onClick={() => onOpenSimulador(estrategiaAtiva)}
               className="flex items-center gap-2 px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all"
             >
               <Play className="w-3.5 h-3.5 fill-amber-400" />
@@ -471,7 +471,16 @@ export const EstrategiasReativacaoPanel: React.FC<Props> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => onOpenSimulador(estrategiaAtiva)}
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-amber-500/40 rounded-xl text-xs font-headline font-bold uppercase tracking-wider transition-all"
+                  title="Testar cadência de timers e limite diário com número fictício"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Testar Timers ⏱️</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleDispararCampanha}

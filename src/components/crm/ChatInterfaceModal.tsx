@@ -1,7 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Paperclip, Bot, User, X, ExternalLink, Sparkles } from 'lucide-react';
+import { 
+  Send, 
+  Smile, 
+  Paperclip, 
+  Bot, 
+  User, 
+  X, 
+  ExternalLink, 
+  Sparkles, 
+  Clock, 
+  Calendar, 
+  CheckCircle2, 
+  ChevronRight,
+  Flame,
+  MessageSquare,
+  Copy,
+  Check
+} from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
-import { CRMMessage } from '../../types/crm';
+import { CRMMessage, LeadStage } from '../../types/crm';
 import { crmService } from '../../lib/crmService';
 import { cn } from '../../lib/utils';
 
@@ -13,20 +30,47 @@ interface ChatInterfaceModalProps {
     nome: string;
     telefone: string;
     avatar?: string;
+    estagio?: LeadStage;
+    ideiaProjeto?: string;
+    temperatura?: string;
   } | null;
+  onStageChange?: (id: string, novoEstagio: LeadStage) => void;
 }
 
-export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, onClose, cliente }) => {
+const ESTAGIOS_CONFIG: { id: LeadStage; label: string; cor: string; emoji: string }[] = [
+  { id: 'novo', label: 'Novo Lead', cor: 'bg-blue-500/20 text-blue-300 border-blue-500/40', emoji: '✨' },
+  { id: 'qualificacao', label: 'Qualificação', cor: 'bg-amber-500/20 text-amber-300 border-amber-500/40', emoji: '🎯' },
+  { id: 'negociacao', label: 'Negociação / Orçamento', cor: 'bg-purple-500/20 text-purple-300 border-purple-500/40', emoji: '💰' },
+  { id: 'agendado', label: 'Sessão Agendada', cor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', emoji: '🗓️' },
+  { id: 'concluido', label: 'Tattoo Concluída', cor: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/40', emoji: '🏆' },
+  { id: 'followup', label: 'Follow-up / Resgate', cor: 'bg-rose-500/20 text-rose-300 border-rose-500/40', emoji: '🚨' }
+];
+
+export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  cliente,
+  onStageChange 
+}) => {
   const [mensagens, setMensagens] = useState<CRMMessage[]>([]);
   const [novaMensagem, setNovaMensagem] = useState('');
   const [remetenteSelecionado, setRemetenteSelecionado] = useState<'ia' | 'tatuador'>('tatuador');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showSugestoesIA, setShowSugestoesIA] = useState(false);
+  const [copiadoIdx, setCopiadoIdx] = useState<number | null>(null);
   const [anexoNome, setAnexoNome] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [carregando, setCarregando] = useState(false);
+  const [estagioAtual, setEstagioAtual] = useState<LeadStage>(cliente?.estagio || 'novo');
   
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (cliente?.estagio) {
+      setEstagioAtual(cliente.estagio);
+    }
+  }, [cliente?.estagio]);
 
   // Carrega histórico de mensagens do cliente
   useEffect(() => {
@@ -37,13 +81,14 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
           if (hist && hist.length > 0) {
             setMensagens(hist);
           } else {
-            // Se ainda não houver histórico gravado, inicia com mensagem de boas-vindas da IA
+            // Histórico inicial com contexto do cliente
+            const primeiroNome = cliente.nome.split(' ')[0] || cliente.nome;
             setMensagens([
               {
                 id: 'welcome-1',
                 clienteId: cliente.id,
                 remetente: 'ia',
-                mensagem: `Olá ${cliente.nome}! Sou o assistente virtual do Somos 1 Tattoo Studio. Como posso ajudar com sua ideia de tattoo hoje?`,
+                mensagem: `Olá ${primeiroNome}! Sou o assistente do Somos 1 Tattoo Studio. Vi seu interesse e estou à disposição para te ajudar a tirar a ideia do papel!`,
                 timestamp: new Date(),
                 status: 'lido'
               }
@@ -62,6 +107,90 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
   }, [mensagens]);
 
   if (!isOpen || !cliente) return null;
+
+  const primeiroNome = cliente.nome.split(' ')[0] || cliente.nome;
+
+  // Sugestões inteligentes do Co-Piloto Meta Style adaptadas ao estágio
+  const getSugestoesIA = () => {
+    switch (estagioAtual) {
+      case 'novo':
+      case 'qualificacao':
+        return [
+          {
+            titulo: 'Pedir referência & local do corpo',
+            texto: `Fala ${primeiroNome}, beleza? Você já tem alguma imagem ou desenho de referência em mente? E em qual parte do corpo você tá pensando em mandar?`
+          },
+          {
+            titulo: 'Sondar estilo desejado',
+            texto: `Opa ${primeiroNome}! Curti a ideia. Você prefere uma linha mais fina e delicada (Fineline) ou algo mais sombreado/realista com presença?`
+          },
+          {
+            titulo: 'Primeira tattoo (Acolhimento)',
+            texto: `Fala ${primeiroNome}! Essa vai ser a sua primeira tatuagem ou já tem outros rabiscos? Se for a primeira, fica tranquilo(a) que te oriento em tudo!`
+          }
+        ];
+      case 'negociacao':
+        return [
+          {
+            titulo: 'Passar estimativa & sinal',
+            texto: `Consigo fazer essa arte exclusiva pra você! O investimento fica em torno de R$ 350 a R$ 600 dependendo do tamanho final, com um sinalzinho simples para travar a data na agenda. Vamos fechar?`
+          },
+          {
+            titulo: 'Oferecer horários da semana',
+            texto: `Tô com a agenda dessa semana aberta, ${primeiroNome}! Tenho vaga na quinta às 14h ou sexta às 16h. Qual desses horários fica melhor pra você?`
+          },
+          {
+            titulo: 'Quebrar objeção de valor',
+            texto: `Entendo perfeitamente, ${primeiroNome}! Se preferir, podemos ajustar o tamanho ou simplificar alguns detalhes para encaixar certinho no seu orçamento. O que acha?`
+          }
+        ];
+      case 'agendado':
+        return [
+          {
+            titulo: 'Instruções pré-sessão',
+            texto: `Tudo confirmado pra sua sessão, ${primeiroNome}! Lembra de se hidratar bem, vir bem alimentado(a) e evitar álcool nas 24h antes. Nosso estúdio fica na Rua Francesco de Martini 29. Até lá! 🤘`
+          },
+          {
+            titulo: 'Confirmar pontualidade',
+            texto: `Opa ${primeiroNome}! Passando só para alinhar os detalhes da nossa sessão marcada. Tá tudo certo com o horário combinado? Te espero aqui no estúdio!`
+          }
+        ];
+      case 'concluido':
+        return [
+          {
+            titulo: 'Check-in de Cicatrização',
+            texto: `Fala ${primeiroNome}! Passando pra saber como tá a cicatrização da sua tattoo. Já começou a descascar? Lembra de manter a pomada fininha e qualquer dúvida me chama!`
+          },
+          {
+            titulo: 'Pedir foto para o feed',
+            texto: `Opa ${primeiroNome}! Consegue mandar uma foto de como a arte assentou na pele na luz do dia? Quero postar o resultado no insta do estúdio!`
+          }
+        ];
+      default:
+        return [
+          {
+            titulo: 'Resgate amigável',
+            texto: `Fala ${primeiroNome}, tudo bem por aí? Lembrei daquele projeto que a gente tava conversando. Conseguiu pensar no desenho ou quer dar continuidade essa semana?`
+          },
+          {
+            titulo: 'Condição especial',
+            texto: `Opa ${primeiroNome}! Tô organizando os horários do mês e separamos uma condição exclusiva pra quem já tava trocando ideia com a gente. Bora tirar aquela tattoo do papel?`
+          }
+        ];
+    }
+  };
+
+  const handleMudarEstagio = async (novo: LeadStage) => {
+    setEstagioAtual(novo);
+    if (onStageChange) {
+      onStageChange(cliente.id, novo);
+    }
+    try {
+      await crmService.updateLeadStage(cliente.id, novo);
+    } catch (err) {
+      console.warn('Erro ao atualizar estágio:', err);
+    }
+  };
 
   const handleEnviar = async () => {
     if (!novaMensagem.trim() && !anexoNome) return;
@@ -84,6 +213,7 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
     setNovaMensagem('');
     setAnexoNome(null);
     setShowEmojiPicker(false);
+    setShowSugestoesIA(false);
     setEnviando(true);
 
     try {
@@ -96,6 +226,11 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
     }
   };
 
+  const handleAplicarSugestao = (texto: string) => {
+    setNovaMensagem(texto);
+    setShowSugestoesIA(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -104,7 +239,7 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
   };
 
   const emojisRapidos = [
-    '😊', '😍', '🔥', '⚡', '✨', '👏', '🤝', '🎨', '🖤', '📍', '💬', '🚀'
+    '😊', '🔥', '⚡', '✨', '👏', '🤝', '🎨', '🖤', '📍', '💬', '🚀', '🤘'
   ];
 
   const abrirNoWhatsAppWeb = () => {
@@ -113,103 +248,176 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
     window.open(url, '_blank');
   };
 
+  const configEstagio = ESTAGIOS_CONFIG.find(e => e.id === estagioAtual) || ESTAGIOS_CONFIG[0];
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
       {/* Clique fora para fechar */}
       <div className="flex-1" onClick={onClose} />
 
-      {/* Drawer Lateral */}
-      <div className="w-full sm:w-[500px] h-full bg-zinc-950 border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-        {/* Header do Chat */}
-        <div className="p-4 border-b border-white/10 bg-zinc-900/90 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-black font-headline font-black text-sm shrink-0 shadow-md">
-              {cliente.nome.charAt(0).toUpperCase()}
+      {/* Drawer Lateral Estilo Meta Inbox */}
+      <div className="w-full sm:w-[540px] h-full bg-zinc-950 border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+        
+        {/* ── Header Principal ── */}
+        <div className="p-4 border-b border-white/10 bg-zinc-900/90 shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-black font-headline font-black text-base shrink-0 shadow-md">
+                {cliente.nome.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-headline font-black text-sm text-white truncate flex items-center gap-1.5">
+                  {cliente.nome}
+                </h3>
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-400 font-mono">
+                  <span>{cliente.telefone || 'Sem WhatsApp'}</span>
+                  {cliente.telefone && (
+                    <button 
+                      onClick={abrirNoWhatsAppWeb}
+                      className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-[10px] font-bold font-headline flex items-center gap-1 border border-emerald-500/40 transition-all active:scale-95"
+                      title="Abrir no WhatsApp Web / Celular"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5" />
+                      WhatsApp Web
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h3 className="font-headline font-black text-sm text-white truncate flex items-center gap-1.5">
-                {cliente.nome}
-              </h3>
-              <p className="text-xs text-zinc-400 font-mono flex items-center gap-2">
-                <span>{cliente.telefone || 'Sem WhatsApp'}</span>
-                {cliente.telefone && (
-                  <button 
-                    onClick={abrirNoWhatsAppWeb}
-                    className="text-[10px] text-green-400 hover:text-green-300 hover:underline flex items-center gap-0.5"
-                    title="Abrir no WhatsApp Web"
-                  >
-                    <ExternalLink className="w-2.5 h-2.5" />
-                    Web
-                  </button>
-                )}
-              </p>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Seletor IA vs Tatuador */}
+              <div className="bg-zinc-950 p-1 rounded-xl border border-white/10 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setRemetenteSelecionado('ia')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[10px] font-headline font-bold flex items-center gap-1 transition-all",
+                    remetenteSelecionado === 'ia'
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "text-zinc-400 hover:text-white"
+                  )}
+                  title="Responder em nome do Robô de IA"
+                >
+                  <Bot className="w-3 h-3" />
+                  IA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRemetenteSelecionado('tatuador')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[10px] font-headline font-bold flex items-center gap-1 transition-all",
+                    remetenteSelecionado === 'tatuador'
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-zinc-400 hover:text-white"
+                  )}
+                  title="Responder como Tatuador / Dono"
+                >
+                  <User className="w-3 h-3" />
+                  Tatuador
+                </button>
+              </div>
+
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Seletor IA vs Tatuador */}
-            <div className="bg-zinc-950 p-1 rounded-xl border border-white/10 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setRemetenteSelecionado('ia')}
+          {/* ── Barra de Nível do Funil Interativa ── */}
+          <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-zinc-400 font-headline uppercase tracking-wider font-bold">
+                Nível no Funil:
+              </span>
+              <select
+                value={estagioAtual}
+                onChange={e => handleMudarEstagio(e.target.value as LeadStage)}
                 className={cn(
-                  "px-2.5 py-1 rounded-lg text-[10px] font-headline font-bold flex items-center gap-1 transition-all",
-                  remetenteSelecionado === 'ia'
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "text-zinc-400 hover:text-white"
+                  "px-2.5 py-1 rounded-lg text-xs font-headline font-bold border cursor-pointer focus:outline-none transition-all",
+                  configEstagio.cor
                 )}
-                title="Responder em nome do Robô de IA"
               >
-                <Bot className="w-3 h-3" />
-                IA
-              </button>
-              <button
-                type="button"
-                onClick={() => setRemetenteSelecionado('tatuador')}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-[10px] font-headline font-bold flex items-center gap-1 transition-all",
-                  remetenteSelecionado === 'tatuador'
-                    ? "bg-emerald-600 text-white shadow-xs"
-                    : "text-zinc-400 hover:text-white"
-                )}
-                title="Responder como Tatuador / Atendente"
-              >
-                <User className="w-3 h-3" />
-                Tatuador
-              </button>
+                {ESTAGIOS_CONFIG.map(st => (
+                  <option key={st.id} value={st.id} className="bg-zinc-900 text-white">
+                    {st.emoji} {st.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
+            {/* Botão de Sugestão de IA (Meta Style) */}
             <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+              type="button"
+              onClick={() => setShowSugestoesIA(!showSugestoesIA)}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-headline font-black flex items-center gap-1.5 border transition-all active:scale-95 shadow-sm",
+                showSugestoesIA
+                  ? "bg-purple-600 text-white border-purple-400 shadow-purple-600/30"
+                  : "bg-purple-600/20 text-purple-300 border-purple-500/40 hover:bg-purple-600/30"
+              )}
             >
-              <X className="w-5 h-5" />
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Co-Piloto IA</span>
             </button>
           </div>
+
+          {/* Card Contextual da Ideia do Projeto */}
+          {cliente.ideiaProjeto && (
+            <div className="mt-2.5 bg-zinc-950 p-2.5 rounded-xl border border-white/5 text-xs text-zinc-300 flex items-start gap-2">
+              <span className="text-amber-400 font-bold shrink-0">💡 Projeto:</span>
+              <span className="truncate italic text-zinc-400">{cliente.ideiaProjeto}</span>
+            </div>
+          )}
         </div>
 
-        {/* Sub-header Indicador */}
-        <div className="px-4 py-2 bg-zinc-900/40 border-b border-white/5 flex items-center justify-between text-[11px] text-zinc-400">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Resposta Direta pelo Navegador</span>
+        {/* ── Painel de Sugestões de IA (Meta Inbox Style) ── */}
+        {showSugestoesIA && (
+          <div className="p-3 bg-purple-950/30 border-b border-purple-500/30 space-y-2 animate-in slide-in-from-top duration-200">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-headline font-bold text-purple-200 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                Sugestões Rápidas de Fechamento (Fase: {configEstagio.label})
+              </span>
+              <span className="text-[10px] text-purple-400">Clique para aplicar</span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {getSugestoesIA().map((sug, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleAplicarSugestao(sug.texto)}
+                  className="p-2.5 bg-zinc-900/90 hover:bg-purple-900/30 border border-purple-500/20 hover:border-purple-500/50 rounded-xl cursor-pointer transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-amber-300 font-headline">
+                      {sug.titulo}
+                    </span>
+                    <span className="text-[10px] text-purple-400 group-hover:text-purple-300 font-bold flex items-center gap-0.5">
+                      Usar resposta <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-300 line-clamp-2 leading-relaxed font-sans">
+                    "{sug.texto}"
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-          <span className="text-[10px] text-zinc-500">
-            Modo Atual: <strong className={remetenteSelecionado === 'ia' ? "text-purple-400" : "text-emerald-400"}>
-              {remetenteSelecionado === 'ia' ? 'Robô IA (NAIA)' : 'Você (Tatuador)'}
-            </strong>
-          </span>
-        </div>
+        )}
 
-        {/* Área de Mensagens */}
-        <div ref={scrollAreaRef} className="flex-1 p-4 overflow-y-auto space-y-4">
+        {/* ── Área de Mensagens (WhatsApp Web Style) ── */}
+        <div ref={scrollAreaRef} className="flex-1 p-4 overflow-y-auto space-y-3.5">
           {carregando ? (
             <div className="py-12 text-center text-zinc-500 text-xs font-headline animate-pulse">
-              Carregando histórico do cliente...
+              Carregando histórico do WhatsApp...
             </div>
           ) : mensagens.length === 0 ? (
             <div className="py-12 text-center text-zinc-600 text-xs font-headline italic">
-              Nenhuma mensagem registrada ainda. Digite abaixo para iniciar a conversa!
+              Nenhuma mensagem registrada ainda. Digite abaixo ou use o Co-Piloto para iniciar!
             </div>
           ) : (
             mensagens.map(msg => (
@@ -222,7 +430,7 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
         {anexoNome && (
           <div className="px-4 py-2 bg-zinc-900 border-t border-white/10 flex items-center justify-between text-xs text-zinc-300">
             <div className="flex items-center gap-2 truncate">
-              <Paperclip className="w-3.5 h-3.5 text-primary-fixed" />
+              <Paperclip className="w-3.5 h-3.5 text-amber-400" />
               <span className="truncate">{anexoNome}</span>
             </div>
             <button onClick={() => setAnexoNome(null)} className="text-zinc-500 hover:text-red-400">
@@ -250,7 +458,7 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
           </div>
         )}
 
-        {/* Input Bar Estilo WhatsApp */}
+        {/* ── Input Bar Estilo WhatsApp ── */}
         <div className="p-3 bg-zinc-900/90 border-t border-white/10 shrink-0">
           <div className="flex items-end gap-2">
             <div className="flex items-center gap-1 pb-2">
@@ -276,7 +484,7 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-                title="Anexar arquivo / imagem"
+                title="Anexar imagem de referência"
               >
                 <Paperclip className="w-5 h-5" />
               </button>
@@ -287,9 +495,9 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
                 value={novaMensagem}
                 onChange={e => setNovaMensagem(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Mensagem como ${remetenteSelecionado === 'ia' ? 'IA' : 'Tatuador'}...`}
+                placeholder={`Responder ${cliente.nome.split(' ')[0]} como ${remetenteSelecionado === 'ia' ? 'IA' : 'Tatuador'}...`}
                 rows={1}
-                className="w-full bg-zinc-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-fixed resize-none max-h-32 min-h-[42px]"
+                className="w-full bg-zinc-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-500 resize-none max-h-32 min-h-[42px]"
               />
             </div>
 
@@ -297,8 +505,8 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ isOpen, 
               type="button"
               onClick={handleEnviar}
               disabled={(!novaMensagem.trim() && !anexoNome) || enviando}
-              className="p-2.5 rounded-xl bg-primary-fixed text-black hover:opacity-90 disabled:opacity-40 transition-all font-black shrink-0 mb-0.5 shadow-md shadow-primary-fixed/20 active:scale-95"
-              title="Enviar mensagem"
+              className="p-2.5 rounded-xl bg-amber-500 text-black hover:bg-amber-400 disabled:opacity-40 transition-all font-black shrink-0 mb-0.5 shadow-md shadow-amber-500/20 active:scale-95"
+              title="Enviar mensagem via WhatsApp"
             >
               <Send className="w-4 h-4" />
             </button>

@@ -98,10 +98,11 @@ export const crmService = {
       });
 
       // Mescla, evitando duplicidade pelo telefone
-      const mapTelefones = new Set(leadsManuais.map(l => (l.telefone || '').replace(/\D/g, '')));
+      const phonesDosManuais = leadsManuais.map(l => (l.telefone || '').replace(/\D/g, '')).filter(Boolean);
       const bookingsNaoDuplicados = leadsFromBookings.filter(lb => {
         const clean = (lb.telefone || '').replace(/\D/g, '');
-        return !clean || !mapTelefones.has(clean);
+        if (!clean) return true;
+        return !phonesDosManuais.some(p => p === clean || p.endsWith(clean) || clean.endsWith(p));
       });
 
       return [...leadsManuais, ...bookingsNaoDuplicados];
@@ -178,34 +179,57 @@ export const crmService = {
   // CARTEIRA DE CLIENTES (pós-tattoo, temperatura)
   // ==========================================
   async getClientes(): Promise<ClienteCRM[]> {
-    const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
-    const bookingsSnap = await getDocs(collection(db, BOOKINGS_COLLECTION));
+    const [usersSnap, bookingsSnap] = await Promise.all([
+      getDocs(collection(db, USERS_COLLECTION)),
+      getDocs(collection(db, BOOKINGS_COLLECTION))
+    ]);
 
     const allBookings = bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Booking));
     const agora = Date.now();
     const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
-    // Função utilitária para extrair timestamp seguro mesmo com data no formato "YYYY-MM-DD HH:mm"
-    const extrairMsDeData = (dateStr?: string): number => {
-      if (!dateStr || typeof dateStr !== 'string') return 0;
-      const clean = dateStr.trim().split(' ')[0]; // isola YYYY-MM-DD
-      const parts = clean.split('-');
-      if (parts.length < 3) return 0;
-      const a = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10);
-      const d = parseInt(parts[2], 10);
-      if (isNaN(a) || isNaN(m) || isNaN(d)) return 0;
-      return new Date(a, m - 1, d, 12, 0, 0).getTime();
+    // Função utilitária para extrair timestamp seguro mesmo com data no formato "YYYY-MM-DD", "DD/MM/YYYY", ISO ou Timestamp
+    const extrairMsDeData = (b: any): number => {
+      if (!b) return 0;
+      const dateStr = typeof b === 'string' ? b : b.date;
+      let ms = 0;
+      if (dateStr && typeof dateStr === 'string') {
+        const clean = dateStr.trim();
+        if (clean.includes('/')) {
+          const parts = clean.split(' ')[0].split('/');
+          if (parts.length === 3) {
+            ms = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0).getTime();
+          }
+        } else if (clean.includes('-')) {
+          const parts = clean.split(' ')[0].split('T')[0].split('-');
+          if (parts.length === 3) {
+            ms = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0).getTime();
+          }
+        }
+      }
+      if (ms === 0 && typeof b === 'object') {
+        if (b.updatedAt?.toMillis) ms = b.updatedAt.toMillis();
+        else if (b.createdAt?.toMillis) ms = b.createdAt.toMillis();
+        else if (b.createdAt) ms = new Date(b.createdAt).getTime();
+      }
+      return isNaN(ms) ? 0 : ms;
     };
 
     const clientes: ClienteCRM[] = usersSnap.docs.map(uDoc => {
       const u = uDoc.data() as UserProfile;
-      const userBookings = allBookings.filter(b => b.userId === uDoc.id || b.userPhone === u.phone);
+      const uPhoneClean = (u.phone || '').replace(/\D/g, '');
+      const userBookings = allBookings.filter(b => {
+        if (b.userId && b.userId === uDoc.id) return true;
+        if (uPhoneClean && b.userPhone) {
+          const bPhoneClean = b.userPhone.replace(/\D/g, '');
+          if (bPhoneClean === uPhoneClean) return true;
+          if (bPhoneClean.endsWith(uPhoneClean) || uPhoneClean.endsWith(bPhoneClean)) return true;
+        }
+        return false;
+      });
 
       const concluidas = userBookings.filter(b => 
-        b.status === BookingStatus.COMPLETED || 
-        b.status === BookingStatus.APPROVED || 
-        b.status === BookingStatus.DEPOSIT_PAID
+        b.status === BookingStatus.COMPLETED
       );
       const agendadas = userBookings.filter(b =>
         b.status === BookingStatus.APPROVED ||
@@ -226,7 +250,7 @@ export const crmService = {
         if (b.estilo && !estilos.includes(b.estilo)) {
           estilos.push(b.estilo);
         }
-        const dataMs = extrairMsDeData(b.date);
+        const dataMs = extrairMsDeData(b);
         if (dataMs > ultimaDataMs) ultimaDataMs = dataMs;
       });
 
@@ -234,21 +258,28 @@ export const crmService = {
         ? Math.max(0, Math.floor((agora - ultimaDataMs) / MS_POR_DIA))
         : undefined;
 
-      const desmarcadas = userBookings.filter(b => 
-        b.status === BookingStatus.REJECTED || 
-        b.status === BookingStatus.NO_SHOW
-      );
+      const desmarcadas = userBookings.filter(b => {
+        const st = String(b.status || '').toLowerCase().replace('-', '_').trim();
+        return st === 'no_show' || st === 'rejected';
+      });
       const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
 
       // Identifica o agendamento mais recente do cliente para verificar se ele faltou ou desmarcou
-      const sortedBookings = [...userBookings].sort((a, b) => extrairMsDeData(b.date) - extrairMsDeData(a.date));
+      const sortedBookings = [...userBookings].sort((a, b) => extrairMsDeData(b) - extrairMsDeData(a));
       const ultimoBooking = sortedBookings[0];
       const ultimoStatus = ultimoBooking ? (ultimoBooking.status as string) : undefined;
+      const normUltimoStatus = (ultimoStatus || '').toLowerCase().replace('-', '_').trim();
+      const temNoShow = (normUltimoStatus === 'no_show' || normUltimoStatus === 'rejected') || (u as any).bucketTemperatura === 'desmarcou';
 
-      const totalSessoes = concluidas.length || (userBookings.length > 0 ? 1 : 0);
-      let bucketTemperatura: ClienteCarteiraTempStage = (u as any).bucketTemperatura === 'emReativacao'
-        ? 'emReativacao'
-        : calcularBucketTemperatura(diasSemContato, totalSessoes, ultimoStatus);
+      const totalSessoes = concluidas.length;
+      let bucketTemperatura: ClienteCarteiraTempStage;
+      if (temNoShow) {
+        bucketTemperatura = 'desmarcou';
+      } else if ((u as any).bucketTemperatura === 'emReativacao') {
+        bucketTemperatura = 'emReativacao';
+      } else {
+        bucketTemperatura = calcularBucketTemperatura(diasSemContato, totalSessoes, ultimoStatus, false);
+      }
 
       return {
         id: uDoc.id,
@@ -275,14 +306,15 @@ export const crmService = {
     });
 
     // ─── POPULAR CARTEIRA COM CLIENTES REAIS DE BOOKINGS ───
-    const mapTelefones = new Set(clientes.map(c => (c.telefone || '').replace(/\D/g, '')).filter(Boolean));
+    const phonesClientes = clientes.map(c => (c.telefone || '').replace(/\D/g, '')).filter(Boolean);
     const mapNomes = new Set(clientes.map(c => (c.nome || '').trim().toLowerCase()).filter(Boolean));
 
     const bookingsByClient: Record<string, Booking[]> = {};
     allBookings.forEach(b => {
       const cleanPhone = (b.userPhone || '').replace(/\D/g, '');
       const cleanName = (b.userName || '').trim().toLowerCase();
-      const isAlreadyCovered = (cleanPhone && mapTelefones.has(cleanPhone)) || (cleanName && mapNomes.has(cleanName));
+      const phoneMatch = cleanPhone && phonesClientes.some(p => p === cleanPhone || p.endsWith(cleanPhone) || cleanPhone.endsWith(p));
+      const isAlreadyCovered = phoneMatch || (cleanName && mapNomes.has(cleanName));
       if (!isAlreadyCovered) {
         const groupKey = cleanPhone || cleanName || b.id;
         if (!bookingsByClient[groupKey]) bookingsByClient[groupKey] = [];
@@ -295,9 +327,7 @@ export const crmService = {
       const nome = first.userName || 'Cliente Estúdio';
       const telefone = first.userPhone || '';
       const concluidas = bList.filter(b => 
-        b.status === BookingStatus.COMPLETED || 
-        b.status === BookingStatus.APPROVED || 
-        b.status === BookingStatus.DEPOSIT_PAID
+        b.status === BookingStatus.COMPLETED
       );
       const agendadas = bList.filter(b =>
         b.status === BookingStatus.APPROVED ||
@@ -317,7 +347,7 @@ export const crmService = {
         if (b.estilo && !estilos.includes(b.estilo)) {
           estilos.push(b.estilo);
         }
-        const dataMs = extrairMsDeData(b.date);
+        const dataMs = extrairMsDeData(b);
         if (dataMs > ultimaDataMs) ultimaDataMs = dataMs;
       });
 
@@ -325,19 +355,26 @@ export const crmService = {
         ? Math.max(0, Math.floor((agora - ultimaDataMs) / MS_POR_DIA))
         : undefined;
 
-      const desmarcadas = bList.filter(b => 
-        b.status === BookingStatus.REJECTED || 
-        b.status === BookingStatus.NO_SHOW
-      );
+      const desmarcadas = bList.filter(b => {
+        const st = String(b.status || '').toLowerCase().replace('-', '_').trim();
+        return st === 'no_show' || st === 'rejected';
+      });
       const desmarcouEm = desmarcadas.length > 0 ? desmarcadas[desmarcadas.length - 1].date : undefined;
 
       // Identifica o agendamento mais recente da lista do cliente
-      const sortedBList = [...bList].sort((a, b) => extrairMsDeData(b.date) - extrairMsDeData(a.date));
+      const sortedBList = [...bList].sort((a, b) => extrairMsDeData(b) - extrairMsDeData(a));
       const ultimoBooking = sortedBList[0];
       const ultimoStatus = ultimoBooking ? (ultimoBooking.status as string) : undefined;
+      const normUltimoStatus = (ultimoStatus || '').toLowerCase().replace('-', '_').trim();
+      const temNoShow = normUltimoStatus === 'no_show' || normUltimoStatus === 'rejected';
 
-      const totalSessoes = concluidas.length || (bList.length > 0 ? 1 : 0);
-      const bucketTemperatura = calcularBucketTemperatura(diasSemContato, totalSessoes, ultimoStatus);
+      const totalSessoes = concluidas.length;
+      let bucketTemperatura: ClienteCarteiraTempStage;
+      if (temNoShow) {
+        bucketTemperatura = 'desmarcou';
+      } else {
+        bucketTemperatura = calcularBucketTemperatura(diasSemContato, totalSessoes, ultimoStatus, false);
+      }
 
       clientes.push({
         id: `booking_client_${key}`,
@@ -399,19 +436,20 @@ export const crmService = {
     if (data.instagram !== undefined) payload.instagram = data.instagram;
     if (data.observacoesInternas !== undefined) payload.observacoesInternas = data.observacoesInternas;
     if (data.bucketTemperatura) payload.bucketTemperatura = data.bucketTemperatura;
-    await updateDoc(docRef, payload);
+    await setDoc(docRef, payload, { merge: true });
   },
 
   async deleteCliente(id: string): Promise<void> {
+    if (id.startsWith('booking_client_')) return;
     await deleteDoc(doc(db, USERS_COLLECTION, id));
   },
 
   async salvarObservacoesCliente(clienteId: string, observacoes: string): Promise<void> {
     try {
-      await updateDoc(doc(db, USERS_COLLECTION, clienteId), {
+      await setDoc(doc(db, USERS_COLLECTION, clienteId), {
         observacoesInternas: observacoes,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
     } catch (e) {
       console.warn('Aviso ao salvar observações do cliente:', e);
     }
@@ -548,11 +586,11 @@ export const crmService = {
 
     // Marca o cliente na Carteira como "emReativacao" e vincula o lead
     try {
-      await updateDoc(doc(db, USERS_COLLECTION, cliente.id), {
+      await setDoc(doc(db, USERS_COLLECTION, cliente.id), {
         bucketTemperatura: 'emReativacao',
         emReativacaoLeadId: leadId,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
     } catch (e) {
       console.warn('Aviso ao atualizar status de reativação do cliente:', e);
     }
@@ -570,9 +608,20 @@ export const crmService = {
     ]);
 
     const leadsNovos = leads.filter(l => l.estagio === 'novo').length;
-    const leadsQualificados = leads.filter(l => l.estagio === 'qualificacao' || l.estagio === 'negociacao').length;
-    const leadsAgendados = leads.filter(l => l.estagio === 'agendado' || l.estagio === 'concluido' || l.estagio === 'pos_venda').length;
-    const taxaConversao = leads.length > 0 ? (leadsAgendados / leads.length) * 100 : 0;
+    const leadsQualificados = leads.filter(l => l.estagio === 'qualificacao').length;
+    const leadsNegociacao = leads.filter(l => l.estagio === 'negociacao' || l.estagio === 'pronto').length;
+    const leadsAgendados = leads.filter(l => l.estagio === 'agendado').length;
+    const leadsConcluidos = leads.filter(l => l.estagio === 'concluido' || l.estagio === 'pos_venda').length;
+
+    const totalConvertidos = leadsAgendados + leadsConcluidos;
+    const taxaConversao = leads.length > 0 ? (totalConvertidos / leads.length) * 100 : 0;
+    const taxaQualificacao = leads.length > 0 ? ((leadsQualificados + leadsNegociacao + totalConvertidos) / leads.length) * 100 : 0;
+    const taxaFechamento = (leadsNegociacao + totalConvertidos) > 0 ? (totalConvertidos / (leadsNegociacao + totalConvertidos)) * 100 : 0;
+
+    // Pipeline estimado (valor potencial em negociação e agendado)
+    const pipelineEstimado = leads
+      .filter(l => l.estagio === 'negociacao' || l.estagio === 'pronto' || l.estagio === 'agendado')
+      .reduce((acc, l) => acc + (l.spin?.ticketEstimado || l.orcamentoMaximo || 450), 0);
 
     const temperaturaCounts = {
       quente: clientes.filter(c => c.bucketTemperatura === 'quente').length,
@@ -588,8 +637,13 @@ export const crmService = {
       totalLeads: leads.length,
       leadsNovos,
       leadsQualificados,
+      leadsNegociacao,
       leadsAgendados,
+      leadsConcluidos,
       taxaConversao: Math.round(taxaConversao * 10) / 10,
+      taxaQualificacao: Math.round(taxaQualificacao * 10) / 10,
+      taxaFechamento: Math.round(taxaFechamento * 10) / 10,
+      pipelineEstimado,
       totalClientes: clientes.length,
       clientesInativos: temperaturaCounts.esfriando + temperaturaCounts.alerta + temperaturaCounts.expirado,
       totalFollowUpsPendentes: temperaturaCounts.alerta + temperaturaCounts.quente,
@@ -668,6 +722,71 @@ export const crmService = {
     } catch (err) {
       console.error('Erro ao excluir crm_estrategia:', err);
       throw err;
+    }
+  },
+
+  /**
+   * Sincroniza em tempo real a mudança de status da agenda no CRM (leads e carteira)
+   */
+  async syncBookingToCRM(booking: Booking, nextStatus: BookingStatus): Promise<void> {
+    if (!booking) return;
+    const norm = String(nextStatus).toLowerCase().replace('-', '_').trim();
+    const cleanBookingPhone = (booking.userPhone || '').replace(/\D/g, '');
+    
+    // 1. Atualiza documento do usuário/cliente no users se houver userId ou telefone
+    try {
+      let userDocId = booking.userId;
+      if (!userDocId && cleanBookingPhone) {
+        const uSnap = await getDocs(collection(db, USERS_COLLECTION));
+        const matched = uSnap.docs.find(d => {
+          const uData = d.data();
+          const p = (uData.phone || uData.telefone || '').replace(/\D/g, '');
+          return p && (p === cleanBookingPhone || p.endsWith(cleanBookingPhone) || cleanBookingPhone.endsWith(p));
+        });
+        if (matched) userDocId = matched.id;
+      }
+
+      if (userDocId) {
+        const userRef = doc(db, USERS_COLLECTION, userDocId);
+        const updatePayload: Record<string, any> = { updatedAt: serverTimestamp() };
+        if (norm === 'no_show' || norm === 'rejected') {
+          updatePayload.bucketTemperatura = 'desmarcou';
+          updatePayload.desmarcouEm = booking.date || new Date().toISOString();
+        } else if (norm === 'completed') {
+          updatePayload.bucketTemperatura = 'quente';
+          updatePayload.ultimaSessaoEm = booking.date || new Date().toISOString();
+        }
+        await updateDoc(userRef, updatePayload);
+      } else if (cleanBookingPhone && (norm === 'no_show' || norm === 'rejected')) {
+        // Se o cliente ainda não tinha cadastro na tabela users mas faltou, cria o registro para aparecer em desmarcou
+        await addDoc(collection(db, USERS_COLLECTION), {
+          name: booking.userName || 'Cliente Estúdio',
+          phone: booking.userPhone,
+          role: 'user',
+          bucketTemperatura: 'desmarcou',
+          desmarcouEm: booking.date || new Date().toISOString(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      console.warn('syncBookingToCRM [user]:', err);
+    }
+
+    // 2. Atualiza lead correspondente no funil se existir (isolado para não depender do bloco 1)
+    try {
+      if (booking.id) {
+        const leadRef = doc(db, LEADS_COLLECTION, `booking_${booking.id}`);
+        const leadSnap = await getDoc(leadRef);
+        if (leadSnap.exists()) {
+          let novoEstagio: LeadStage = 'agendado';
+          if (norm === 'completed') novoEstagio = 'concluido';
+          else if (norm === 'no_show' || norm === 'rejected') novoEstagio = 'followup';
+          await updateDoc(leadRef, { estagio: novoEstagio, updatedAt: serverTimestamp() });
+        }
+      }
+    } catch (err) {
+      console.warn('syncBookingToCRM [lead]:', err);
     }
   }
 };

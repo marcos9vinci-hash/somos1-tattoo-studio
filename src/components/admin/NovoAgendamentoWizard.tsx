@@ -6,6 +6,7 @@ import { collection, addDoc, getDocs, serverTimestamp, query, where, doc, update
 import { cn } from '../../lib/utils';
 import { BookingStatus } from '../../types';
 import { whatsappService } from '../../lib/whatsappService';
+import { crmService } from '../../lib/crmService';
 
 interface NovoAgendamentoWizardProps {
   isOpen: boolean;
@@ -280,6 +281,7 @@ export default function NovoAgendamentoWizard({
           }
 
           await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), updateData);
+          await crmService.syncBookingToCRM({ ...agendamentoParaEditar, ...updateData } as any, updateData.status);
 
           alert(
             clienteJaTatuouFlag
@@ -302,6 +304,7 @@ export default function NovoAgendamentoWizard({
         }
 
         await updateDoc(doc(db, 'bookings', agendamentoParaEditar.id), updateData);
+        await crmService.syncBookingToCRM({ ...agendamentoParaEditar, ...updateData } as any, updateData.status);
 
         // Dispara mensagem no WhatsApp se houver reagendamento OU se o usuário marcou enviar confirmação
         if (selectedUser && (isDateTimeChanged || form.enviarConfirmacao)) {
@@ -346,6 +349,7 @@ export default function NovoAgendamentoWizard({
       payload.createdAt = serverTimestamp();
 
       const docRef = await addDoc(collection(db, 'bookings'), payload);
+      await crmService.syncBookingToCRM({ id: docRef.id, ...payload } as any, payload.status);
 
       if (modo === 'ajustar') {
         alert(

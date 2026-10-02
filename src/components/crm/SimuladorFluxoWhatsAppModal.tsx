@@ -12,14 +12,17 @@ import {
   Smartphone,
   Sparkles,
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  Timer
 } from 'lucide-react';
 import { parseArtistWhatsAppIntent } from '../../lib/whatsappIntentParser';
+import { EstrategiaCampanha } from '../../types/crm';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onLeadSimuladoCriado?: (lead: any) => void;
+  estrategia?: EstrategiaCampanha | null;
 }
 
 interface LogStep {
@@ -34,7 +37,8 @@ interface LogStep {
 export const SimuladorFluxoWhatsAppModal: React.FC<Props> = ({
   isOpen,
   onClose,
-  onLeadSimuladoCriado
+  onLeadSimuladoCriado,
+  estrategia
 }) => {
   const [numeroFicticio, setNumeroFicticio] = useState('11999998888');
   const [nomeCliente, setNomeCliente] = useState('Lucas Teste (Fictício)');
@@ -48,6 +52,12 @@ export const SimuladorFluxoWhatsAppModal: React.FC<Props> = ({
   const [especialistaAtivo, setEspecialistaAtivo] = useState('🤖 [Triagem · Clone do Dono]');
   const [inputRespostaTatuador, setInputRespostaTatuador] = useState('');
   const [simulandoAudio, setSimulandoAudio] = useState(false);
+
+  React.useEffect(() => {
+    if (estrategia) {
+      setCenarioAtivo('reativacao');
+    }
+  }, [estrategia]);
 
   if (!isOpen) return null;
 
@@ -139,23 +149,33 @@ export const SimuladorFluxoWhatsAppModal: React.FC<Props> = ({
         setFaseSimulacao('aguardando_aprovacao');
       }, 800);
     } else {
+      const nomeSim = nomeCliente.split(' ')[0];
+      const templateMsg = estrategia?.mensagemTemplate
+        ? estrategia.mensagemTemplate.replace(/\[Nome\]/gi, nomeSim).replace(/\[Tatuagem\]/gi, 'tatuagem')
+        : `Fala ${nomeSim}! Tudo certo por aí? Lembrei da sua tattoo aqui no estúdio. Como tá a cicatrização? Temos 2 horários VIPs essa semana se quiser fechar outro projeto com 15% de bônus!`;
+
+      const assinatura = estrategia?.especialistaAssinatura || '🌿 [Pós-Venda & Reativação · Juliana]';
+      const timersConfig = (estrategia?.sequenciaTimersMinutos && estrategia.sequenciaTimersMinutos.length > 0)
+        ? estrategia.sequenciaTimersMinutos
+        : [5, 10, 15, 10];
+      const limiteDiario = estrategia?.limiteDiario || 20;
+
       addLog(
         'CRM_ENGINE',
         'info',
-        'Campanha de Reativação Segura Selecionada',
-        `Cliente ${nomeCliente} está sem tatuar há 68 dias (Temperatura Esfriando).`
+        `Campanha Ativa: ${estrategia?.emoji || '🎯'} ${estrategia?.titulo || 'Reativação de Carteira'}`,
+        `Trava Anti-Ban Meta: Limite Diário = ${limiteDiario} disparos • Sequência de Timers = [${timersConfig.join('m ➔ ')}m]`
       );
 
       setTimeout(() => {
-        const proposta = `Fala ${nomeCliente.split(' ')[0]}! Tudo certo por aí? Lembrei da sua tattoo aqui no estúdio. Como tá a cicatrização? Temos 2 horários VIPs essa semana se quiser fechar outro projeto com 15% de bônus!`;
-        setPropostaRobo(proposta);
-        setEspecialistaAtivo('🌿 [Pós-Venda & Reativação · Juliana]');
+        setPropostaRobo(templateMsg);
+        setEspecialistaAtivo(assinatura);
 
         addLog(
           'COPILOTO_ZAP',
           'warning',
-          'Juliana Reativação chamou você no WhatsApp (Modo Co-Piloto)',
-          `"Marquinhos, preparei mensagem de resgate para ${nomeCliente}. Posso enviar? [1 - Sim / 2 - Não manda nada]"`
+          `${assinatura} chamou você no WhatsApp (Modo Co-Piloto)`,
+          `"Marquinhos, preparei a mensagem da campanha para ${nomeCliente}. Posso colocar na fila de disparo seguro? [1 - Sim / 2 - Não manda nada]"`
         );
         setFaseSimulacao('aguardando_aprovacao');
       }, 800);
@@ -183,12 +203,23 @@ export const SimuladorFluxoWhatsAppModal: React.FC<Props> = ({
 
     setTimeout(() => {
       if (intentResult.intent === 'APPROVE') {
-        if (cenarioAtivo === 'novo_lead' || cenarioAtivo === 'reativacao') {
+        if (cenarioAtivo === 'novo_lead') {
           addLog(
             'DISPARO_FINAL',
             'success',
             `Mensagem Enviada ao Cliente Fictício (${numeroFicticio}) ✅`,
             `Robô disparou a resposta autorizada com sucesso. Lead movido para "Contato Feito" no CRM.`
+          );
+        } else if (cenarioAtivo === 'reativacao') {
+          const timersConfig = (estrategia?.sequenciaTimersMinutos && estrategia.sequenciaTimersMinutos.length > 0)
+            ? estrategia.sequenciaTimersMinutos
+            : [5, 10, 15, 10];
+          const limite = estrategia?.limiteDiario || 20;
+          addLog(
+            'DISPARO_FINAL',
+            'success',
+            `Fila de Disparos Segura Ativada ✅ (Proteção Meta Anti-Ban)`,
+            `#1 ${nomeCliente}: Disparo Imediato (0s) • #2 Próximo: Aguarda ${timersConfig[0] || 5} min • #3 Próximo: Aguarda +${timersConfig[1] || 10} min • #4 Próximo: Aguarda +${timersConfig[2] || 15} min. Pausa automática ao atingir ${limite} envios/dia hoje.`
           );
         } else {
           addLog(
@@ -330,6 +361,57 @@ export const SimuladorFluxoWhatsAppModal: React.FC<Props> = ({
               </button>
             </div>
           </div>
+
+          {/* Detalhes da Estratégia, Limite Diário e Timers no Cenário de Reativação */}
+          {cenarioAtivo === 'reativacao' && (
+            <div className="bg-zinc-950 p-4 rounded-2xl border border-purple-500/30 space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{estrategia?.emoji || '🎯'}</span>
+                  <div>
+                    <h4 className="text-xs font-headline font-black text-white uppercase tracking-wider">
+                      {estrategia?.titulo || 'Campanha de Reativação Segura'}
+                    </h4>
+                    <p className="text-[10px] text-zinc-400">
+                      Disparo controlado via Co-Piloto com proteção anti-ban da Meta.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-purple-500/20 text-purple-300 font-bold px-2.5 py-0.5 rounded-full border border-purple-500/40">
+                  {estrategia?.limiteDiario || 20} envios/dia max
+                </span>
+              </div>
+
+              {/* Sequência de Timers */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-zinc-300 font-headline">
+                  <span className="flex items-center gap-1.5 text-amber-400 font-bold">
+                    <Clock className="w-3.5 h-3.5" />
+                    Sequência de Espera entre Mensagens:
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    Modo: {estrategia?.modoCadencia || 'sequencial'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-wrap">
+                  {(estrategia?.sequenciaTimersMinutos || [5, 10, 15, 10]).map((min, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700/80 px-2.5 py-1 rounded-xl text-xs text-zinc-200"
+                    >
+                      <span className="text-[10px] text-zinc-500 font-mono">#{idx + 1}</span>
+                      <Clock className="w-3 h-3 text-amber-400" />
+                      <strong className="text-amber-300">{min} min</strong>
+                    </div>
+                  ))}
+                  <span className="text-[10px] text-zinc-500 italic">
+                    (Disparo seguro anti-ban da Meta)
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Dados Fictícios de Entrada */}
           <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800 space-y-3">

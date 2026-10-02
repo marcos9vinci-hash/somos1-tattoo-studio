@@ -279,6 +279,82 @@ export const agentService = {
   },
 
   /**
+   * Captura ou atualiza o lead automaticamente no Funil do CRM sem consumir tokens de LLM
+   */
+  async captureOrUpdateLead({ senderPhone, senderName, text, intent }) {
+    if (!senderPhone) return null;
+    const cleanPhone = String(senderPhone).replace(/\D/g, '');
+    if (!cleanPhone) return null;
+
+    try {
+      const leadsRef = collection(db, 'leads');
+      const snap = await getDocs(leadsRef);
+      const matchedDoc = snap.docs.find(d => {
+        const dPhone = (d.data().telefone || '').replace(/\D/g, '');
+        return dPhone && (dPhone === cleanPhone || dPhone.endsWith(cleanPhone) || cleanPhone.endsWith(dPhone));
+      });
+
+      // Mapeamento dinâmico de estágio conforme o teor da mensagem
+      const lower = (text || '').toLowerCase();
+      let nextStage = 'novo';
+      if (intent === 'BOOK') {
+        nextStage = 'agendado';
+      } else if (intent === 'CHECK_SLOTS' || lower.includes('preço') || lower.includes('preco') || lower.includes('valor') || lower.includes('orçamento') || lower.includes('orcamento') || lower.includes('quanto fica')) {
+        nextStage = 'negociacao';
+      } else if (lower.includes('ideia') || lower.includes('tatuar') || lower.includes('desenho') || lower.includes('foto') || lower.includes('flash') || lower.includes('estilo') || lower.includes('antebraço') || lower.includes('braço') || lower.includes('perna')) {
+        nextStage = 'qualificacao';
+      }
+
+      if (matchedDoc) {
+        const currentData = matchedDoc.data();
+        const stagePriority = { 'novo': 1, 'qualificacao': 2, 'negociacao': 3, 'pronto': 4, 'agendado': 5, 'concluido': 6 };
+        const currentPriority = stagePriority[currentData.estagio] || 1;
+        const newPriority = stagePriority[nextStage] || 1;
+        const resolvedStage = newPriority > currentPriority ? nextStage : currentData.estagio;
+
+        const updatePayload = {
+          ultimoContatoEm: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          estagio: resolvedStage
+        };
+
+        if (text && (!currentData.ideiaProjeto || currentData.ideiaProjeto.length < 5)) {
+          updatePayload.ideiaProjeto = text;
+        }
+
+        const notas = Array.isArray(currentData.notasInternas) ? [...currentData.notasInternas] : [];
+        if (notas.length < 15 && text) {
+          notas.push(`Zap [${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}]: ${text.slice(0, 100)}`);
+          updatePayload.notasInternas = notas;
+        }
+
+        await updateDoc(doc(db, 'leads', matchedDoc.id), updatePayload);
+        return matchedDoc.id;
+      } else {
+        const newLead = {
+          nome: senderName || 'Lead WhatsApp',
+          telefone: cleanPhone,
+          origem: 'whatsapp',
+          estagio: nextStage,
+          temperatura: 'quente',
+          ideiaProjeto: text || '',
+          responsavelAtendimento: 'IA_Assessor',
+          criadoPor: 'agente_ia',
+          notasInternas: [`Lead captado via WhatsApp em ${new Date().toLocaleDateString('pt-BR')}: "${(text || '').slice(0, 120)}"`],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          ultimoContatoEm: serverTimestamp()
+        };
+        const newDoc = await addDoc(collection(db, 'leads'), newLead);
+        return newDoc.id;
+      }
+    } catch (err) {
+      console.warn('Aviso ao capturar/atualizar lead automático no CRM:', err);
+      return null;
+    }
+  },
+
+  /**
    * Processador Central de Mensagens Inbound (Meta Business Agent Style)
    */
   async processIncomingMessage({ senderPhone, senderName, text }) {
@@ -351,6 +427,16 @@ export const agentService = {
       intent = 'BOOK';
     } else if (lower.includes('horário') || lower.includes('horario') || lower.includes('vaga') || lower.includes('disponivel') || lower.includes('disponível') || (targetDate && !targetTime)) {
       intent = 'CHECK_SLOTS';
+    }
+
+    // 2. Captura / Atualização Automática do Lead no CRM (Zero consumo de tokens de IA)
+    if (!isAdmin) {
+      await this.captureOrUpdateLead({
+        senderPhone,
+        senderName,
+        text: rawText,
+        intent
+      });
     }
 
     let replyText = '';
@@ -431,7 +517,14 @@ export const agentService = {
       if (isAdmin) {
         replyText = `Olá, chefe! 🤘 Sou o assistente da agenda do *Somos 1 Tattoo Studio*.\n\nVocê pode me pedir:\n• *"Agenda o [Nome] [data] às [horário]"*\n• *"Como tá a agenda de hoje / amanhã?"*\n• *"Bloqueia o dia [data]"*\n\nO que deseja fazer agora?`;
       } else {
-        replyText = `Olá, ${senderName}! 🖤 Tudo bem? Bem-vindo(a) ao *Somos 1 Tattoo Studio*!\n\nSou o assistente virtual de agendamentos. Para marcar seu horário ou tirar dúvidas, você pode:\n\n1. Me dizer qual dia você gostaria de tatuar (Ex: *"Quais horários tem na sexta?"*)\n2. Dizer o horário desejado (Ex: *"Quero agendar amanhã às 15h"*)\n\nComo posso te ajudar hoje? 🤘✨`;
+        // Se for uma saudação inicial explícita, acolhe o cliente
+        const isGreeting = /^(oi|ol[aá]|bom dia|boa tarde|boa noite|opa|fala|e a[ií]|hello|hi)[!.]?$/i.test(lower);
+        if (isGreeting) {
+          replyText = `Olá, ${senderName}! 🖤 Tudo bem? Bem-vindo(a) ao *Somos 1 Tattoo Studio*!\n\nSou o assistente virtual de agendamentos. Para marcar seu horário ou tirar dúvidas, você pode:\n\n1. Me dizer qual dia você gostaria de tatuar (Ex: *"Quais horários tem na sexta?"*)\n2. Dizer o horário desejado (Ex: *"Quero agendar amanhã às 15h"*)\n\nComo posso te ajudar hoje? 🤘✨`;
+        } else {
+          // Conversa em andamento: Não polui o chat nem gasta tokens, apenas registra e monitora a esteira do CRM em modo co-piloto
+          replyText = '';
+        }
       }
     }
 

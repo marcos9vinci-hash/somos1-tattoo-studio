@@ -302,7 +302,7 @@ export default function Admin() {
       await updateDoc(doc(db, 'bookings', booking.id), updateData);
       
       // Sincroniza automaticamente a esteira do CRM (lead/cliente)
-      crmService.syncBookingToCRM(booking, nextStatus);
+      await crmService.syncBookingToCRM(booking, nextStatus);
 
       if (!customData?.silent) {
         if (isReschedule) {

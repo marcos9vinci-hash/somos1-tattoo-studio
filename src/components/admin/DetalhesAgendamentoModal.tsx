@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Booking, BookingStatus, StudioSettings } from '../../types';
 import { whatsappService } from '../../lib/whatsappService';
+import { crmService } from '../../lib/crmService';
 
 interface DetalhesAgendamentoModalProps {
   agendamento: Booking | null;
@@ -98,6 +99,7 @@ export default function DetalhesAgendamentoModal({
     const newStatus = e.target.value as BookingStatus;
     try {
       await updateDoc(doc(db, 'bookings', agendamento.id), { status: newStatus });
+      await crmService.syncBookingToCRM(agendamento, newStatus);
       onStatusChange?.();
     } catch (err) {
       console.error(err);
