@@ -15,6 +15,9 @@ export type LeadStage =
 
 export type LeadSource = 'whatsapp' | 'instagram' | 'indicacao' | 'site' | 'manual' | 'n8n_agente';
 
+/** Modo de Operação do Agente de IA da Coluna */
+export type ModoAtuacaoAgente = 'copiloto' | 'apenas_sugerir' | 'autonomo' | 'silencioso';
+
 /** Configuração dos Agentes de IA por Coluna (Base NAIA) */
 export interface ColunaAIAgentConfig {
   id: string;
@@ -27,6 +30,9 @@ export interface ColunaAIAgentConfig {
   skillsAtivas: string[];
   ativo: boolean;
   tempoEsperaMinutos?: number;
+  modoAtuacao?: ModoAtuacaoAgente;
+  notificarWhatsAppTatuador?: boolean;
+  webhookAtivo?: boolean;
 }
 
 // ==========================================

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lead, LeadStage, ColunaAIAgentConfig } from '../../types/crm';
+import { crmService } from '../../lib/crmService';
 import { 
   UserPlus, 
   MessageCircle, 
@@ -49,6 +50,12 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
   const [agentsConfig, setAgentsConfig] = useState<Record<LeadStage, ColunaAIAgentConfig>>(STAGE_AGENTS_NAIA);
   const [selectedAgentForModal, setSelectedAgentForModal] = useState<ColunaAIAgentConfig | null>(null);
 
+  useEffect(() => {
+    crmService.getStageAgents().then(loaded => {
+      if (loaded) setAgentsConfig(loaded);
+    }).catch(err => console.warn('Erro ao carregar agentes do Firestore:', err));
+  }, []);
+
   const handleDragStart = (e: React.DragEvent, leadId: string) => {
     e.dataTransfer.setData('text/plain', leadId);
   };
@@ -65,11 +72,30 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
     }
   };
 
-  const handleSaveAgentConfig = (novaConfig: ColunaAIAgentConfig) => {
+  const handleSaveAgentConfig = async (novaConfig: ColunaAIAgentConfig) => {
     setAgentsConfig(prev => ({
       ...prev,
       [novaConfig.stageId]: novaConfig
     }));
+    try {
+      await crmService.saveStageAgent(novaConfig);
+    } catch (err) {
+      console.error('Erro ao persistir agente no Firestore:', err);
+    }
+  };
+
+  const getModoBadge = (agent: ColunaAIAgentConfig) => {
+    if (!agent.ativo) return { label: 'Pausado', icon: '⏸️', color: 'text-zinc-500 border-zinc-700/50 bg-zinc-800/40' };
+    switch (agent.modoAtuacao) {
+      case 'copiloto':
+        return { label: 'Co-Piloto', icon: '🛡️', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' };
+      case 'apenas_sugerir':
+        return { label: 'Sugestão', icon: '💡', color: 'text-sky-400 border-sky-500/30 bg-sky-500/10' };
+      case 'autonomo':
+        return { label: 'Auto', icon: '⚡', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' };
+      default:
+        return { label: 'Co-Piloto', icon: '🛡️', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' };
+    }
   };
 
   return (
@@ -99,6 +125,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
           const stageLeads = leads.filter((lead) => lead.estagio === stage.id);
           const Icon = stage.icon;
           const agent = agentsConfig[stage.id];
+          const modo = agent ? getModoBadge(agent) : null;
 
           return (
             <div
@@ -124,7 +151,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                   type="button"
                   onClick={() => setSelectedAgentForModal(agent)}
                   className="mb-3 w-full px-2.5 py-1.5 bg-black/40 hover:bg-purple-950/40 border border-purple-500/20 hover:border-purple-500/40 rounded-lg flex items-center justify-between transition-all group"
-                  title="Configurar Skills e Personalidade da IA desta Coluna"
+                  title="Configurar Skills e Modo de Operação deste Agente"
                 >
                   <div className="flex items-center gap-1.5 truncate">
                     <Bot className={`w-3.5 h-3.5 ${agent.ativo ? 'text-amber-400' : 'text-zinc-600'} shrink-0`} />
@@ -132,8 +159,13 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                       {agent.nomeAgente.split('(')[0].trim()}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className={`w-1.5 h-1.5 rounded-full ${agent.ativo ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {modo && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono font-bold flex items-center gap-0.5 ${modo.color}`}>
+                        <span>{modo.icon}</span>
+                        <span>{modo.label}</span>
+                      </span>
+                    )}
                     <Sliders className="w-3 h-3 text-zinc-500 group-hover:text-zinc-300" />
                   </div>
                 </button>

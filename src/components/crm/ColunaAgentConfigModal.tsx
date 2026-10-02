@@ -46,6 +46,8 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
   const [novaSkill, setNovaSkill] = useState('');
   const [ativo, setAtivo] = useState(true);
   const [tempoEsperaMinutos, setTempoEsperaMinutos] = useState(15);
+  const [modoAtuacao, setModoAtuacao] = useState<any>('copiloto');
+  const [notificarWhatsAppTatuador, setNotificarWhatsAppTatuador] = useState(true);
 
   useEffect(() => {
     if (config) {
@@ -56,6 +58,8 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
       setSkillsAtivas([...config.skillsAtivas]);
       setAtivo(config.ativo);
       setTempoEsperaMinutos(config.tempoEsperaMinutos || 15);
+      setModoAtuacao(config.modoAtuacao || 'copiloto');
+      setNotificarWhatsAppTatuador(config.notificarWhatsAppTatuador ?? true);
       setNovaSkill('');
     }
   }, [config]);
@@ -84,7 +88,9 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
       promptBase,
       skillsAtivas,
       ativo,
-      tempoEsperaMinutos
+      tempoEsperaMinutos,
+      modoAtuacao,
+      notificarWhatsAppTatuador
     });
     onClose();
   };
@@ -148,6 +154,109 @@ export const ColunaAgentConfigModal: React.FC<ColunaAgentConfigModalProps> = ({
             >
               {ativo ? 'LIGADO' : 'PAUSADO'}
             </button>
+          </div>
+
+          {/* MODO DE OPERAÇÃO DO AGENTE (Co-piloto, Sugestão, Automático, Silencioso) */}
+          <div className="bg-zinc-950/80 rounded-xl border border-zinc-800 p-4 space-y-3">
+            <div>
+              <label className="text-xs font-bold text-white block mb-0.5">
+                Modo de Operação deste Especialista
+              </label>
+              <p className="text-[11px] text-zinc-400">
+                Defina como este agente de IA deve se comportar ao interagir com o cliente e com você.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Opção 1: Co-piloto */}
+              <button
+                type="button"
+                onClick={() => setModoAtuacao('copiloto')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  modoAtuacao === 'copiloto'
+                    ? 'bg-amber-500/10 border-amber-500 text-white shadow-xs'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm">🛡️</span>
+                  <span className="text-xs font-bold text-white">Co-Piloto (Aprovar no Zap)</span>
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                  Chama o Marquinhos no WhatsApp: <em>"Posso enviar essa resposta?"</em> com botões Sim/Não.
+                </p>
+              </button>
+
+              {/* Opção 2: Apenas Sugestão */}
+              <button
+                type="button"
+                onClick={() => setModoAtuacao('apenas_sugerir')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  modoAtuacao === 'apenas_sugerir'
+                    ? 'bg-sky-500/10 border-sky-500 text-white shadow-xs'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm">💡</span>
+                  <span className="text-xs font-bold text-white">Apenas Sugestão (CRM)</span>
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                  Gera a resposta recomendada dentro do card no CRM para você revisar e enviar se quiser.
+                </p>
+              </button>
+
+              {/* Opção 3: Piloto Automático */}
+              <button
+                type="button"
+                onClick={() => setModoAtuacao('autonomo')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  modoAtuacao === 'autonomo'
+                    ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-xs'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm">⚡</span>
+                  <span className="text-xs font-bold text-white">Piloto Automático</span>
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                  Dispara diretamente para o cliente após {tempoEsperaMinutos} minutos se você não responder.
+                </p>
+              </button>
+
+              {/* Opção 4: Silencioso */}
+              <button
+                type="button"
+                onClick={() => setModoAtuacao('silencioso')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  modoAtuacao === 'silencioso'
+                    ? 'bg-zinc-700/30 border-zinc-600 text-white shadow-xs'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm">⏸️</span>
+                  <span className="text-xs font-bold text-white">Silencioso</span>
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                  Fica em espera sem emitir alertas nem sugestões para esta etapa.
+                </p>
+              </button>
+            </div>
+
+            {/* Checkbox de notificação no WhatsApp do Tatuador com a assinatura deste Agente */}
+            <label className="flex items-center gap-2.5 pt-2 border-t border-zinc-800/60 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notificarWhatsAppTatuador}
+                onChange={e => setNotificarWhatsAppTatuador(e.target.checked)}
+                className="w-4 h-4 rounded accent-amber-500 bg-zinc-900 border-zinc-700"
+              />
+              <span className="text-xs text-zinc-300">
+                Notificar o tatuador no WhatsApp assinando como <strong>{nomeAgente || 'Agente da Etapa'}</strong>
+              </span>
+            </label>
           </div>
 
           {/* Nome e Papel */}

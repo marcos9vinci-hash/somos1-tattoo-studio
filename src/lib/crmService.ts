@@ -6,6 +6,7 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  setDoc,
   query, 
   where,
   orderBy, 
@@ -18,8 +19,10 @@ import {
   LeadStage, 
   ClienteCarteiraTempStage,
   CRMDashboardMetrics,
+  ColunaAIAgentConfig,
   calcularBucketTemperatura
 } from '../types/crm';
+import { STAGE_AGENTS_NAIA } from './naiaAgentsConfig';
 import { UserProfile, Booking, BookingStatus } from '../types';
 import { whatsappService } from './whatsappService';
 
@@ -485,5 +488,41 @@ export const crmService = {
       totalFollowUpsPendentes: temperaturaCounts.alerta + temperaturaCounts.quente,
       temperaturaCounts
     };
+  },
+
+  // ==========================================
+  // CONFIGURAÇÃO DOS AGENTES DE IA POR ETAPA (CRUD COMPLETO)
+  // ==========================================
+  async getStageAgents(): Promise<Record<LeadStage, ColunaAIAgentConfig>> {
+    try {
+      const snap = await getDocs(collection(db, 'crm_stage_agents'));
+      if (snap.empty) {
+        return STAGE_AGENTS_NAIA;
+      }
+      const loaded: Partial<Record<LeadStage, ColunaAIAgentConfig>> = {};
+      snap.docs.forEach(docSnap => {
+        const data = docSnap.data() as ColunaAIAgentConfig;
+        if (data.stageId) {
+          loaded[data.stageId] = { ...STAGE_AGENTS_NAIA[data.stageId], ...data };
+        }
+      });
+      return { ...STAGE_AGENTS_NAIA, ...loaded };
+    } catch (err) {
+      console.warn('Erro ao carregar crm_stage_agents do Firestore, usando fallback:', err);
+      return STAGE_AGENTS_NAIA;
+    }
+  },
+
+  async saveStageAgent(config: ColunaAIAgentConfig): Promise<void> {
+    try {
+      const docRef = doc(db, 'crm_stage_agents', config.stageId);
+      await setDoc(docRef, {
+        ...config,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Erro ao salvar crm_stage_agent:', err);
+      throw err;
+    }
   }
 };
