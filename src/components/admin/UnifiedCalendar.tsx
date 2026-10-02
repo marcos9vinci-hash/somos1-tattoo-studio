@@ -25,33 +25,59 @@ interface QuickBookingForm {
   priceEstimated: number;
 }
 
-// CORES E BORDAS DOS AGENDAMENTOS (Confirmado: verde | Faltou: vermelho | Agendado: amarelo)
+// PALETA DE CORES DOS AGENDAMENTOS SINCRONIZADA COM CRM
 function getBookingStatusTheme(status: string) {
   switch (status) {
-    case BookingStatus.APPROVED:
-    case BookingStatus.DEPOSIT_PAID:
+    case BookingStatus.COMPLETED:
       return {
-        badgeBg: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50',
+        badgeBg: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40',
         ringClass: 'ring-2 ring-emerald-500/80 shadow-emerald-500/10',
         dotColor: 'bg-emerald-500',
-        label: 'Confirmado'
+        label: 'Concluído'
       };
-    case BookingStatus.NO_SHOW:
-    case BookingStatus.REJECTED:
+    case BookingStatus.DEPOSIT_PAID:
       return {
-        badgeBg: 'bg-red-500/20 text-red-400 border border-red-500/50',
-        ringClass: 'ring-2 ring-red-500/80 shadow-red-500/10',
-        dotColor: 'bg-red-500',
-        label: 'Faltou'
+        badgeBg: 'bg-purple-500/20 text-purple-400 border border-purple-500/40',
+        ringClass: 'ring-2 ring-purple-500/80 shadow-purple-500/10',
+        dotColor: 'bg-purple-500',
+        label: 'Sinal Pago'
+      };
+    case BookingStatus.APPROVED:
+      return {
+        badgeBg: 'bg-sky-500/20 text-sky-400 border border-sky-500/40',
+        ringClass: 'ring-2 ring-sky-500/80 shadow-sky-500/10',
+        dotColor: 'bg-sky-500',
+        label: 'Agendado'
+      };
+    case BookingStatus.RESCHEDULED:
+      return {
+        badgeBg: 'bg-amber-500/20 text-amber-400 border border-amber-500/40',
+        ringClass: 'ring-2 ring-amber-500/80 shadow-amber-500/10',
+        dotColor: 'bg-amber-500',
+        label: 'Reagendado'
       };
     case BookingStatus.PENDING_APPROVAL:
     case BookingStatus.DEPOSIT_PENDING:
+      return {
+        badgeBg: 'bg-orange-500/20 text-orange-400 border border-orange-500/40',
+        ringClass: 'ring-2 ring-orange-500/80 shadow-orange-500/10',
+        dotColor: 'bg-orange-500',
+        label: 'Aguardando'
+      };
+    case BookingStatus.NO_SHOW:
+      return {
+        badgeBg: 'bg-rose-500/20 text-rose-400 border border-rose-500/40',
+        ringClass: 'ring-2 ring-rose-500/80 shadow-rose-500/10',
+        dotColor: 'bg-rose-500',
+        label: 'Faltou'
+      };
+    case BookingStatus.REJECTED:
     default:
       return {
-        badgeBg: 'bg-amber-500/20 text-amber-400 border border-amber-500/50',
-        ringClass: 'ring-2 ring-amber-500/80 shadow-amber-500/10',
-        dotColor: 'bg-amber-500',
-        label: 'Agendado'
+        badgeBg: 'bg-zinc-700/30 text-zinc-400 border border-zinc-700/40',
+        ringClass: 'ring-2 ring-zinc-600/80 shadow-zinc-600/10',
+        dotColor: 'bg-zinc-500',
+        label: 'Desmarcou'
       };
   }
 }

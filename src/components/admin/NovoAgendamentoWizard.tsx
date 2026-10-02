@@ -41,6 +41,9 @@ export default function NovoAgendamentoWizard({
     enviarLembrete: true,
     tempoLembreteValor: 2,
     tempoLembreteUnidade: 'hours', // minutes, hours, days
+    enviarCheckIn: true,
+    tempoCheckInValor: 30,
+    tempoCheckInUnidade: 'minutes', // minutes, hours, days
     enviarFollowUp: true,
     tempoFollowUpValor: 2,
     tempoFollowUpUnidade: 'minutes' // minutes, hours, days
@@ -89,6 +92,9 @@ export default function NovoAgendamentoWizard({
           enviarLembrete: customAuto?.enviarLembrete ?? true,
           tempoLembreteValor: customAuto?.reminderValue ?? 2,
           tempoLembreteUnidade: customAuto?.reminderUnit ?? 'hours',
+          enviarCheckIn: customAuto?.enviarCheckIn ?? true,
+          tempoCheckInValor: customAuto?.sessionCheckInValue ?? 30,
+          tempoCheckInUnidade: customAuto?.sessionCheckInUnit ?? 'minutes',
           enviarFollowUp: customAuto?.enviarFollowUp ?? true,
           tempoFollowUpValor: customAuto?.followUpValue ?? 2,
           tempoFollowUpUnidade: customAuto?.followUpUnit ?? 'minutes'
@@ -223,9 +229,12 @@ export default function NovoAgendamentoWizard({
         customAutomation: {
           reminderValue: Number(form.tempoLembreteValor) || 2,
           reminderUnit: form.tempoLembreteUnidade || 'hours',
+          sessionCheckInValue: Number(form.tempoCheckInValor) || 30,
+          sessionCheckInUnit: form.tempoCheckInUnidade || 'minutes',
           followUpValue: Number(form.tempoFollowUpValor) || 2,
           followUpUnit: form.tempoFollowUpUnidade || 'minutes',
           enviarLembrete: form.enviarLembrete,
+          enviarCheckIn: form.enviarCheckIn,
           enviarFollowUp: form.enviarFollowUp
         }
       };
@@ -826,7 +835,48 @@ export default function NovoAgendamentoWizard({
               )}
             </div>
 
-            {/* 3. Follow-up Pós-Tattoo */}
+            {/* 3. Check-in de Conclusão (Miguel ↔ Tatuador) */}
+            <div className="space-y-1.5 border-t border-white/5 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-primary-fixed w-3.5 h-3.5 rounded"
+                    checked={form.enviarCheckIn}
+                    onChange={e => handleChange('enviarCheckIn', e.target.checked)}
+                  />
+                  <span className="text-emerald-400 font-bold">3. Check-in de Conclusão (Miguel ↔ Tatuador)</span>
+                </label>
+                <span className="text-[11px] text-zinc-400">Tempo:</span>
+              </div>
+              {form.enviarCheckIn && (
+                <div className="space-y-1.5 pl-5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-full bg-zinc-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary-fixed"
+                      value={form.tempoCheckInValor}
+                      onChange={e => handleChange('tempoCheckInValor', e.target.value)}
+                    />
+                    <select
+                      className="w-full bg-zinc-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-primary-fixed"
+                      value={form.tempoCheckInUnidade}
+                      onChange={e => handleChange('tempoCheckInUnidade', e.target.value)}
+                    >
+                      <option value="minutes">Minutos após</option>
+                      <option value="hours">Horas após</option>
+                      <option value="days">Dias após</option>
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-zinc-500">
+                    O Miguel chamará você no zap para confirmar se o cliente compareceu antes de liberar os cuidados pós-venda.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Follow-up Pós-Tattoo (Cicatrização) */}
             <div className="space-y-1.5 border-t border-white/5 pt-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5 cursor-pointer">
@@ -836,9 +886,9 @@ export default function NovoAgendamentoWizard({
                     checked={form.enviarFollowUp}
                     onChange={e => handleChange('enviarFollowUp', e.target.checked)}
                   />
-                  <span>3. Follow-up (Pós-Venda / Cicatrização)</span>
+                  <span>4. Follow-up Cicatrização (Cliente)</span>
                 </label>
-                <span className="text-[11px] text-zinc-400">Após a tattoo:</span>
+                <span className="text-[11px] text-zinc-400">Após sessão:</span>
               </div>
               {form.enviarFollowUp && (
                 <div className="grid grid-cols-2 gap-2 pl-5">

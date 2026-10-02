@@ -33,8 +33,8 @@ const STAGES: { id: LeadStage; title: string; color: string; badge: string; icon
   { id: 'novo',        title: 'Novo Contato',          color: 'border-blue-500/40 bg-blue-500/5',     badge: 'bg-blue-500/20 text-blue-300',     icon: UserPlus },
   { id: 'qualificacao',title: 'Qualificação (SPIN)',    color: 'border-amber-500/40 bg-amber-500/5',   badge: 'bg-amber-500/20 text-amber-300',   icon: Sparkles },
   { id: 'negociacao',  title: '💬 Negociação',          color: 'border-purple-500/40 bg-purple-500/5', badge: 'bg-purple-500/20 text-purple-300', icon: MessageCircle },
-  { id: 'agendado',    title: '📅 Sessão Agendada',     color: 'border-emerald-500/40 bg-emerald-500/5',badge: 'bg-emerald-500/20 text-emerald-300', icon: Calendar },
-  { id: 'concluido',   title: '✅ Trabalho Realizado',  color: 'border-teal-500/40 bg-teal-500/5',     badge: 'bg-teal-500/20 text-teal-300',     icon: CheckCircle2 },
+  { id: 'agendado',    title: '📅 Sessão Agendada',     color: 'border-sky-500/40 bg-sky-500/5',       badge: 'bg-sky-500/20 text-sky-300',       icon: Calendar },
+  { id: 'concluido',   title: '✅ Trabalho Realizado',  color: 'border-emerald-500/40 bg-emerald-500/5', badge: 'bg-emerald-500/20 text-emerald-300', icon: CheckCircle2 },
   { id: 'pos_venda',   title: '✨ Pós-Venda (Cuidado)', color: 'border-pink-500/40 bg-pink-500/5',     badge: 'bg-pink-500/20 text-pink-300',     icon: HeartHandshake },
   { id: 'followup',    title: '🔕 Follow-up (Resgate)', color: 'border-orange-500/40 bg-orange-500/5', badge: 'bg-orange-500/20 text-orange-300', icon: BellRing }
 ];

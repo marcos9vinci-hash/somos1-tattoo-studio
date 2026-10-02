@@ -139,6 +139,11 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
           evolutionInstance: 'wats',
           reminderValue: 24,
           reminderUnit: 'hours',
+          sessionCheckInEnabled: true,
+          sessionCheckInValue: 30,
+          sessionCheckInUnit: 'minutes',
+          dailyReportEnabled: true,
+          dailyReportTime: '20:00',
           followUpValue: 7,
           followUpUnit: 'days',
           enabled: false,
@@ -187,6 +192,11 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
     evolutionInstance: 'wats',
     reminderValue: 24,
     reminderUnit: 'hours',
+    sessionCheckInEnabled: true,
+    sessionCheckInValue: 30,
+    sessionCheckInUnit: 'minutes',
+    dailyReportEnabled: true,
+    dailyReportTime: '20:00',
     followUpValue: 7,
     followUpUnit: 'days',
     enabled: false,
@@ -507,7 +517,76 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 3. Follow-up Pós-Tatuagem */}
+          {/* 3. Check-in de Conclusão da Sessão (Presença do Cliente com Tatuador / Miguel) */}
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-headline font-bold text-foreground">
+                    3. Check-in de Conclusão (Miguel ↔ Tatuador)
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    Confirmação de presença antes do pós-venda
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateAutomation('sessionCheckInEnabled', !(auto.sessionCheckInEnabled ?? true))}
+                className={`px-3 py-1 rounded-full text-[10px] font-headline font-black uppercase tracking-wider transition-all ${
+                  (auto.sessionCheckInEnabled ?? true)
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {(auto.sessionCheckInEnabled ?? true) ? 'ATIVADO' : 'DESLIGADO'}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              O Miguel envia uma mensagem no WhatsApp do Tatuador perguntando se o cliente compareceu. Somente após seu "Sim", a tattoo fica Verde (Concluída) e o pós-venda é liberado.
+            </p>
+            <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground shrink-0">Chamar tatuador após o horário:</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => updateAutomation('sessionCheckInValue', Math.max(1, (auto.sessionCheckInValue || 30) - 5))}
+                  className="w-7 h-7 rounded-lg border border-border bg-muted/40 hover:bg-muted flex items-center justify-center text-xs font-bold"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={auto.sessionCheckInValue ?? 30}
+                  onChange={(e) => updateAutomation('sessionCheckInValue', Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-12 h-7 text-center rounded-lg border border-border bg-card text-xs font-bold"
+                />
+                <button
+                  type="button"
+                  onClick={() => updateAutomation('sessionCheckInValue', (auto.sessionCheckInValue || 30) + 5)}
+                  className="w-7 h-7 rounded-lg border border-border bg-muted/40 hover:bg-muted flex items-center justify-center text-xs font-bold"
+                >
+                  +
+                </button>
+                <select
+                  value={auto.sessionCheckInUnit || 'minutes'}
+                  onChange={(e) => updateAutomation('sessionCheckInUnit', e.target.value)}
+                  className="h-7 text-xs font-bold rounded-lg border border-border bg-card px-2"
+                >
+                  <option value="minutes">Minutos</option>
+                  <option value="hours">Horas</option>
+                  <option value="days">Dias</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Follow-up Cicatrização */}
           <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5">
@@ -516,10 +595,10 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-headline font-bold text-foreground">
-                    3. Follow-up Cicatrização
+                    4. Follow-up Cicatrização (Cliente)
                   </h4>
                   <p className="text-[11px] text-muted-foreground">
-                    Acompanhamento pós-sessão
+                    Acompanhamento pós-sessão confirmada
                   </p>
                 </div>
               </div>
@@ -536,7 +615,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
               </button>
             </div>
             <p className="text-xs text-muted-foreground mb-4">
-              Dispara dias após a sessão para saber como está a cicatrização e reforçar o cuidado com pomada.
+              Dispara para o cliente após a sessão ter sido confirmada para saber como está a cicatrização e reforçar os cuidados com pomada.
             </p>
             <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-2">
               <span className="text-[11px] text-muted-foreground shrink-0">Enviar após a sessão:</span>
@@ -576,7 +655,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 4. Retoque & Avaliação Final */}
+          {/* 5. Retoque & Avaliação Final */}
           <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5">
@@ -585,7 +664,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-headline font-bold text-foreground">
-                    4. Retoque & Avaliação
+                    5. Retoque & Avaliação
                   </h4>
                   <p className="text-[11px] text-muted-foreground">
                     Lembrete da janela de retoque
@@ -637,7 +716,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 5. Reativação de Clientes Ausentes */}
+          {/* 6. Reativação de Clientes Ausentes */}
           <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5">
@@ -646,7 +725,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-headline font-bold text-foreground">
-                    5. Reativação de Clientes
+                    6. Reativação de Clientes
                   </h4>
                   <p className="text-[11px] text-muted-foreground">
                     Resgatar clientes sem nova sessão
@@ -698,7 +777,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 6. Feliz Aniversário */}
+          {/* 7. Feliz Aniversário */}
           <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5">
@@ -707,7 +786,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-headline font-bold text-foreground">
-                    6. Mensagem de Aniversário
+                    7. Mensagem de Aniversário
                   </h4>
                   <p className="text-[11px] text-muted-foreground">
                     Parabéns e cupom comemorativo
@@ -743,7 +822,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 7. Lista de Espera / Encaixe */}
+          {/* 8. Lista de Espera / Encaixe */}
           <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between md:col-span-2">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5">
@@ -752,7 +831,7 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-headline font-bold text-foreground">
-                    7. Alerta de Vagas na Lista de Espera
+                    8. Alerta de Vagas na Lista de Espera
                   </h4>
                   <p className="text-[11px] text-muted-foreground">
                     Notificação rápida ao surgir desistência ou horário vago
@@ -777,6 +856,62 @@ export const WhatsAppAutomationModule: React.FC<Props> = ({
             <div className="pt-3 border-t border-border/50 text-[11px] text-muted-foreground flex items-center justify-between">
               <span>Critério de envio:</span>
               <span className="font-bold text-foreground">Ordem de inscrição na lista</span>
+            </div>
+          </div>
+        </div>
+
+        {/* MÓDULO EXECUTIVO: Relatório Diário de Fechamento Operacional para o Tatuador */}
+        <div className="bg-gradient-to-br from-card to-amber-500/5 border border-amber-500/30 rounded-2xl p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-headline font-bold text-foreground flex items-center gap-2">
+                  Relatório Diário de Fechamento Operacional (Miguel no seu WhatsApp)
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    EXCLUSIVO TATUADOR
+                  </span>
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Consolidação automática de atendimentos realizados, faturamento, faltas e agenda do dia seguinte.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => updateAutomation('dailyReportEnabled', !(auto.dailyReportEnabled ?? true))}
+              className={`px-4 py-2 rounded-xl text-xs font-headline font-black uppercase tracking-wider transition-all shrink-0 ${
+                (auto.dailyReportEnabled ?? true)
+                  ? 'bg-amber-500 text-black shadow-sm font-black'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {(auto.dailyReportEnabled ?? true) ? 'RELATÓRIO ATIVADO' : 'DESLIGADO'}
+            </button>
+          </div>
+
+          <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-foreground">
+                ⏰ Horário Manual do Envio do Relatório Diário:
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Escolha o horário em que o Miguel deve enviar o relatório consolidado para o seu WhatsApp.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={auto.dailyReportTime || '20:00'}
+                onClick={(e) => (e.target as any).showPicker?.()}
+                onChange={(e) => updateAutomation('dailyReportTime', e.target.value)}
+                className="h-9 px-3 text-sm font-mono font-bold rounded-xl border border-amber-500/30 bg-card text-foreground cursor-pointer focus:outline-none focus:border-amber-500"
+              />
+              <span className="text-xs font-bold text-muted-foreground">horas</span>
             </div>
           </div>
         </div>

@@ -538,12 +538,13 @@ export default function Admin() {
 
   const getStatusColor = (s: BookingStatus) => {
     switch (s) {
-      case BookingStatus.PENDING_APPROVAL: return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
-      case BookingStatus.APPROVED: return 'bg-blue-500/20 text-blue-400 border-blue-500/20';
-      case BookingStatus.REJECTED: return 'bg-red-500/20 text-red-500 border-red-500/20';
-      case BookingStatus.DEPOSIT_PAID: return 'bg-green-500/20 text-green-400 border-green-500/20';
-      case BookingStatus.COMPLETED: return 'bg-primary-fixed/20 text-primary-fixed border-primary-fixed/20';
-      case BookingStatus.NO_SHOW: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/20';
+      case BookingStatus.COMPLETED: return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      case BookingStatus.DEPOSIT_PAID: return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      case BookingStatus.APPROVED: return 'bg-sky-500/20 text-sky-400 border-sky-500/30';
+      case BookingStatus.RESCHEDULED: return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case BookingStatus.PENDING_APPROVAL: return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case BookingStatus.NO_SHOW: return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+      case BookingStatus.REJECTED: return 'bg-zinc-700/30 text-zinc-400 border-zinc-700/40';
       default: return 'bg-zinc-800 text-zinc-500';
     }
   };

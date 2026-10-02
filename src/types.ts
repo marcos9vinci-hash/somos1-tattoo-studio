@@ -117,6 +117,12 @@ export interface StudioSettings {
     enabled: boolean;
     confirmationEnabled?: boolean;
     reminderEnabled?: boolean;
+    sessionCheckInEnabled?: boolean;
+    sessionCheckInValue?: number;
+    sessionCheckInUnit?: 'minutes' | 'hours' | 'days';
+    dailyReportEnabled?: boolean;
+    dailyReportTime?: string;
+    dailyReportPhone?: string;
     followUpEnabled?: boolean;
     birthdayEnabled?: boolean;
     birthdayTime?: string;
