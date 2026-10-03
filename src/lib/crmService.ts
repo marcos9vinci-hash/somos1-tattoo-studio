@@ -49,7 +49,8 @@ export const crmService = {
         leadsManuais = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Lead));
       }
 
-      // 2. Agendamentos reais da Agenda → alimentam o funil automaticamente
+      // 2. Agendamentos reais da Agenda → alimentam o funil comercial apenas se forem ATIVOS / FUTUROS
+      // REGRA: Clientes de sessões passadas/concluídas pertencem exclusivamente à CARTEIRA DE CLIENTES (Esteira de Temperatura).
       const [bookingsSnap, usersSnap] = await Promise.all([
         getDocs(collection(db, BOOKINGS_COLLECTION)),
         getDocs(collection(db, USERS_COLLECTION))
@@ -61,51 +62,90 @@ export const crmService = {
         if (uData.phone) userPhoneMap.set(d.id, uData.phone);
       });
 
-      const leadsFromBookings: Lead[] = allBookings.map(b => {
-        let estagio: LeadStage = 'agendado';
-        if (b.status === BookingStatus.COMPLETED) {
-          estagio = 'concluido'; // → promovido para Carteira de Clientes
-        } else if (b.status === BookingStatus.APPROVED || b.status === BookingStatus.DEPOSIT_PAID) {
-          estagio = 'agendado';
-        } else if (b.status === BookingStatus.PENDING_APPROVAL) {
-          estagio = 'negociacao';
-        } else if (b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW) {
-          estagio = 'followup'; // Desmarcou ou faltou → entra no follow-up de resgate
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Filtra APENAS agendamentos futuros ou de hoje (não concluídos no passado)
+      const activeBookings = allBookings.filter(b => {
+        if (b.status === BookingStatus.COMPLETED) return false;
+        const bDate = (b.date || '').split('T')[0];
+        // Se tem data informada, deve ser hoje ou no futuro
+        if (bDate && bDate < todayStr) return false;
+        return true;
+      });
+
+      // Mapeia bookings ativos por telefone normalizado
+      const activeBookingsByPhone = new Map<string, Booking>();
+      activeBookings.forEach(b => {
+        const rawPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
+        const cleanPhone = rawPhone.replace(/\D/g, '');
+        if (cleanPhone) activeBookingsByPhone.set(cleanPhone, b);
+      });
+
+      // Atualiza leads manuais existentes: se houver agendamento ativo futuro, promove para 'agendado'
+      const updatedLeadsManuais = leadsManuais
+        .filter(l => l.estagio !== 'concluido') // Tattoos concluídas vão para Carteira de Temperatura
+        .map(lead => {
+          const cleanPhone = (lead.telefone || '').replace(/\D/g, '');
+          const matchingBooking = cleanPhone ? activeBookingsByPhone.get(cleanPhone) : null;
+          if (matchingBooking) {
+            const dataFmt = matchingBooking.date ? matchingBooking.date.split('-').reverse().join('/') : '';
+            return {
+              ...lead,
+              estagio: 'agendado' as LeadStage,
+              temperatura: 'quente' as const,
+              ideiaProjeto: lead.ideiaProjeto || matchingBooking.descricao_servico || `Tattoo ${matchingBooking.size} em ${dataFmt} às ${matchingBooking.time}`,
+              spin: {
+                ticketEstimado: matchingBooking.priceEstimated || matchingBooking.valor_estimado || lead.spin?.ticketEstimado || 0,
+                urgencia: 'alta' as const
+              }
+            };
+          }
+          return lead;
+        });
+
+      // Para os bookings ativos que NÃO possuem lead manual ainda, cria o lead 'agendado'
+      const existingPhones = new Set(updatedLeadsManuais.map(l => (l.telefone || '').replace(/\D/g, '')).filter(Boolean));
+      const leadsFromActiveBookings: Lead[] = [];
+
+      activeBookings.forEach(b => {
+        const rawPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
+        const cleanPhone = rawPhone.replace(/\D/g, '');
+        if (!cleanPhone || !existingPhones.has(cleanPhone)) {
+          let estagio: LeadStage = 'agendado';
+          if (b.status === BookingStatus.PENDING_APPROVAL) {
+            estagio = 'negociacao';
+          } else if (b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW) {
+            estagio = 'followup';
+          }
+
+          const dataFmt = b.date ? b.date.split('-').reverse().join('/') : '';
+
+          leadsFromActiveBookings.push({
+            id: `booking_${b.id}`,
+            nome: b.userName || 'Cliente da Agenda',
+            telefone: rawPhone,
+            origem: 'site',
+            estagio,
+            temperatura: 'quente',
+            ideiaProjeto: b.descricao_servico || `Tattoo tamanho ${b.size}${dataFmt ? ` (${dataFmt} às ${b.time || ''})` : ''}`,
+            estiloTatuagem: b.estilo || '',
+            tamanhoAproximado: b.size,
+            localCorpo: b.regiao_corpo || '',
+            fotosReferencia: b.fotos_referencia || [],
+            spin: {
+              ticketEstimado: b.priceEstimated || b.valor_estimado || 0,
+              urgencia: 'alta'
+            },
+            responsavelAtendimento: 'Agenda Oficial',
+            createdAt: b.createdAt || new Date().toISOString(),
+            updatedAt: b.createdAt || new Date().toISOString()
+          } as Lead);
+
+          if (cleanPhone) existingPhones.add(cleanPhone);
         }
-
-        const resolvedPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
-
-        return {
-          id: `booking_${b.id}`,
-          nome: b.userName || 'Cliente da Agenda',
-          telefone: resolvedPhone,
-          origem: 'site',
-          estagio,
-          temperatura: b.status === BookingStatus.COMPLETED ? 'morno' : 'quente',
-          ideiaProjeto: b.descricao_servico || `Tattoo tamanho ${b.size}`,
-          estiloTatuagem: b.estilo || '',
-          tamanhoAproximado: b.size,
-          localCorpo: b.regiao_corpo || '',
-          fotosReferencia: b.fotos_referencia || [],
-          spin: {
-            ticketEstimado: b.priceEstimated || b.valor_estimado || 0,
-            urgencia: 'alta'
-          },
-          responsavelAtendimento: 'Agenda Oficial',
-          createdAt: b.createdAt || new Date().toISOString(),
-          updatedAt: b.createdAt || new Date().toISOString()
-        } as Lead;
       });
 
-      // Mescla, evitando duplicidade pelo telefone
-      const phonesDosManuais = leadsManuais.map(l => (l.telefone || '').replace(/\D/g, '')).filter(Boolean);
-      const bookingsNaoDuplicados = leadsFromBookings.filter(lb => {
-        const clean = (lb.telefone || '').replace(/\D/g, '');
-        if (!clean) return true;
-        return !phonesDosManuais.some(p => p === clean || p.endsWith(clean) || clean.endsWith(p));
-      });
-
-      return [...leadsManuais, ...bookingsNaoDuplicados];
+      return [...updatedLeadsManuais, ...leadsFromActiveBookings];
     } catch (error) {
       console.warn('Fallback leads sem índice:', error);
       return [];
@@ -229,12 +269,14 @@ export const crmService = {
       });
 
       const concluidas = userBookings.filter(b => 
-        b.status === BookingStatus.COMPLETED
+        b.status === BookingStatus.COMPLETED ||
+        (b.status === BookingStatus.APPROVED && b.date && b.date < todayStr)
       );
       const agendadas = userBookings.filter(b =>
-        b.status === BookingStatus.APPROVED ||
+        (b.status === BookingStatus.APPROVED ||
         b.status === BookingStatus.DEPOSIT_PAID ||
-        b.status === BookingStatus.PENDING_APPROVAL
+        b.status === BookingStatus.PENDING_APPROVAL) &&
+        (!b.date || b.date >= todayStr)
       );
 
       const totalGasto = concluidas.reduce((acc, b) => acc + (b.priceEstimated || b.valor_estimado || 0), 0);
@@ -490,7 +532,7 @@ export const crmService = {
 
     if ((remetente === 'tatuador' || remetente === 'ia') && telefone) {
       try {
-        whatsappService.sendTextMessage(telefone, mensagem).catch(err => {
+        whatsappService.sendMessage(telefone, mensagem, null, 'followup').catch(err => {
           console.warn('Aviso no disparo via WhatsApp Evolution:', err);
         });
       } catch (err) {
