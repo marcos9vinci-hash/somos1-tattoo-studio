@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lead, LeadStage, ColunaAIAgentConfig } from '../../types/crm';
 import { crmService } from '../../lib/crmService';
+import { cn } from '../../lib/utils';
 import { 
   UserPlus, 
   MessageCircle, 
