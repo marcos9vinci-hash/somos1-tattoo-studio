@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp, doc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { LeadStage } from '../types/crm';
 
@@ -24,6 +24,7 @@ export interface ScanBatchReport {
   novosLeadsCapturados: number;
   leadsAtualizados: number;
   ignorados: number;
+  contatosIgnorados: number;
   erros: { remoteJid: string; erro: string }[];
 }
 
@@ -141,6 +142,7 @@ export async function executeBatchScan50Chats(
     novosLeadsCapturados: 0,
     leadsAtualizados: 0,
     ignorados: 0,
+    contatosIgnorados: 0,
     erros: []
   };
 
@@ -149,6 +151,18 @@ export async function executeBatchScan50Chats(
   }
 
   const cleanBaseUrl = evolutionBaseUrl.replace(/\/$/, '');
+  
+  // a) Carrega contatos ignorados
+  const ignoradosSet = new Set<string>();
+  try {
+    const ignoradosSnap = await getDocs(collection(db, 'contatos_ignorados'));
+    ignoradosSnap.forEach(d => {
+      ignoradosSet.add(d.id);
+    });
+  } catch (err: any) {
+    console.warn('Erro ao carregar contatos ignorados:', err);
+  }
+
   const findChatsUrl = `${cleanBaseUrl}/chat/findChats/${instance}`;
 
   // 1. Busca os últimos 50 chats
@@ -193,8 +207,13 @@ export async function executeBatchScan50Chats(
       report.totalChatsLidos++;
       const remoteJid = chat.id || chat.remoteJid || '';
 
-      // Filtra grupos (@g.us) e status broadcast
-      if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
+      // b) Filtra grupos e broadcasts
+      if (!remoteJid || 
+          remoteJid.includes('@g.us') || 
+          remoteJid.includes('@broadcast') || 
+          remoteJid.includes('@newsletter') || 
+          remoteJid.includes('@lid') || 
+          remoteJid.includes('status@')) {
         report.ignorados++;
         return;
       }
@@ -205,18 +224,61 @@ export async function executeBatchScan50Chats(
         return;
       }
 
-      try {
-        // Extrai texto da última mensagem e nome
-        const pushName = chat.pushName || chat.name || chat.verifiedName || 'Cliente WhatsApp';
-        const lastMsgObj = chat.lastMessage?.message;
-        const lastText = 
-          lastMsgObj?.conversation ||
-          lastMsgObj?.extendedTextMessage?.text ||
-          lastMsgObj?.imageMessage?.caption ||
-          (lastMsgObj?.imageMessage ? '[Foto enviada]' : '') ||
-          '';
+      // a) Verifica blacklist
+      if (ignoradosSet.has(cleanPhone)) {
+        report.contatosIgnorados++;
+        return;
+      }
 
-        const classification = LeadClassifier.classify(lastText);
+      try {
+        const pushName = chat.pushName || chat.name || chat.verifiedName || 'Cliente WhatsApp';
+
+        // c) Fetch last 15 messages
+        const findMsgsUrl = `${cleanBaseUrl}/chat/findMessages/${instance}`;
+        const msgRes = await fetch(findMsgsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey
+          },
+          body: JSON.stringify({ where: { key: { remoteJid: remoteJid } }, limit: 15 })
+        });
+
+        if (!msgRes.ok) {
+          throw new Error(`Erro ao buscar mensagens: ${msgRes.status}`);
+        }
+
+        const msgsData = await msgRes.json();
+        const messages = Array.isArray(msgsData?.messages) ? msgsData.messages : 
+                         (Array.isArray(msgsData) ? msgsData : []);
+                         
+        // d) Only client messages
+        const clientMessages = messages
+          .map((m: any) => ({
+             id: m.key?.id,
+             fromMe: m.key?.fromMe,
+             text: m.message?.conversation || m.message?.extendedTextMessage?.text || m.message?.imageMessage?.caption || '',
+             type: m.messageType || (m.message?.imageMessage ? 'image' : 'text'),
+             timestamp: m.messageTimestamp
+          }))
+          .filter((m: any) => m.fromMe === false);
+
+        // e) 30-day recency filter
+        const thirtyDaysAgoSeconds = (Date.now() / 1000) - (30 * 24 * 60 * 60);
+        const hasRecent = clientMessages.some((m: any) => (m.timestamp || 0) >= thirtyDaysAgoSeconds);
+
+        if (!hasRecent) {
+          report.ignorados++;
+          return;
+        }
+
+        // f) Use ConversationSanitizer.buildContext() with only client messages
+        const context = ConversationSanitizer.buildContext(cleanPhone, pushName, clientMessages);
+
+        // g) Pass lastCustomerMessage to classify
+        const classification = LeadClassifier.classify(context.lastCustomerMessage);
+        
+        const lastText = context.lastCustomerMessage || classification.intencaoResumo;
 
         // 3. Verificação Canônica no Firestore (Deduplicação Atômica)
         const q = query(collection(db, 'leads'), where('telefone', '==', cleanPhone));
@@ -277,4 +339,16 @@ export async function executeBatchScan50Chats(
   }
 
   return report;
+}
+
+export async function limparLeadsFalsos(): Promise<number> {
+  const q = query(
+    collection(db, 'leads'),
+    where('origem', '==', 'whatsapp'),
+    where('criadoPor', '==', 'agente_ia')
+  );
+  const snap = await getDocs(q);
+  const deletePromises = snap.docs.map(d => deleteDoc(doc(db, 'leads', d.id)));
+  await Promise.all(deletePromises);
+  return snap.docs.length;
 }

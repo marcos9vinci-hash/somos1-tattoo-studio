@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { crmService } from '../lib/crmService';
 import { whatsappService } from '../lib/whatsappService';
-import { executeBatchScan50Chats } from '../lib/whatsappBatchScanner';
+import { executeBatchScan50Chats, limparLeadsFalsos } from '../lib/whatsappBatchScanner';
 import { Lead, ClienteCRM, LeadStage, CRMDashboardMetrics, EstrategiaCampanha } from '../types/crm';
 import { LeadKanbanBoard } from '../components/crm/LeadKanbanBoard';
 import { CarteiraClientesKanban } from '../components/crm/CarteiraClientesKanban';
@@ -29,7 +29,9 @@ import {
   Snowflake,
   AlertTriangle,
   Zap,
-  Play
+  Play,
+  Ban,
+  Trash2
 } from 'lucide-react';
 
 type ActiveTab = 'carteira' | 'funil' | 'estrategias';
@@ -49,8 +51,15 @@ export const CRMDashboardPage: React.FC = () => {
   const [selectedCliente, setSelectedCliente] = useState<ClienteCRM | null>(null);
   const [isClienteModalOpen, setIsClienteModalOpen] = useState(false);
 
-  // Painéis laterais e Simulador
-  const [clienteParaChat, setClienteParaChat] = useState<{ id: string; nome: string; telefone: string } | null>(null);
+  const [clienteParaChat, setClienteParaChat] = useState<{
+    id: string;
+    nome: string;
+    telefone: string;
+    avatar?: string;
+    estagio?: LeadStage;
+    ideiaProjeto?: string;
+    temperatura?: string;
+  } | null>(null);
   const [clienteParaFicha, setClienteParaFicha] = useState<ClienteCRM | null>(null);
   const [isMassMessageOpen, setIsMassMessageOpen] = useState(false);
   const [isSimuladorOpen, setIsSimuladorOpen] = useState(false);
@@ -111,6 +120,27 @@ export const CRMDashboardPage: React.FC = () => {
       showToast('error', `Falha ao escanear conversas: ${err?.message || 'Erro de conexão'}`);
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  const handleIgnorarContato = async (lead: Lead) => {
+    try {
+      await crmService.ignorarContato(lead.telefone, `Removido manualmente: ${lead.nome}`);
+      showToast('success', `${lead.nome} ignorado e removido do CRM.`);
+      await loadData();
+    } catch (err: any) {
+      showToast('error', `Falha ao ignorar contato: ${err?.message}`);
+    }
+  };
+
+  const handleLimparLeadsFalsos = async () => {
+    if (!window.confirm('Tem certeza? Isso vai DELETAR todos os leads importados automaticamente pelo scanner (origem: whatsapp + criadoPor: agente_ia). Leads manuais NÃO serão afetados.')) return;
+    try {
+      const count = await limparLeadsFalsos();
+      showToast('success', `${count} leads falsos removidos com sucesso.`);
+      await loadData();
+    } catch (err: any) {
+      showToast('error', `Falha ao limpar leads: ${err?.message}`);
     }
   };
 
@@ -272,6 +302,15 @@ export const CRMDashboardPage: React.FC = () => {
           >
             <RefreshCw className={`w-3.5 h-3.5 text-blue-400 ${isScanning ? 'animate-spin' : ''}`} />
             {isScanning ? 'Lendo 50 Chats...' : 'Scan 50 Conversas'}
+          </button>
+
+          <button
+            onClick={handleLimparLeadsFalsos}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/40 rounded-xl text-xs font-headline font-bold transition-all active:scale-95"
+            title="Remove todos os leads criados automaticamente pelo scanner"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            Limpar Leads IA
           </button>
 
           <button
@@ -516,6 +555,7 @@ export const CRMDashboardPage: React.FC = () => {
             onStageChange={handleLeadStageChange}
             onSelectLead={(l) => { setSelectedLead(l); setIsLeadModalOpen(true); }}
             onNewLeadClick={() => { setSelectedLead(null); setIsLeadModalOpen(true); }}
+            onIgnorarContato={handleIgnorarContato}
             onAbrirChat={(l) => setClienteParaChat({ 
               id: l.id, 
               nome: l.nome, 

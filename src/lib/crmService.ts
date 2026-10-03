@@ -614,14 +614,15 @@ export const crmService = {
     const leadsConcluidos = leads.filter(l => l.estagio === 'concluido' || l.estagio === 'pos_venda').length;
 
     const totalConvertidos = leadsAgendados + leadsConcluidos;
-    const taxaConversao = leads.length > 0 ? (totalConvertidos / leads.length) * 100 : 0;
+    const leadsAtivos = leads.filter(l => l.estagio !== 'perdido').length;
+    const taxaConversao = leadsAtivos > 0 ? (totalConvertidos / leadsAtivos) * 100 : 0;
     const taxaQualificacao = leads.length > 0 ? ((leadsQualificados + leadsNegociacao + totalConvertidos) / leads.length) * 100 : 0;
     const taxaFechamento = (leadsNegociacao + totalConvertidos) > 0 ? (totalConvertidos / (leadsNegociacao + totalConvertidos)) * 100 : 0;
 
     // Pipeline estimado (valor potencial em negociação e agendado)
     const pipelineEstimado = leads
       .filter(l => l.estagio === 'negociacao' || l.estagio === 'pronto' || l.estagio === 'agendado')
-      .reduce((acc, l) => acc + (l.spin?.ticketEstimado || l.orcamentoMaximo || 450), 0);
+      .reduce((acc, l) => acc + (l.spin?.ticketEstimado || l.orcamentoMaximo || 0), 0);
 
     const temperaturaCounts = {
       quente: clientes.filter(c => c.bucketTemperatura === 'quente').length,
@@ -788,5 +789,35 @@ export const crmService = {
     } catch (err) {
       console.warn('syncBookingToCRM [lead]:', err);
     }
+  },
+
+  // ==========================================
+  // CONTATOS IGNORADOS (BLACKLIST)
+  // ==========================================
+  async ignorarContato(telefone: string, motivo: string = 'Marcado manualmente'): Promise<void> {
+    const normalizedPhone = telefone.replace(/\D/g, '');
+    if (!normalizedPhone) return;
+    // Use phone as document ID for idempotency
+    await setDoc(doc(db, 'contatos_ignorados', normalizedPhone), {
+      telefone: normalizedPhone,
+      motivo,
+      dataIgnorado: serverTimestamp()
+    });
+    // Also delete any existing lead with this phone
+    const q = query(collection(db, LEADS_COLLECTION), where('telefone', '==', normalizedPhone));
+    const snap = await getDocs(q);
+    const deletePromises = snap.docs.map(d => deleteDoc(doc(db, LEADS_COLLECTION, d.id)));
+    await Promise.all(deletePromises);
+  },
+
+  async removerContatoIgnorado(telefone: string): Promise<void> {
+    const normalizedPhone = telefone.replace(/\D/g, '');
+    if (!normalizedPhone) return;
+    await deleteDoc(doc(db, 'contatos_ignorados', normalizedPhone));
+  },
+
+  async getContatosIgnorados(): Promise<{ telefone: string; motivo: string; dataIgnorado: any }[]> {
+    const snap = await getDocs(collection(db, 'contatos_ignorados'));
+    return snap.docs.map(d => ({ telefone: d.id, ...d.data() } as any));
   }
 };

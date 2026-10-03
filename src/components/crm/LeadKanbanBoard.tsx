@@ -17,7 +17,8 @@ import {
   MessageSquare,
   ChevronRight,
   Bot,
-  Sliders
+  Sliders,
+  Ban
 } from 'lucide-react';
 import { STAGE_AGENTS_NAIA } from '../../lib/naiaAgentsConfig';
 import { ColunaAgentConfigModal } from './ColunaAgentConfigModal';
@@ -28,6 +29,7 @@ interface LeadKanbanBoardProps {
   onSelectLead: (lead: Lead) => void;
   onNewLeadClick: () => void;
   onAbrirChat?: (lead: Lead) => void;
+  onIgnorarContato?: (lead: Lead) => void;
 }
 
 const STAGES: { id: LeadStage; title: string; color: string; badge: string; icon: any }[] = [
@@ -45,7 +47,8 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
   onStageChange,
   onSelectLead,
   onNewLeadClick,
-  onAbrirChat
+  onAbrirChat,
+  onIgnorarContato
 }) => {
   const [agentsConfig, setAgentsConfig] = useState<Record<LeadStage, ColunaAIAgentConfig>>(STAGE_AGENTS_NAIA);
   const [selectedAgentForModal, setSelectedAgentForModal] = useState<ColunaAIAgentConfig | null>(null);
@@ -277,6 +280,23 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                             title="Sem telefone: clique para cadastrar WhatsApp"
                           >
                             <Send className="w-3 h-3 opacity-40" />
+                          </button>
+                        )}
+
+                        {/* Botão Ignorar Contato */}
+                        {onIgnorarContato && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Ignorar ${lead.nome}? O contato será removido do CRM e bloqueado de futuras importações.`)) {
+                                onIgnorarContato(lead);
+                              }
+                            }}
+                            className="p-1 bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/30 rounded-lg transition-all"
+                            title="Não é Lead / Ignorar Contato"
+                          >
+                            <Ban className="w-3 h-3" />
                           </button>
                         )}
 
