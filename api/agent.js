@@ -352,12 +352,17 @@ export default async function handler(req, res) {
         return res.status(200).json({ status: 'ignored_from_me' });
       }
 
-      const remoteJid = key.remoteJid || '';
-      if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
+      let remoteJid = key.remoteJid || '';
+      // Suporte para contas WhatsApp com privacy LID (e.g., iPhone / Business)
+      if (remoteJid.includes('@lid') && key.remoteJidAlt && key.remoteJidAlt.includes('@s.whatsapp.net')) {
+        remoteJid = key.remoteJidAlt;
+      }
+
+      if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast') || remoteJid.includes('@newsletter')) {
         return res.status(200).json({ status: 'ignored_group' });
       }
 
-      const senderPhone = remoteJid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+      const senderPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/\D/g, '');
       const senderName = data.pushName || 'Cliente';
 
       let userText = '';
@@ -426,7 +431,7 @@ export default async function handler(req, res) {
           console.warn('Erro ao consultar lead por telefone:', qErr);
         }
 
-        // 3. Se não existe lead, cadastra na coluna 'novo'
+        // 3. Se não existe lead, cadastra na coluna 'novo'. Se já existe, atualiza a última mensagem
         if (!existingLead) {
           try {
             const createLeadUrl = `${FIRESTORE_BASE}/leads?key=${FIREBASE_API_KEY}`;
@@ -449,6 +454,23 @@ export default async function handler(req, res) {
             });
           } catch (createErr) {
             console.warn('Erro ao criar novo lead:', createErr);
+          }
+        } else {
+          try {
+            const leadDocName = existingLead.name;
+            const updateLeadUrl = `https://firestore.googleapis.com/v1/${leadDocName}?updateMask.fieldPaths=ultimaMensagem&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`;
+            await fetch(updateLeadUrl, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fields: {
+                  ultimaMensagem: { stringValue: userText },
+                  updatedAt: { timestampValue: new Date().toISOString() }
+                }
+              })
+            });
+          } catch (uErr) {
+            console.warn('Erro ao atualizar ultimaMensagem do lead existente:', uErr);
           }
         }
 

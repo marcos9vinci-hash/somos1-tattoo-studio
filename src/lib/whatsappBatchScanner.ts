@@ -206,19 +206,26 @@ export async function executeBatchScan50Chats(
     await Promise.all(chunk.map(async (chat) => {
       report.totalChatsLidos++;
       const remoteJid = chat.id || chat.remoteJid || '';
+      let effectiveJid = remoteJid;
+      if (effectiveJid.includes('@lid')) {
+        const alt = chat.lastMessage?.key?.remoteJidAlt || chat.remoteJidAlt;
+        if (alt && alt.includes('@s.whatsapp.net')) {
+          effectiveJid = alt;
+        }
+      }
 
       // b) Filtra grupos e broadcasts
-      if (!remoteJid || 
-          remoteJid.includes('@g.us') || 
-          remoteJid.includes('@broadcast') || 
-          remoteJid.includes('@newsletter') || 
-          remoteJid.includes('@lid') || 
-          remoteJid.includes('status@')) {
+      if (!effectiveJid || 
+          effectiveJid.includes('@g.us') || 
+          effectiveJid.includes('@broadcast') || 
+          effectiveJid.includes('@newsletter') || 
+          effectiveJid.includes('@lid') || 
+          effectiveJid.includes('status@')) {
         report.ignorados++;
         return;
       }
 
-      const cleanPhone = ConversationSanitizer.normalizePhone(remoteJid);
+      const cleanPhone = ConversationSanitizer.normalizePhone(effectiveJid);
       if (!cleanPhone || cleanPhone.length < 10) {
         report.ignorados++;
         return;
