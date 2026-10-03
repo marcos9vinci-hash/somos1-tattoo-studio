@@ -1083,6 +1083,25 @@ export const crmService = {
     }
   },
 
+  async enviarAlertaPresencaWhatsApp(sessao: any): Promise<boolean> {
+    const adminPhone = '5511948116922';
+    const dataFmt = sessao.data ? sessao.data.split('-').reverse().join('/') : 'Hoje';
+    const msg = `🔔 *Confirmação de Presença — Somos 1 Tattoo*\n\nMarkinhos, o cliente *${sessao.nome}* compareceu à sessão das *${sessao.hora}* (${dataFmt})?\n\nResponda diretamente aqui com:\n✅ *Sim, compareceu*\n❌ *Não compareceu*\n\n(Ou responda com áudio ou texto natural que o robô já atualiza a agenda e o CRM no app! 👊 ⚔️🛡️)`;
+    
+    try {
+      const ok = await whatsappService.sendViaN8n({
+        to: adminPhone,
+        text: msg,
+        action: 'lembrete'
+      });
+      if (ok) return true;
+      return await whatsappService.sendDirectEvolution(adminPhone, msg);
+    } catch (e) {
+      console.warn('Erro ao enviar alerta WhatsApp de presença:', e);
+      return false;
+    }
+  },
+
   async concluirSessoesAntigasEmLote(diasAtras: number = 15): Promise<number> {
     const cutoff = new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const sessoes = await this.getSessoesParaConfirmar();

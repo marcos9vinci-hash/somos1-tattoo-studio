@@ -36,6 +36,7 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  Smartphone,
   X
 } from 'lucide-react';
 
@@ -142,9 +143,50 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
     }
   };
 
+  const [enviandoZapId, setEnviandoZapId] = useState<string | null>(null);
+
+  const handleEnviarZapAdmin = async (sessao: any) => {
+    setEnviandoZapId(sessao.id);
+    try {
+      const ok = await crmService.enviarAlertaPresencaWhatsApp(sessao);
+      if (ok) {
+        showToast('success', `📲 Pergunta enviada no seu WhatsApp para confirmar ${sessao.nome}!`);
+      } else {
+        showToast('info', `📲 Disparo enviado para o seu WhatsApp.`);
+      }
+    } catch (e: any) {
+      showToast('error', `Falha ao enviar WhatsApp: ${e?.message}`);
+    } finally {
+      setEnviandoZapId(null);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
+
+  // Notificação nativa no celular / navegador se suportado
+  useEffect(() => {
+    if (sessoesParaConfirmar.length > 0 && typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      } else if (Notification.permission === 'granted') {
+        const sessao = sessoesParaConfirmar[0];
+        try {
+          const n = new Notification('🔔 Confirmação de Presença Somos 1', {
+            body: `O cliente ${sessao.nome} compareceu à sessão das ${sessao.hora}? Toque para responder.`,
+            icon: '/favicon.ico',
+            tag: `presenca-${sessao.id}`
+          });
+          n.onclick = () => {
+            window.focus();
+          };
+        } catch (e) {
+          console.warn('Erro ao disparar notificação no navegador:', e);
+        }
+      }
+    }
+  }, [sessoesParaConfirmar.length]);
 
   const handleIgnorarContato = async (lead: Lead) => {
     try {
@@ -451,6 +493,22 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
                     >
                       <AlertCircle className="w-4 h-4 text-rose-400" />
                       ❌ Não Compareceu (Faltou)
+                    </button>
+                  </div>
+
+                  {/* Disparo Direto pro Celular / WhatsApp do Admin */}
+                  <div className="mt-2.5 flex items-center justify-between gap-2 bg-black/40 border border-emerald-500/20 rounded-xl p-2 px-3">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="text-[11px]">Quer responder pelo celular enquanto tatua?</span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={enviandoZapId === sessao.id}
+                      onClick={() => handleEnviarZapAdmin(sessao)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-headline font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+                    >
+                      {enviandoZapId === sessao.id ? 'Enviando...' : '📲 Notificar no meu Zap'}
                     </button>
                   </div>
 
