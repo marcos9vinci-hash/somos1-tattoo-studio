@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
@@ -251,6 +251,11 @@ export default function Admin() {
     } catch (err) { console.error('Erro settings:', err); }
   };
 
+  const bookingsRef = useRef<Booking[]>([]);
+  useEffect(() => {
+    bookingsRef.current = bookings;
+  }, [bookings]);
+
   useEffect(() => {
     fetchData();
     fetchSettings();
@@ -264,7 +269,7 @@ export default function Admin() {
       const detail = e.detail || {};
       if (detail.leadId) {
         const cleanBookingId = String(detail.leadId).replace('booking_', '');
-        const targetBooking = bookings.find(b => b.id === cleanBookingId || (detail.nome && b.userName === detail.nome));
+        const targetBooking = bookingsRef.current.find(b => b.id === cleanBookingId || (detail.nome && b.userName === detail.nome));
         if (targetBooking) {
           setSelectedBooking(targetBooking);
         }
@@ -276,7 +281,7 @@ export default function Admin() {
       clearInterval(interval);
       window.removeEventListener('somos1:navegar_agenda', handleNavegarAgenda);
     };
-  }, [isAdmin, settings?.automation?.enabled, bookings]);
+  }, [isAdmin, settings?.automation?.enabled]);
 
   const handleSendWhatsApp = (booking: Booking, type: 'confirmacao' | 'lembrete' | 'followup' = 'confirmacao') => {
     let phone = booking.userPhone || users.find(u => u.uid === booking.userId)?.phone;
