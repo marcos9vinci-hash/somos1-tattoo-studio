@@ -655,58 +655,84 @@ export const crmService = {
     const chatsData = await chatsRes.json();
     const allChats: any[] = Array.isArray(chatsData) ? chatsData : (chatsData.chats || chatsData.records || []);
 
-    let targetChat: any = null;
-    if (cleanPhone) {
-      const normClean = cleanPhone.replace(/^55/, '');
-      targetChat = allChats.find(c => {
-        const jid = c.remoteJid || c.id || '';
-        const alt = c.lastMessage?.key?.remoteJidAlt || '';
-        return jid.includes(cleanPhone) || jid.includes(normClean) || alt.includes(cleanPhone) || alt.includes(normClean);
-      });
-    }
+    const normClean = cleanPhone ? cleanPhone.replace(/^55/, '') : '';
+    const first = searchName ? searchName.split(' ')[0].toLowerCase() : '';
 
-    if (!targetChat && searchName) {
-      const first = searchName.split(' ')[0].toLowerCase();
-      targetChat = allChats.find(c => {
-        const pName = (c.pushName || c.name || '').toLowerCase();
-        return pName.includes(first) || first.includes(pName);
-      });
-    }
+    // Encontra TODAS as threads que pertencem a este contato (ex: número direto + JID @lid)
+    const matchingChats = allChats.filter(c => {
+      const jid = c.remoteJid || c.id || '';
+      const alt = c.lastMessage?.key?.remoteJidAlt || '';
+      const pName = (c.pushName || c.name || '').toLowerCase();
 
-    if (!targetChat) return [];
+      const phoneMatch = Boolean(
+        cleanPhone && (
+          jid.includes(cleanPhone) ||
+          jid.includes(normClean) ||
+          alt.includes(cleanPhone) ||
+          alt.includes(normClean)
+        )
+      );
 
-    const remoteJid = targetChat.remoteJid || targetChat.id;
-    if (!remoteJid) return [];
+      const nameMatch = Boolean(
+        first && first.length >= 3 && (pName.includes(first) || first.includes(pName))
+      );
 
-    const msgRes = await fetch(`https://${EVOLUTION_HOST}/chat/findMessages/${EVOLUTION_INSTANCE}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_APIKEY },
-      body: JSON.stringify({
-        where: { key: { remoteJid } },
-        limit: 30
-      })
+      return phoneMatch || nameMatch;
     });
-    if (!msgRes.ok) return [];
 
-    const msgData = await msgRes.json();
-    const records: any[] = msgData.messages?.records || [];
+    if (matchingChats.length === 0) return [];
 
-    return records.map(r => {
-      const fromMe = r.key?.fromMe;
+    // Coleta JIDs únicos
+    const jidsToFetch = Array.from(new Set(matchingChats.map(c => c.remoteJid || c.id).filter(Boolean)));
+
+    // Busca mensagens em paralelo para todos os JIDs vinculados
+    const messagePromises = jidsToFetch.map(async (remoteJid) => {
+      try {
+        const msgRes = await fetch(`https://${EVOLUTION_HOST}/chat/findMessages/${EVOLUTION_INSTANCE}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_APIKEY },
+          body: JSON.stringify({
+            where: { key: { remoteJid } },
+            limit: 40
+          })
+        });
+        if (!msgRes.ok) return [];
+        const msgData = await msgRes.json();
+        return (msgData.messages?.records || []) as any[];
+      } catch (err) {
+        console.warn(`Erro ao buscar mensagens do JID ${remoteJid}:`, err);
+        return [];
+      }
+    });
+
+    const results = await Promise.all(messagePromises);
+    const combinedRecords: any[] = results.flat();
+
+    const seenIds = new Set<string>();
+    const formatted: any[] = [];
+
+    for (const r of combinedRecords) {
+      const msgId = r.key?.id || r.id;
+      if (!msgId || seenIds.has(msgId)) continue;
+      seenIds.add(msgId);
+
+      const fromMe = Boolean(r.key?.fromMe);
       const msgObj = r.message || {};
       let text = msgObj.conversation || msgObj.extendedTextMessage?.text || '';
       if (!text && msgObj.imageMessage) text = '📸 [Foto enviada]';
       if (!text && msgObj.audioMessage) text = '🎵 [Áudio enviado]';
       if (!text) text = '[Mensagem]';
 
-      return {
-        id: r.key?.id || r.id,
+      formatted.push({
+        id: msgId,
         remetente: fromMe ? 'tatuador' : 'cliente',
         mensagem: text,
         timestamp: new Date((r.messageTimestamp || Date.now() / 1000) * 1000),
         status: 'entregue'
-      };
-    });
+      });
+    }
+
+    return formatted;
   },
 
   async enviarMensagemChat(
@@ -1220,6 +1246,38 @@ export const crmService = {
     // 3. Dispara sincronização em cadeia com Funil e Carteira de Temperatura
     if (bData) {
       await this.syncBookingToCRM(bData, nextStatus);
+
+      // 4. Cascata para agendamentos duplicados do mesmo cliente na mesma data
+      try {
+        const cleanPhone = (bData.userPhone || bData.clientPhone || '').replace(/\D/g, '');
+        const clientName = (bData.userName || bData.clientName || '').trim().toLowerCase();
+        const bookingDate = (bData.date || '').split('T')[0];
+
+        const allSnap = await getDocs(collection(db, BOOKINGS_COLLECTION));
+        const duplicates = allSnap.docs.filter(d => {
+          if (d.id === bookingId) return false;
+          const data = d.data();
+          const dDate = (data.date || '').split('T')[0];
+          if (bookingDate && dDate !== bookingDate) return false;
+
+          const dPhone = (data.userPhone || data.clientPhone || '').replace(/\D/g, '');
+          const dName = (data.userName || data.clientName || '').trim().toLowerCase();
+
+          const samePhone = cleanPhone && dPhone && (dPhone === cleanPhone || dPhone.endsWith(cleanPhone) || cleanPhone.endsWith(dPhone));
+          const sameName = Boolean(clientName && dName && (clientName === dName || dName.includes(clientName) || clientName.includes(dName)));
+
+          return samePhone || sameName;
+        });
+
+        for (const dup of duplicates) {
+          await updateDoc(doc(db, BOOKINGS_COLLECTION, dup.id), {
+            status: nextStatus,
+            updatedAt: serverTimestamp()
+          });
+        }
+      } catch (errDup) {
+        console.warn('Erro ao atualizar duplicatas de booking:', errDup);
+      }
     }
   }
 };

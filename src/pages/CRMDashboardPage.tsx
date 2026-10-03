@@ -165,25 +165,88 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
     loadData();
   }, []);
 
+  // Dispara notificação nativa flutuante (Heads-up) no celular / navegador
+  const dispararNotificacaoFlutuante = async (sessao?: any) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return;
+    }
+
+    let perm = Notification.permission;
+    if (perm === 'default') {
+      try {
+        perm = await Notification.requestPermission();
+      } catch (e) {
+        // permissão falhou
+      }
+    }
+
+    if (perm !== 'granted') {
+      return;
+    }
+
+    const title = '🔔 Confirmação de Presença — Somos 1';
+    const body = sessao 
+      ? `O cliente ${sessao.nome} compareceu à sessão das ${sessao.hora}? Toque para confirmar.`
+      : 'Teste de Notificação Flutuante ativo! O sistema de presença está conectado ao seu celular.';
+
+    const options: any = {
+      body,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: sessao ? `presenca-${sessao.id}` : 'teste-presenca',
+      vibrate: [300, 150, 300, 150, 300],
+      renotify: true,
+      requireInteraction: true,
+      data: { url: '/admin' }
+    };
+
+    try {
+      // Prioridade: Service Worker Registration (obrigatório para Android Chrome / PWA flutuante)
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && 'showNotification' in reg) {
+          await reg.showNotification(title, options);
+          return;
+        }
+      }
+      // Fallback para desktop
+      const n = new Notification(title, options);
+      n.onclick = () => {
+        window.focus();
+      };
+    } catch (e: any) {
+      console.warn('Aviso showNotification:', e);
+      try {
+        const n = new Notification(title, options);
+        n.onclick = () => window.focus();
+      } catch (err2) {
+        // silencioso
+      }
+    }
+  };
+
+  const handleTestarNotificacaoMobile = async () => {
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
+        const res = await Notification.requestPermission();
+        if (res !== 'granted') {
+          showToast('error', 'Permissão de notificação não foi concedida no seu navegador.');
+          return;
+        }
+      }
+      const sessao = sessoesParaConfirmar[0];
+      await dispararNotificacaoFlutuante(sessao);
+      showToast('success', '🔔 Notificação enviada! Verifique o topo do seu celular.');
+    } catch (e: any) {
+      showToast('error', `Falha ao emitir notificação: ${e?.message}`);
+    }
+  };
+
   // Notificação nativa no celular / navegador se suportado
   useEffect(() => {
     if (sessoesParaConfirmar.length > 0 && typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission();
-      } else if (Notification.permission === 'granted') {
-        const sessao = sessoesParaConfirmar[0];
-        try {
-          const n = new Notification('🔔 Confirmação de Presença Somos 1', {
-            body: `O cliente ${sessao.nome} compareceu à sessão das ${sessao.hora}? Toque para responder.`,
-            icon: '/favicon.ico',
-            tag: `presenca-${sessao.id}`
-          });
-          n.onclick = () => {
-            window.focus();
-          };
-        } catch (e) {
-          console.warn('Erro ao disparar notificação no navegador:', e);
-        }
+      if (Notification.permission === 'granted') {
+        dispararNotificacaoFlutuante(sessoesParaConfirmar[0]);
       }
     }
   }, [sessoesParaConfirmar.length]);
@@ -497,19 +560,30 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
                   </div>
 
                   {/* Disparo Direto pro Celular / WhatsApp do Admin */}
-                  <div className="mt-2.5 flex items-center justify-between gap-2 bg-black/40 border border-emerald-500/20 rounded-xl p-2 px-3">
+                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 bg-black/40 border border-emerald-500/20 rounded-xl p-2 px-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span className="text-[11px]">Quer responder pelo celular enquanto tatua?</span>
+                      <span className="text-[11px]">Notificação flutuante no celular &amp; WhatsApp:</span>
                     </div>
-                    <button
-                      type="button"
-                      disabled={enviandoZapId === sessao.id}
-                      onClick={() => handleEnviarZapAdmin(sessao)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-headline font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
-                    >
-                      {enviandoZapId === sessao.id ? 'Enviando...' : '📲 Notificar no meu Zap'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleTestarNotificacaoMobile}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-headline font-bold transition-all active:scale-95 cursor-pointer shrink-0"
+                        title="Dispara a notificação de topo no seu celular com som e vibração"
+                      >
+                        <Bell className="w-3.5 h-3.5 fill-amber-400" />
+                        🔔 Testar no Celular
+                      </button>
+                      <button
+                        type="button"
+                        disabled={enviandoZapId === sessao.id}
+                        onClick={() => handleEnviarZapAdmin(sessao)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-headline font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {enviandoZapId === sessao.id ? 'Enviando...' : '📲 Notificar no Zap'}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Atalho de Lote para Sessões Antigas */}
