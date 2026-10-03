@@ -113,6 +113,11 @@ export interface Lead {
   artistaDesejadoNome?: string;
   fotosReferencia?: string[];
   spin?: SPINAnalysis;
+  valorSinal?: number;
+  sinalPago?: boolean;
+  chavePixSinal?: string;
+  dataAgendada?: string;
+  horaAgendada?: string;
   notasInternas?: string[];
   responsavelAtendimento?: string; // 'IA_Assessor' ou nome do atendente humano
   criadoPor?: 'agente_ia' | 'usuario_admin' | 'usuario_publico';

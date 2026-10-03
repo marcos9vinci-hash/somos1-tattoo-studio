@@ -327,6 +327,18 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
     }
   };
 
+  const handleUpdateLead = async (leadId: string, data: Partial<Lead>) => {
+    try {
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...data } : l));
+      await crmService.updateLead(leadId, data);
+      showToast('success', 'Lead atualizado com sucesso!');
+      crmService.getDashboardMetrics().then(setMetrics);
+    } catch (err: any) {
+      showToast('error', `Falha ao atualizar lead: ${err?.message}`);
+      loadData();
+    }
+  };
+
   const handleSaveLead = async (leadData: Partial<Lead>) => {
     try {
       if (selectedLead) {
@@ -852,9 +864,9 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
                 <span className="text-[9px] text-zinc-500 block">Data Marcada</span>
               </div>
               <div className="bg-zinc-900/60 p-2 rounded-xl border border-white/5">
-                <span className="text-[10px] text-zinc-300 font-headline font-bold block">5. Concluídos</span>
+                <span className="text-[10px] text-zinc-300 font-headline font-bold block">5. Concluídos & Pós-Venda</span>
                 <span className="text-base font-headline font-black text-emerald-400">{metrics?.leadsConcluidos ?? 0}</span>
-                <span className="text-[9px] text-zinc-500 block">Tattoo Feita</span>
+                <span className="text-[9px] text-zinc-500 block">Tattoo &amp; Cicatrização</span>
               </div>
             </div>
           </div>
@@ -862,6 +874,7 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
           <LeadKanbanBoard
             leads={leads}
             onStageChange={handleLeadStageChange}
+            onUpdateLead={handleUpdateLead}
             onSelectLead={(l) => { setSelectedLead(l); setIsLeadModalOpen(true); }}
             onNewLeadClick={() => { setSelectedLead(null); setIsLeadModalOpen(true); }}
             onIgnorarContato={handleIgnorarContato}

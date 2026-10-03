@@ -31,6 +31,10 @@ export const LeadModal: React.FC<LeadModalProps> = ({
   const [tamanhoAproximado, setTamanhoAproximado] = useState(lead?.tamanhoAproximado || '');
   const [localCorpo, setLocalCorpo] = useState(lead?.localCorpo || '');
   const [ticketEstimado, setTicketEstimado] = useState<number>(lead?.spin?.ticketEstimado || 0);
+  const [valorSinal, setValorSinal] = useState<number>(
+    lead?.valorSinal || (lead?.spin?.ticketEstimado ? Math.round(lead.spin.ticketEstimado * 0.3) : 0)
+  );
+  const [sinalPago, setSinalPago] = useState<boolean>(lead?.sinalPago || false);
   const [urgencia, setUrgencia] = useState<'baixa' | 'media' | 'alta'>(lead?.spin?.urgencia || 'media');
   
   // Notas e Mensagem Direta
@@ -53,6 +57,8 @@ export const LeadModal: React.FC<LeadModalProps> = ({
         estiloTatuagem,
         tamanhoAproximado,
         localCorpo,
+        valorSinal: Number(valorSinal) || 0,
+        sinalPago,
         spin: {
           ...lead?.spin,
           ticketEstimado: Number(ticketEstimado) || 0,
@@ -149,10 +155,9 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               >
                 <option value="novo">Novo Lead</option>
                 <option value="qualificacao">Em Qualificação (SPIN)</option>
-                <option value="negociacao">💬 Em Negociação</option>
+                <option value="negociacao">💬 Em Negociação & Sinal</option>
                 <option value="agendado">📅 Sessão Agendada</option>
-                <option value="concluido">✅ Trabalho Realizado</option>
-                <option value="pos_venda">✨ Pós-Venda (Cicatrização)</option>
+                <option value="pos_venda">✨ Realizado & Pós-Venda (Cicatrização)</option>
                 <option value="followup">🔕 Follow-up / Resgate</option>
                 <option value="perdido">❌ Perdido / Desistiu</option>
               </select>
@@ -190,7 +195,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1">Estilo</label>
                   <input
@@ -211,15 +216,48 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
+              </div>
+
+              {/* Linha Financeira: Valor Total + Sinal de Reserva (30%) + Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-zinc-950/60 p-3 rounded-xl border border-zinc-800">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1">Valor Estimado (R$)</label>
                   <input
                     type="number"
                     value={ticketEstimado}
-                    onChange={(e) => setTicketEstimado(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setTicketEstimado(val);
+                      if (!lead?.valorSinal) {
+                        setValorSinal(Math.round(val * 0.3));
+                      }
+                    }}
                     placeholder="Ex: 800"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-purple-300 mb-1">Sinal Reserva (R$ 30%)</label>
+                  <input
+                    type="number"
+                    value={valorSinal}
+                    onChange={(e) => setValorSinal(Number(e.target.value))}
+                    placeholder="Ex: 240"
+                    className="w-full bg-zinc-900 border border-purple-500/40 rounded-lg px-3 py-2 text-sm text-amber-300 focus:outline-none focus:border-purple-400 font-bold"
+                  />
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="flex items-center gap-2 p-2 bg-zinc-900 rounded-lg border border-zinc-800 cursor-pointer hover:border-zinc-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={sinalPago}
+                      onChange={(e) => setSinalPago(e.target.checked)}
+                      className="rounded border-zinc-700 text-emerald-500 focus:ring-emerald-500 h-4 w-4 bg-zinc-950"
+                    />
+                    <span className={`text-xs font-bold ${sinalPago ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                      {sinalPago ? '✅ Sinal Pago (PIX)' : '⏳ Sinal Pendente'}
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>

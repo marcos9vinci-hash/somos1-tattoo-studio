@@ -21,7 +21,10 @@ import {
   ArrowUpRight,
   Bot,
   Sliders,
-  Ban
+  Ban,
+  Coins,
+  Copy,
+  Check
 } from 'lucide-react';
 import { STAGE_AGENTS_NAIA } from '../../lib/naiaAgentsConfig';
 import { ColunaAgentConfigModal } from './ColunaAgentConfigModal';
@@ -34,16 +37,16 @@ interface LeadKanbanBoardProps {
   onAbrirChat?: (lead: Lead) => void;
   onIgnorarContato?: (lead: Lead) => void;
   onAbrirAgenda?: (lead: Lead) => void;
+  onUpdateLead?: (leadId: string, data: Partial<Lead>) => Promise<void>;
 }
 
 const STAGES: { id: LeadStage; title: string; color: string; badge: string; icon: any }[] = [
-  { id: 'novo',        title: 'Novo Contato',          color: 'border-blue-500/40 bg-blue-500/5',     badge: 'bg-blue-500/20 text-blue-300',     icon: UserPlus },
-  { id: 'qualificacao',title: 'Qualificação (SPIN)',    color: 'border-amber-500/40 bg-amber-500/5',   badge: 'bg-amber-500/20 text-amber-300',   icon: Sparkles },
-  { id: 'negociacao',  title: '💬 Negociação',          color: 'border-purple-500/40 bg-purple-500/5', badge: 'bg-purple-500/20 text-purple-300', icon: MessageCircle },
-  { id: 'agendado',    title: '📅 Sessão Agendada',     color: 'border-sky-500/40 bg-sky-500/5',       badge: 'bg-sky-500/20 text-sky-300',       icon: Calendar },
-  { id: 'concluido',   title: '✅ Trabalho Realizado',  color: 'border-emerald-500/40 bg-emerald-500/5', badge: 'bg-emerald-500/20 text-emerald-300', icon: CheckCircle2 },
-  { id: 'pos_venda',   title: '✨ Pós-Venda (Cuidado)', color: 'border-pink-500/40 bg-pink-500/5',     badge: 'bg-pink-500/20 text-pink-300',     icon: HeartHandshake },
-  { id: 'followup',    title: '🔕 Follow-up (Resgate)', color: 'border-orange-500/40 bg-orange-500/5', badge: 'bg-orange-500/20 text-orange-300', icon: BellRing }
+  { id: 'novo',        title: 'Novo Contato',             color: 'border-blue-500/40 bg-blue-500/5',       badge: 'bg-blue-500/20 text-blue-300',       icon: UserPlus },
+  { id: 'qualificacao',title: 'Qualificação (SPIN)',       color: 'border-amber-500/40 bg-amber-500/5',     badge: 'bg-amber-500/20 text-amber-300',     icon: Sparkles },
+  { id: 'negociacao',  title: '💬 Negociação & Sinal',     color: 'border-purple-500/40 bg-purple-500/5',   badge: 'bg-purple-500/20 text-purple-300',   icon: MessageCircle },
+  { id: 'agendado',    title: '📅 Sessão Agendada',        color: 'border-sky-500/40 bg-sky-500/5',         badge: 'bg-sky-500/20 text-sky-300',         icon: Calendar },
+  { id: 'pos_venda',   title: '✨ Realizado & Pós-Venda',  color: 'border-emerald-500/40 bg-emerald-500/5', badge: 'bg-emerald-500/20 text-emerald-300', icon: CheckCircle2 },
+  { id: 'followup',    title: '🔕 Follow-up (Resgate)',    color: 'border-orange-500/40 bg-orange-500/5',   badge: 'bg-orange-500/20 text-orange-300',   icon: BellRing }
 ];
 
 export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
@@ -53,7 +56,8 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
   onNewLeadClick,
   onAbrirChat,
   onIgnorarContato,
-  onAbrirAgenda
+  onAbrirAgenda,
+  onUpdateLead
 }) => {
   const [agentsConfig, setAgentsConfig] = useState<Record<LeadStage, ColunaAIAgentConfig>>(STAGE_AGENTS_NAIA);
   const [selectedAgentForModal, setSelectedAgentForModal] = useState<ColunaAIAgentConfig | null>(null);
@@ -117,6 +121,42 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
     const leadId = e.dataTransfer.getData('text/plain');
     if (leadId) {
       onStageChange(leadId, targetStage);
+    }
+  };
+
+  const handleCopiarPixSinal = (lead: Lead, sinalValor: number, totalValor: number) => {
+    const totalMsg = totalValor > 0 ? ` (Total do projeto: R$ ${totalValor})` : '';
+    const sinalMsg = sinalValor > 0 ? `R$ ${sinalValor}` : '30% do valor combinado';
+    const texto = `Olá, ${lead.nome}! 🎨\nPara garantir sua vaga na agenda da Somos 1 Tattoo Studio e iniciarmos o desenho personalizado, solicitamos o sinal de reserva:\n\n💰 *Valor do Sinal:* ${sinalMsg}${totalMsg}\n🔑 *Chave PIX (E-mail):* somos1tattoo@gmail.com\n\nAssim que fizer o PIX, manda o comprovante por aqui que já confirmo seu dia oficial! 🚀`;
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(texto).then(() => {
+        alert(`✅ Mensagem e Chave PIX copiadas para a área de transferência!\n\nEnvie no WhatsApp de ${lead.nome}.`);
+      }).catch(() => {
+        prompt('Copie a mensagem com a chave PIX abaixo:', texto);
+      });
+    } else {
+      prompt('Copie a mensagem com a chave PIX abaixo:', texto);
+    }
+  };
+
+  const handleConfirmarSinal = async (lead: Lead, sinalValor: number) => {
+    const valorMsg = sinalValor > 0 ? `R$ ${sinalValor}` : 'sinal';
+    if (window.confirm(`Confirmar o recebimento do sinal de ${valorMsg} de ${lead.nome}?\n\nO lead será marcado com Sinal Pago e movido para a etapa '📅 Sessão Agendada'.`)) {
+      if (onUpdateLead) {
+        await onUpdateLead(lead.id, {
+          sinalPago: true,
+          valorSinal: sinalValor,
+          estagio: 'agendado'
+        });
+      } else {
+        await crmService.updateLead(lead.id, {
+          sinalPago: true,
+          valorSinal: sinalValor,
+          estagio: 'agendado'
+        });
+        onStageChange(lead.id, 'agendado');
+      }
     }
   };
 
@@ -206,7 +246,12 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
         )}
       >
         {STAGES.map((stage) => {
-          const stageLeads = leads.filter((lead) => lead.estagio === stage.id);
+          const stageLeads = leads.filter((lead) => {
+            if (stage.id === 'pos_venda') {
+              return lead.estagio === 'pos_venda' || lead.estagio === 'concluido';
+            }
+            return lead.estagio === stage.id;
+          });
           const Icon = stage.icon;
           const agent = agentsConfig[stage.id];
           const modo = agent ? getModoBadge(agent) : null;
@@ -305,6 +350,72 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                           "{lead.ideiaProjeto}"
                         </p>
                       )}
+
+                      {/* Bloco de Negociação & Sinal PIX */}
+                      {(() => {
+                        const valorTotal = lead.spin?.ticketEstimado || lead.orcamentoMaximo || (lead as any).priceEstimated || (lead as any).valor_estimado || 0;
+                        const valorSinal = lead.valorSinal || (valorTotal > 0 ? Math.round(valorTotal * 0.3) : 0);
+                        const isNegociacao = stage.id === 'negociacao' || lead.sinalPago || lead.valorSinal;
+
+                        if (!isNegociacao && valorTotal === 0) return null;
+
+                        return (
+                          <div className="bg-purple-950/30 border border-purple-500/25 rounded-lg p-2 space-y-1.5 font-headline">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-zinc-400">Total Tattoo:</span>
+                              <span className="font-bold text-white">
+                                {valorTotal > 0 ? `R$ ${valorTotal}` : 'A combinar'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-purple-300 font-semibold flex items-center gap-1">
+                                <Coins className="w-3 h-3 text-amber-400" />
+                                Sinal Reserva (30%):
+                              </span>
+                              <span className="font-bold text-amber-400">
+                                {valorSinal > 0 ? `R$ ${valorSinal}` : '30%'}
+                              </span>
+                            </div>
+
+                            <div className="pt-1 flex items-center gap-1.5 border-t border-purple-500/20">
+                              {lead.sinalPago ? (
+                                <span className="w-full text-center py-1 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 flex items-center justify-center gap-1">
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  Sinal Pago! (R$ {valorSinal})
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCopiarPixSinal(lead, valorSinal, valorTotal);
+                                    }}
+                                    className="flex-1 py-1 px-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/30 rounded text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95"
+                                    title="Copiar mensagem com chave PIX para enviar no WhatsApp"
+                                  >
+                                    <Copy className="w-2.5 h-2.5 text-purple-300" />
+                                    Copiar PIX
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleConfirmarSinal(lead, valorSinal);
+                                    }}
+                                    className="py-1 px-2 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-400/30 rounded text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95"
+                                    title="Marcar sinal pago e avançar para Agendado"
+                                  >
+                                    <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                    Sinal Pago
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Badge de Agendamento Clicável (Acesso Rápido ao Calendário & Editor) */}
                       {(lead.estagio === 'agendado' || lead.id.startsWith('booking_') || /às\s*\d{2}:\d{2}|\d{2}\/\d{2}/i.test(lead.ideiaProjeto || '')) && (
