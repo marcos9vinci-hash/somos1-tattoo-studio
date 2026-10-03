@@ -29,6 +29,40 @@ export interface Commission {
   updatedAt: string;
 }
 
+export interface ContaPagar {
+  id: string;
+  descricao: string;
+  fornecedor?: string;
+  valor: number;
+  vencimento: string;
+  dataPgto?: string;
+  formaPgto: 'pix' | 'boleto' | 'cartao_credito' | 'dinheiro' | 'outro';
+  categoria: 'material' | 'aluguel' | 'energia_agua' | 'equipamentos' | 'marketing' | 'impostos' | 'comissao' | 'outro';
+  status: 'pendente' | 'pago' | 'vencido';
+  obs?: string;
+  createdAt: string;
+}
+
+export interface ContaReceber {
+  id: string;
+  descricao: string;
+  cliente: string;
+  clienteTelefone?: string;
+  valor: number;
+  valorSinal?: number;
+  vencimento: string;
+  dataPgto?: string;
+  formaPgto: 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro';
+  status: 'pendente' | 'sinal_pago' | 'pago';
+  artistaNome?: string;
+  artistaComissao?: number; // Valor R$
+  indicadorNome?: string;
+  indicadorComissao?: number; // Valor R$
+  lucroEstudio?: number; // Valor R$
+  obs?: string;
+  createdAt: string;
+}
+
 export interface FinancialEntry {
   id: string;
   type: 'income' | 'expense';
@@ -45,6 +79,10 @@ export interface FinancialEntry {
 export interface FinanceSummary {
   grossRevenue: number;          // Faturamento bruto total
   monthRevenue: number;          // Faturamento deste mês
+  totalExpenses: number;         // Total de despesas pagas
+  netCashBalance: number;        // Saldo atual em caixa (Entradas - Saídas)
+  pendingPayables: number;       // Total de contas a pagar pendentes
+  pendingReceivables: number;    // Total de contas a receber pendentes
   depositTotal: number;          // Total de sinais recebidos
   commissionsPending: number;    // Comissões a pagar aos indicadores
   commissionsPaid: number;       // Comissões já pagas aos indicadores
@@ -52,7 +90,9 @@ export interface FinanceSummary {
   studioNetProfit: number;       // Lucro líquido retido pelo estúdio
   completedBookingsCount: number;// Quantidade de atendimentos concluídos
   ticketAverage: number;         // Ticket médio por atendimento
+  contasPagar: ContaPagar[];
+  contasReceber: ContaReceber[];
   recentCommissions: Commission[];
   recentEntries: FinancialEntry[];
-  monthlyChartData: { month: string; receita: number; comissoes: number; lucro: number }[];
+  monthlyChartData: { month: string; receita: number; despesas: number; lucro: number }[];
 }
