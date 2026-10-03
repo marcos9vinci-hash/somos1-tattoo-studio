@@ -534,8 +534,117 @@ export default async function handler(req, res) {
 
       let replyText = '';
 
+      // Confirmação de Presença de Cliente (Comando Admin WhatsApp)
+      // Ex: "o Tiago veio", "Akila compareceu", "fulano faltou", "sim, compareceu", "conclui a sessão da Akila"
+      const isPresencaSim = (text.includes('compareceu') || text.includes('veio') || text.includes('tatuou') || text.includes('conclui') || text.includes('concluído') || text.includes('concluido')) && !text.includes('não') && !text.includes('nao');
+      const isPresencaNao = (text.includes('faltou') || text.includes('não veio') || text.includes('nao veio') || text.includes('não compareceu') || text.includes('nao compareceu') || text.includes('desmarcou') || text.includes('cancelou'));
+
+      if (isAdmin && (isPresencaSim || isPresencaNao)) {
+        const matchName = userText.match(/(?:o|a|cliente|sessão\s+d[oa]|agendamento\s+d[oa])?\s*([A-ZÀ-ÿ][a-zà-ÿ]+)/i);
+        let targetName = matchName && matchName[1] ? matchName[1] : '';
+        if (['Sim', 'Nao', 'Não', 'O', 'A', 'Hoje', 'Ontem', 'Que', 'Como'].includes(targetName)) targetName = '';
+
+        let bookingToConfirm = null;
+        try {
+          const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
+          const qRes = await fetch(queryUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              structuredQuery: {
+                from: [{ collectionId: 'bookings' }],
+                limit: 40
+              }
+            })
+          });
+          const bItems = await qRes.json();
+          const list = (Array.isArray(bItems) ? bItems : []).filter(i => i.document?.fields).map(i => {
+            const f = i.document.fields;
+            return {
+              id: i.document.name.split('/').pop(),
+              name: f.userName?.stringValue || f.clientName?.stringValue || '',
+              date: f.date?.stringValue || '',
+              time: f.time?.stringValue || '',
+              phone: f.userPhone?.stringValue || f.clientPhone?.stringValue || '',
+              status: f.status?.stringValue || ''
+            };
+          });
+
+          if (targetName) {
+            bookingToConfirm = list.find(b => b.name.toLowerCase().includes(targetName.toLowerCase()));
+          }
+          if (!bookingToConfirm) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            bookingToConfirm = list.find(b => b.date <= todayStr && (b.status === 'approved' || b.status === 'deposit_paid'));
+          }
+        } catch (bErr) {
+          console.warn('Erro ao buscar booking para confirmação:', bErr);
+        }
+
+        if (bookingToConfirm) {
+          const newStatus = isPresencaSim ? 'completed' : 'no_show';
+          try {
+            await fetch(`${FIRESTORE_BASE}/bookings/${bookingToConfirm.id}?updateMask.fieldPaths=status&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fields: {
+                  status: { stringValue: newStatus },
+                  updatedAt: { timestampValue: new Date().toISOString() }
+                }
+              })
+            });
+          } catch (patchErr) {}
+
+          try {
+            const leadStage = isPresencaSim ? 'pos_venda' : 'followup';
+            const leadTemp = isPresencaSim ? 'quente' : 'morno';
+            const lRes = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                structuredQuery: {
+                  from: [{ collectionId: 'leads' }],
+                  where: {
+                    fieldFilter: {
+                      field: { fieldPath: 'nome' },
+                      op: 'EQUAL',
+                      value: { stringValue: bookingToConfirm.name }
+                    }
+                  },
+                  limit: 1
+                }
+              })
+            });
+            const lItems = await lRes.json();
+            if (Array.isArray(lItems) && lItems[0]?.document) {
+              const lId = lItems[0].document.name.split('/').pop();
+              await fetch(`${FIRESTORE_BASE}/leads/${lId}?updateMask.fieldPaths=estagio&updateMask.fieldPaths=temperatura&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fields: {
+                    estagio: { stringValue: leadStage },
+                    temperatura: { stringValue: leadTemp },
+                    updatedAt: { timestampValue: new Date().toISOString() }
+                  }
+                })
+              });
+            }
+          } catch (leadSyncErr) {}
+
+          if (isPresencaSim) {
+            replyText = `✅ *Presença Confirmada, Chefe!*\n\n👤 *Cliente:* ${bookingToConfirm.name}\n📅 *Sessão:* ${bookingToConfirm.date} às ${bookingToConfirm.time}\n\nO status foi alterado para *Concluído*, o lead foi movido para *Pós-Venda (Cicatrização / 15 dias)* e o cliente classificado como *🔥 Quente* na Carteira! 🚀`;
+          } else {
+            replyText = `❌ *Falta Registrada, Chefe!*\n\n👤 *Cliente:* ${bookingToConfirm.name}\n📅 *Sessão:* ${bookingToConfirm.date} às ${bookingToConfirm.time}\n\nO status foi alterado para *Faltou*, o lead foi movido para *Follow-up / Resgate* e o cliente marcado como *desmarcou* na Carteira para reativação futura. ⚠️`;
+          }
+        } else {
+          replyText = `⚠️ Chefe, não encontrei nenhum agendamento pendente ${targetName ? `com o nome *${targetName}*` : 'para hoje'}. Verifique no painel ou digite o nome completo do cliente!`;
+        }
+      }
+
       // A. Resumo da Agenda
-      if (text.includes('agenda de') || text.includes('como tá a agenda') || text.includes('como esta a agenda') || (text.includes('agenda') && (text.includes('hoje') || text.includes('amanha')))) {
+      else if (text.includes('agenda de') || text.includes('como tá a agenda') || text.includes('como esta a agenda') || (text.includes('agenda') && (text.includes('hoje') || text.includes('amanha')))) {
         const bookings = await getDailySummary(targetDate);
         const [y, m, d] = targetDate.split('-');
         const formattedDate = `${d}/${m}/${y}`;

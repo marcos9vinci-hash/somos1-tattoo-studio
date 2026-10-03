@@ -32,7 +32,11 @@ import {
   Ban,
   UserCheck,
   CalendarCheck,
-  HelpCircle
+  HelpCircle,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  X
 } from 'lucide-react';
 
 type ActiveTab = 'carteira' | 'funil' | 'estrategias';
@@ -72,6 +76,9 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
 
   const [sessoesParaConfirmar, setSessoesParaConfirmar] = useState<any[]>([]);
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
+  const [promptAtivoIdx, setPromptAtivoIdx] = useState(0);
+  const [promptMinimizado, setPromptMinimizado] = useState(false);
+  const [limpandoLote, setLimpandoLote] = useState(false);
 
   // Toast
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -112,10 +119,26 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
         showToast('error', `❌ Falta registrada para ${sessao.nome}. Lead movido para Resgate / Follow-up.`);
       }
       await loadData();
+      setPromptAtivoIdx(prev => Math.max(0, prev - 1));
     } catch (err: any) {
       showToast('error', `Falha ao registrar presença: ${err?.message}`);
     } finally {
       setConfirmandoId(null);
+    }
+  };
+
+  const handleLimparAntigas = async () => {
+    if (!window.confirm('Deseja marcar todas as sessões anteriores a 15 dias como concluídas em lote?')) return;
+    setLimpandoLote(true);
+    try {
+      const count = await crmService.concluirSessoesAntigasEmLote(15);
+      showToast('success', `${count} sessões antigas marcadas como concluídas!`);
+      await loadData();
+      setPromptAtivoIdx(0);
+    } catch (err: any) {
+      showToast('error', `Falha ao limpar lote: ${err?.message}`);
+    } finally {
+      setLimpandoLote(false);
     }
   };
 
@@ -323,59 +346,133 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
 
       {/* ── BANNER GOOGLE PROMPT: Confirmação de Presença de Sessão ── */}
       {sessoesParaConfirmar.length > 0 && (
-        <div className="space-y-3">
-          {sessoesParaConfirmar.map(sessao => (
-            <div
-              key={sessao.id}
-              className="relative overflow-hidden rounded-2xl border-2 border-amber-500/50 bg-gradient-to-r from-amber-950/60 via-background to-amber-950/40 p-4 sm:p-5 shadow-2xl shadow-amber-500/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-3 duration-300"
+        promptMinimizado ? (
+          <div className="fixed bottom-4 right-4 z-50 animate-bounce">
+            <button
+              onClick={() => setPromptMinimizado(false)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-headline font-black text-xs uppercase tracking-wider rounded-full shadow-2xl shadow-amber-500/50 border-2 border-amber-300 transition-all cursor-pointer"
             >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="p-3 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded-2xl flex-shrink-0 animate-pulse">
-                    <CalendarCheck className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-headline font-black uppercase tracking-wider border border-amber-500/40 flex items-center gap-1">
-                        <HelpCircle className="w-3 h-3 text-amber-400" />
-                        Confirmação de Presença
-                      </span>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {sessao.data ? sessao.data.split('-').reverse().join('/') : 'Hoje'} às {sessao.hora}
-                      </span>
+              <Bell className="w-4 h-4 fill-black" />
+              <span>{sessoesParaConfirmar.length} Presença(s) Pendente(s)</span>
+            </button>
+          </div>
+        ) : (
+          (() => {
+            const safeIdx = Math.min(promptAtivoIdx, sessoesParaConfirmar.length - 1);
+            const sessao = sessoesParaConfirmar[safeIdx] || sessoesParaConfirmar[0];
+            if (!sessao) return null;
+            const dataFormatada = sessao.data ? sessao.data.split('-').reverse().join('/') : 'Hoje';
+            const isHoje = sessao.data === new Date().toISOString().split('T')[0];
+
+            return (
+              <div className="fixed bottom-3 left-3 right-3 sm:relative sm:bottom-auto sm:left-auto sm:right-auto z-50 mb-4">
+                <div className="relative overflow-hidden rounded-3xl border-2 border-amber-500/80 bg-gradient-to-br from-zinc-950/95 via-amber-950/50 to-zinc-950/95 p-4 sm:p-5 shadow-2xl shadow-amber-500/25 backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-3 duration-300">
+                  {/* Cabeçalho do Card */}
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-400 flex-shrink-0">
+                        <Bell className="w-4 h-4 fill-amber-400" />
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-ping" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-headline font-black uppercase tracking-wider text-amber-300">
+                            Confirmação de Presença
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold border border-amber-500/30">
+                            {safeIdx + 1} de {sessoesParaConfirmar.length}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {isHoje ? 'Hoje' : dataFormatada} às {sessao.hora}
+                        </span>
+                      </div>
                     </div>
-                    <h3 className="text-base sm:text-lg font-headline font-black text-foreground">
-                      O cliente <span className="text-amber-400 underline decoration-amber-500/60 underline-offset-4">{sessao.nome}</span> compareceu à sessão?
+
+                    <div className="flex items-center gap-1.5">
+                      {sessoesParaConfirmar.length > 1 && (
+                        <div className="flex items-center gap-1 mr-1">
+                          <button
+                            type="button"
+                            onClick={() => setPromptAtivoIdx(prev => (prev > 0 ? prev - 1 : sessoesParaConfirmar.length - 1))}
+                            className="p-1.5 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-lg transition-all cursor-pointer"
+                            title="Sessão anterior"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPromptAtivoIdx(prev => (prev < sessoesParaConfirmar.length - 1 ? prev + 1 : 0))}
+                            className="p-1.5 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-lg transition-all cursor-pointer"
+                            title="Próxima sessão"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setPromptMinimizado(true)}
+                        className="p-1.5 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-lg transition-all cursor-pointer"
+                        title="Minimizar prompt"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Pergunta Estilo Google Prompt */}
+                  <div className="my-2.5 text-center sm:text-left">
+                    <h3 className="text-base sm:text-lg font-headline font-black text-foreground tracking-tight leading-snug">
+                      O cliente <span className="text-amber-400 underline decoration-amber-500/60 underline-offset-4">{sessao.nome}</span> compareceu à sessão das {sessao.hora} {isHoje ? 'hoje' : ''}?
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Tattoo {sessao.tamanho} {sessao.estilo ? `(${sessao.estilo})` : ''} · Telefone: {sessao.telefone || 'Não informado'}
                     </p>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-                  <button
-                    disabled={confirmandoId === sessao.id}
-                    onClick={() => handleConfirmarPresenca(sessao, true)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-headline font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/30 active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    <UserCheck className="w-4 h-4 stroke-[2.5]" />
-                    {confirmandoId === sessao.id ? 'Gravando...' : 'Sim, Compareceu & Tatuou'}
-                  </button>
+                  {/* Botões de Ação de 1-Clique */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
+                    <button
+                      type="button"
+                      disabled={confirmandoId === sessao.id}
+                      onClick={() => handleConfirmarPresenca(sessao, true)}
+                      className="flex items-center justify-center gap-2 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-headline font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/30 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      <UserCheck className="w-4 h-4 stroke-[2.5]" />
+                      {confirmandoId === sessao.id ? 'Gravando...' : '✅ Sim, Compareceu & Tatuou'}
+                    </button>
 
-                  <button
-                    disabled={confirmandoId === sessao.id}
-                    onClick={() => handleConfirmarPresenca(sessao, false)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 font-headline font-bold text-xs uppercase tracking-wider rounded-xl active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    <AlertCircle className="w-4 h-4 text-rose-400" />
-                    Não Compareceu (Faltou)
-                  </button>
+                    <button
+                      type="button"
+                      disabled={confirmandoId === sessao.id}
+                      onClick={() => handleConfirmarPresenca(sessao, false)}
+                      className="flex items-center justify-center gap-2 px-4 py-3.5 bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 border border-rose-500/40 font-headline font-bold text-xs sm:text-sm uppercase tracking-wider rounded-xl active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      <AlertCircle className="w-4 h-4 text-rose-400" />
+                      ❌ Não Compareceu (Faltou)
+                    </button>
+                  </div>
+
+                  {/* Atalho de Lote para Sessões Antigas */}
+                  {sessoesParaConfirmar.length > 3 && (
+                    <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{sessoesParaConfirmar.length} agendamentos passados pendentes.</span>
+                      <button
+                        type="button"
+                        onClick={handleLimparAntigas}
+                        disabled={limpandoLote}
+                        className="text-amber-400 hover:text-amber-300 underline font-headline font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        {limpandoLote ? 'Concluindo...' : 'Concluir sessões anteriores a 15 dias em lote'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            );
+          })()
+        )
       )}
 
       {/* ── KPI Cards ── */}

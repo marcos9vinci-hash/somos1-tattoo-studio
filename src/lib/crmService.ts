@@ -947,17 +947,53 @@ export const crmService = {
       console.warn('syncBookingToCRM [user]:', err);
     }
 
-    // 2. Atualiza lead correspondente no funil se existir (isolado para não depender do bloco 1)
+    // 2. Atualiza lead correspondente no funil se existir
     try {
+      let leadDocRef: any = null;
       if (booking.id) {
         const leadRef = doc(db, LEADS_COLLECTION, `booking_${booking.id}`);
         const leadSnap = await getDoc(leadRef);
         if (leadSnap.exists()) {
-          let novoEstagio: LeadStage = 'agendado';
-          if (norm === 'completed') novoEstagio = 'concluido';
-          else if (norm === 'no_show' || norm === 'rejected') novoEstagio = 'followup';
-          await updateDoc(leadRef, { estagio: novoEstagio, updatedAt: serverTimestamp() });
+          leadDocRef = leadRef;
         }
+      }
+
+      if (!leadDocRef && cleanBookingPhone) {
+        const qSnap = await getDocs(query(collection(db, LEADS_COLLECTION), where('telefone', '==', cleanBookingPhone)));
+        if (!qSnap.empty) {
+          leadDocRef = doc(db, LEADS_COLLECTION, qSnap.docs[0].id);
+        }
+      }
+
+      if (!leadDocRef && booking.userName) {
+        const qSnap = await getDocs(query(collection(db, LEADS_COLLECTION), where('nome', '==', booking.userName)));
+        if (!qSnap.empty) {
+          leadDocRef = doc(db, LEADS_COLLECTION, qSnap.docs[0].id);
+        }
+      }
+
+      const novoEstagio: LeadStage = norm === 'completed' ? 'pos_venda' : 'followup';
+      const novaTemp: 'quente' | 'morno' = norm === 'completed' ? 'quente' : 'morno';
+
+      if (leadDocRef) {
+        await updateDoc(leadDocRef, {
+          estagio: novoEstagio,
+          temperatura: novaTemp,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        // Se ainda não existia lead correspondente, cria para que apareça na coluna certa do Funil
+        await addDoc(collection(db, LEADS_COLLECTION), {
+          nome: booking.userName || 'Cliente Estúdio',
+          telefone: booking.userPhone || '',
+          estagio: novoEstagio,
+          temperatura: novaTemp,
+          origem: 'agenda',
+          ultimaMensagem: norm === 'completed' ? 'Sessão concluída com sucesso!' : 'Cliente não compareceu à sessão.',
+          pilotoIA: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
       }
     } catch (err) {
       console.warn('syncBookingToCRM [lead]:', err);
@@ -1013,7 +1049,7 @@ export const crmService = {
       const snap = await getDocs(collection(db, BOOKINGS_COLLECTION));
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
-      // Filtra agendamentos cuja data seja hoje ou até 7 dias atrás e que ainda estejam aprovados/pendentes de confirmação
+      // Filtra agendamentos cuja data seja hoje ou anterior e que ainda constem como aprovados
       const pendentes = all.filter(b => {
         const st = String(b.status || '').toLowerCase().replace('-', '_').trim();
         const isApproved = st === 'approved' || st === 'deposit_paid';
@@ -1021,6 +1057,13 @@ export const crmService = {
         const bDate = (b.date || '').split('T')[0];
         if (!bDate) return false;
         return bDate <= todayStr;
+      });
+
+      // Ordena decrescente: sessões de hoje primeiro, e por horário mais recente
+      pendentes.sort((a, b) => {
+        const dateDiff = (b.date || '').localeCompare(a.date || '');
+        if (dateDiff !== 0) return dateDiff;
+        return (b.time || '').localeCompare(a.time || '');
       });
 
       return pendentes.map(b => ({
@@ -1038,6 +1081,16 @@ export const crmService = {
       console.warn('Erro ao buscar sessoesParaConfirmar:', e);
       return [];
     }
+  },
+
+  async concluirSessoesAntigasEmLote(diasAtras: number = 15): Promise<number> {
+    const cutoff = new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const sessoes = await this.getSessoesParaConfirmar();
+    const antigas = sessoes.filter(s => s.data && s.data < cutoff);
+    for (const sessao of antigas) {
+      await this.confirmarPresencaBooking(sessao.id, true, sessao.booking);
+    }
+    return antigas.length;
   },
 
   async confirmarPresencaBooking(bookingId: string, compareceu: boolean, bookingData?: any): Promise<void> {
