@@ -31,22 +31,37 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Manipulador de clique na notificação flutuante do celular (heads-up / banner)
+// Manipulador de clique na notificação flutuante do celular (heads-up / banner com botões)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const urlToOpen = event.notification.data?.url || '/admin';
+  const data = event.notification.data || {};
+  const action = event.action; // 'sim', 'nao' ou vazio (clique no corpo)
+
+  let targetUrl = data.url || '/admin';
+  if (action && data.bookingId) {
+    targetUrl = `${targetUrl}?confirmarPresencaId=${encodeURIComponent(data.bookingId)}&status=${encodeURIComponent(action)}`;
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
+        if (client.url.includes('/admin') && 'focus' in client) {
+          // Se já tem aba aberta, despacha postMessage com a ação para processar imediatamente
+          if (action && data.bookingId) {
+            client.postMessage({
+              type: 'CONFIRMAR_PRESENCA_NOTIFICACAO',
+              bookingId: data.bookingId,
+              compareceu: action === 'sim'
+            });
+          }
           return client.focus();
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow(urlToOpen);
+        return self.clients.openWindow(targetUrl);
       }
     })
   );
 });
+
 

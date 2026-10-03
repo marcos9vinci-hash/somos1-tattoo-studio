@@ -107,11 +107,46 @@ export class LeadClassifier {
       estagio = 'agendado';
       temperatura = 'quente';
       intencaoResumo = 'Quer marcar horário / pagar sinal';
-    } else if (lower.includes('preço') || lower.includes('preco') || lower.includes('valor') || lower.includes('orçamento') || lower.includes('orcamento') || lower.includes('quanto fica')) {
+    } else if (
+      lower.includes('preço') || 
+      lower.includes('preco') || 
+      lower.includes('valor') || 
+      lower.includes('orçamento') || 
+      lower.includes('orcamento') || 
+      lower.includes('quanto fica') ||
+      lower.includes('quanto custa') ||
+      lower.includes('quanto sai') ||
+      lower.includes('quanto tá') ||
+      lower.includes('quanto ta') ||
+      lower.includes('quanto está') ||
+      lower.includes('quanto esta') ||
+      lower.includes('quanto que está') ||
+      lower.includes('quanto que esta') ||
+      lower.includes('quanto que tá') ||
+      lower.includes('quanto que ta') ||
+      lower.includes('qual o valor') ||
+      lower.includes('qual valor') ||
+      lower.includes('tabela') ||
+      lower.includes('cobra')
+    ) {
       estagio = 'negociacao';
       temperatura = 'quente';
-      intencaoResumo = 'Solicitou orçamento de tatuagem';
-    } else if (lower.includes('desenho') || lower.includes('ideia') || lower.includes('tatuar') || lower.includes('foto') || lower.includes('tamanho') || lower.includes('braço') || lower.includes('antebraço')) {
+      intencaoResumo = 'Solicitou orçamento / valor de tatuagem';
+    } else if (
+      lower.includes('desenho') || 
+      lower.includes('ideia') || 
+      lower.includes('tatuar') || 
+      lower.includes('tattoo') || 
+      lower.includes('foto') || 
+      lower.includes('tamanho') || 
+      lower.includes('braço') || 
+      lower.includes('antebraço') ||
+      lower.includes('perna') ||
+      lower.includes('costas') ||
+      lower.includes('peito') ||
+      lower.includes('referência') ||
+      lower.includes('referencia')
+    ) {
       estagio = 'qualificacao';
       temperatura = 'quente';
       intencaoResumo = 'Enviou referências / alinhando ideia';

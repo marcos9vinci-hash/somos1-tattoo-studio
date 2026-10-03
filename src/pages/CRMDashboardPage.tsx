@@ -197,7 +197,14 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
       vibrate: [300, 150, 300, 150, 300],
       renotify: true,
       requireInteraction: true,
-      data: { url: '/admin' }
+      actions: [
+        { action: 'sim', title: '✅ Sim, Compareceu' },
+        { action: 'nao', title: '❌ Não Compareceu' }
+      ],
+      data: {
+        bookingId: sessao?.id || '',
+        url: '/admin'
+      }
     };
 
     try {
@@ -225,6 +232,50 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
     }
   };
 
+  // Escuta cliques nos botões [Sim / Não] da notificação flutuante
+  useEffect(() => {
+    const messageHandler = async (event: MessageEvent) => {
+      if (event.data?.type === 'CONFIRMAR_PRESENCA_NOTIFICACAO') {
+        const { bookingId, compareceu } = event.data;
+        if (bookingId) {
+          try {
+            await crmService.confirmarPresencaBooking(bookingId, compareceu);
+            showToast('success', compareceu ? '✅ Presença confirmada via notificação do celular!' : '❌ Falta registrada via notificação.');
+            await loadData();
+          } catch (err: any) {
+            showToast('error', `Erro ao processar notificação: ${err?.message}`);
+          }
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', messageHandler);
+    }
+
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlBookingId = urlParams.get('confirmarPresencaId');
+      const urlStatus = urlParams.get('status');
+      if (urlBookingId && (urlStatus === 'sim' || urlStatus === 'nao')) {
+        const compareceu = urlStatus === 'sim';
+        window.history.replaceState({}, document.title, window.location.pathname);
+        crmService.confirmarPresencaBooking(urlBookingId, compareceu).then(() => {
+          showToast('success', compareceu ? '✅ Presença confirmada via notificação!' : '❌ Falta registrada via notificação.');
+          loadData();
+        }).catch(err => {
+          console.warn('Erro ao confirmar via URL params:', err);
+        });
+      }
+    }
+
+    return () => {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', messageHandler);
+      }
+    };
+  }, []);
+
   const handleTestarNotificacaoMobile = async () => {
     try {
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
@@ -236,7 +287,7 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
       }
       const sessao = sessoesParaConfirmar[0];
       await dispararNotificacaoFlutuante(sessao);
-      showToast('success', '🔔 Notificação enviada! Verifique o topo do seu celular.');
+      showToast('success', '🔔 Notificação enviada! Verifique o topo do seu celular com os botões Sim e Não.');
     } catch (e: any) {
       showToast('error', `Falha ao emitir notificação: ${e?.message}`);
     }
