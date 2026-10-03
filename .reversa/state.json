@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "project": "Somos 1 Tattoo Studio / Indica Aí",
+  "chat_language": "pt-br",
+  "doc_language": "Português",
+  "doc_level": "detalhado",
+  "output_folder": "_reversa_sdd",
+  "phase": "concluido",
+  "completed": [
+    "reconhecimento",
+    "escavacao",
+    "interpretacao",
+    "geracao",
+    "revisao"
+  ],
+  "pending": [],
+  "checkpoints": {
+    "scout": {
+      "timestamp": "2026-10-03T14:03:49.975Z",
+      "total_files": 262,
+      "modules_found": 6
+    },
+    "archaeologist": {
+      "last_updated": "2026-10-03T14:39:00Z",
+      "modules_analyzed": [
+        "CRM & Funil Comercial",
+        "Indica Aí (Afiliados & Recomendações)",
+        "Agenda & Booking",
+        "Automação WhatsApp & n8n",
+        "Galeria & Portfólio",
+        "Painel Admin & Configurações"
+      ],
+      "current_module": "Painel Admin & Configurações",
+      "total_modules": 6
+    },
+    "detective": {
+      "timestamp": "2026-10-03T14:42:00Z",
+      "rules_identified": 6,
+      "state_machines": 4,
+      "adrs_created": 4,
+      "rbac_matrix": "complete"
+    },
+    "architect": {
+      "timestamp": "2026-10-03T14:43:00Z",
+      "c4_levels": [1, 2, 3],
+      "erd_complete": true,
+      "spec_impact_matrix": true,
+      "deployment_documented": true
+    },
+    "writer": {
+      "timestamp": "2026-10-03T14:53:00Z",
+      "units_generated": 6,
+      "global_artifacts": 2,
+      "layout": "feature-folder"
+    },
+    "reviewer": {
+      "timestamp": "2026-10-03T14:54:00Z",
+      "confidence_score": 95.6,
+      "critical_gaps": 0,
+      "status": "aprovado"
+    }
+  }
+}

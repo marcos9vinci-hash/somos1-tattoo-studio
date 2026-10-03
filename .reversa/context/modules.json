@@ -1,0 +1,127 @@
+{
+  "project": "Somos 1 Tattoo Studio / Indica Aí",
+  "analyzed_at": "2026-10-03T14:47:41.336Z",
+  "modules": [
+    {
+      "id": "crm",
+      "name": "CRM & Funil Comercial Dual",
+      "files": [
+        "src/lib/crmService.ts",
+        "src/types/crm.ts",
+        "src/components/crm/LeadKanbanBoard.tsx",
+        "src/components/crm/CarteiraClientesKanban.tsx",
+        "src/pages/CRMDashboardPage.tsx"
+      ],
+      "entities": [
+        "Lead",
+        "ClienteCRM",
+        "CRMMessage",
+        "LeadStage",
+        "ClienteCarteiraTempStage"
+      ],
+      "key_rules": [
+        "Funil duplo: Funil Comercial (leads orçando + agendados futuros) vs Carteira de Clientes (pós-tattoo)",
+        "Janela de Cicatrização: tattoos < 15 dias permanecem em 'Pós-Venda' no funil comercial; > 15 dias graduam para a Carteira",
+        "Esteira de Temperatura: Quente (0-7d), Morno (8-30d), Esfriando (31-90d), Alerta (91-179d), Expirado (180d+), Desmarcou",
+        "Blacklist idempotente na coleção 'contatos_ignorados' por telefone normalizado",
+        "Disparo de mensagens no WhatsApp via Evolution API / n8n integrado ao chat"
+      ]
+    },
+    {
+      "id": "indica_ai",
+      "name": "Indica Aí — Motor de Afiliados",
+      "files": [
+        "src/lib/referralUtils.ts",
+        "src/types/referral.ts",
+        "src/pages/Network.tsx"
+      ],
+      "entities": [
+        "ReferralCode",
+        "ReferralTransaction",
+        "AffiliateLevel",
+        "RewardWallet"
+      ],
+      "key_rules": [
+        "Comissão multinível: Nível 1 (indicação direta) e Nível 2 (indicação indireta)",
+        "Geração de link e código exclusivo por cliente/usuário",
+        "Créditos acumulados podem ser abatidos em novas tatuagens ou resgatados",
+        "Gamificação com ranking de maiores indicadores do estúdio"
+      ]
+    },
+    {
+      "id": "booking",
+      "name": "Agenda & Gestão de Sessões",
+      "files": [
+        "src/lib/bookingService.ts",
+        "src/types/booking.ts",
+        "src/pages/Agenda.tsx"
+      ],
+      "entities": [
+        "Booking",
+        "BookingStatus",
+        "TimeSlot",
+        "BlockedSlot"
+      ],
+      "key_rules": [
+        "Status: approved, deposit_paid, pending_approval, rescheduled, completed, no_show, rejected",
+        "Cálculo de slots por tamanho: Pequena (~1h), Média (~2h), Grande (~4h)",
+        "Bloqueio manual de dias/horários salvos em studio_settings/main",
+        "Sincronização bidirecional automática com o Lead do CRM"
+      ]
+    },
+    {
+      "id": "whatsapp",
+      "name": "Automação WhatsApp & Co-Piloto IA",
+      "files": [
+        "src/lib/whatsappService.ts",
+        "api/agentService.js",
+        "src/lib/whatsappBatchScanner.ts"
+      ],
+      "entities": [
+        "StudioSettings",
+        "ChatMessage",
+        "ScanBatchReport"
+      ],
+      "key_rules": [
+        "Disparo prioritário via Webhook n8n com fallback imediato para Evolution API direta",
+        "Templates dinâmicos: confirmação, reagendamento, lembrete 24h, pós-venda e follow-up",
+        "Sanitização de texto de mensagens de clientes com exclusão de mensagens do próprio estúdio (fromMe === false)"
+      ]
+    },
+    {
+      "id": "gallery",
+      "name": "Galeria & Portfólio Flash",
+      "files": [
+        "src/pages/Gallery.tsx",
+        "src/pages/Portfolio.tsx"
+      ],
+      "entities": [
+        "FlashTattoo",
+        "Category",
+        "Artist"
+      ],
+      "key_rules": [
+        "Filtros por estilo: Fineline, Realismo, Old School, Blackwork, Coberturas",
+        "Conversão direta: clique na arte preenche ideia de projeto no agendamento"
+      ]
+    },
+    {
+      "id": "admin",
+      "name": "Painel de Controle & Regras do Negócio",
+      "files": [
+        "src/pages/Admin.tsx",
+        "src/types/studioSettings.ts"
+      ],
+      "entities": [
+        "StudioSettings",
+        "ArtistProfile",
+        "FinancialReport"
+      ],
+      "key_rules": [
+        "Persistência em 'studio_settings/main' no Firestore",
+        "Gestão de credenciais da Evolution API (baseUrl, apiKey, instance)",
+        "Controle de comissões por tatuador e fechamento financeiro"
+      ]
+    }
+  ]
+}

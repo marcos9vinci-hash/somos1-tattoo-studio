@@ -170,6 +170,8 @@ async function createBooking(data) {
   const createUrl = `${FIRESTORE_BASE}/bookings?key=${FIREBASE_API_KEY}`;
   const docData = {
     fields: {
+      userName: { stringValue: data.clientName || 'Cliente' },
+      userPhone: { stringValue: data.clientPhone || '' },
       clientName: { stringValue: data.clientName || 'Cliente' },
       clientPhone: { stringValue: data.clientPhone || '' },
       date: { stringValue: data.date },
@@ -191,6 +193,31 @@ async function createBooking(data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(docData)
   });
+
+  // Também cria ou atualiza lead correspondente na coluna "agendado" do Funil Comercial
+  try {
+    const leadUrl = `${FIRESTORE_BASE}/leads?key=${FIREBASE_API_KEY}`;
+    await fetch(leadUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fields: {
+          nome: { stringValue: data.clientName || 'Cliente' },
+          telefone: { stringValue: data.clientPhone || '' },
+          estagio: { stringValue: 'agendado' },
+          temperatura: { stringValue: 'quente' },
+          origem: { stringValue: 'whatsapp' },
+          ideiaProjeto: { stringValue: `Tattoo tamanho ${data.size || 'Média'} em ${data.date} às ${data.time}` },
+          tamanhoAproximado: { stringValue: data.size || 'Média' },
+          createdAt: { timestampValue: new Date().toISOString() },
+          updatedAt: { timestampValue: new Date().toISOString() }
+        }
+      })
+    });
+  } catch (leadErr) {
+    console.warn('Erro ao criar lead para booking:', leadErr);
+  }
+
   return { success: res.status === 200, status: res.status };
 }
 
@@ -282,10 +309,134 @@ export default async function handler(req, res) {
       const adminPhones = ['5511948116922', '5511957837132'];
       const isAdmin = adminPhones.includes(senderPhone);
 
-      // REGRA EXPLÍCITA DO MARKINHOS: O robô NÃO faz atendimento para clientes!
-      // Ele atua estritamente como assistente pessoal e executivo do próprio tatuador.
+      // ATENDIMENTO DE CLIENTES VIA WHATSAPP (Sincronização com CRM & Chat)
       if (!isAdmin) {
-        return res.status(200).json({ status: 'ignored_client', message: 'Agente restrito ao Markinhos.' });
+        // 1. Salva a mensagem recebida no CRM (coleção unificada crm_messages)
+        try {
+          const msgDocUrl = `${FIRESTORE_BASE}/crm_messages?key=${FIREBASE_API_KEY}`;
+          await fetch(msgDocUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                telefone: { stringValue: senderPhone },
+                clienteNome: { stringValue: senderName },
+                mensagem: { stringValue: userText },
+                remetente: { stringValue: 'cliente' },
+                timestamp: { timestampValue: new Date().toISOString() },
+                status: { stringValue: 'entregue' }
+              }
+            })
+          });
+        } catch (msgErr) {
+          console.warn('Erro ao salvar crm_messages:', msgErr);
+        }
+
+        // 2. Busca se o lead já existe na coleção leads pelo telefone
+        let existingLead = null;
+        try {
+          const queryLeadUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
+          const qRes = await fetch(queryLeadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              structuredQuery: {
+                from: [{ collectionId: 'leads' }],
+                where: {
+                  fieldFilter: {
+                    field: { fieldPath: 'telefone' },
+                    op: 'EQUAL',
+                    value: { stringValue: senderPhone }
+                  }
+                },
+                limit: 1
+              }
+            })
+          });
+          const qItems = await qRes.json();
+          if (Array.isArray(qItems) && qItems[0]?.document) {
+            existingLead = qItems[0].document;
+          }
+        } catch (qErr) {
+          console.warn('Erro ao consultar lead por telefone:', qErr);
+        }
+
+        // 3. Se não existe lead, cadastra na coluna 'novo'
+        if (!existingLead) {
+          try {
+            const createLeadUrl = `${FIRESTORE_BASE}/leads?key=${FIREBASE_API_KEY}`;
+            await fetch(createLeadUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fields: {
+                  nome: { stringValue: senderName },
+                  telefone: { stringValue: senderPhone },
+                  estagio: { stringValue: 'novo' },
+                  temperatura: { stringValue: 'quente' },
+                  origem: { stringValue: 'whatsapp' },
+                  ultimaMensagem: { stringValue: userText },
+                  pilotoIA: { booleanValue: false },
+                  createdAt: { timestampValue: new Date().toISOString() },
+                  updatedAt: { timestampValue: new Date().toISOString() }
+                }
+              })
+            });
+          } catch (createErr) {
+            console.warn('Erro ao criar novo lead:', createErr);
+          }
+        }
+
+        // 4. Se o Piloto IA estiver ativo para esse lead, o Agente Especialista responde
+        const isPilotoAtivo = existingLead?.fields?.pilotoIA?.booleanValue === true;
+        const currentStage = existingLead?.fields?.estagio?.stringValue || 'novo';
+
+        if (isPilotoAtivo) {
+          let autoReply = '';
+          const firstName = senderName.split(' ')[0] || senderName;
+
+          if (currentStage === 'novo') {
+            autoReply = `Oi ${firstName}! 😊 Sou a assistente do Somos 1 Tattoo Studio. Vi sua mensagem! Me conta, qual ideia ou estilo de tattoo você tem em mente?`;
+          } else if (currentStage === 'qualificacao') {
+            autoReply = `Perfeito, ${firstName}! Você já tem alguma imagem de referência ou foto de exemplo? E em qual parte do corpo você pretende fazer?`;
+          } else if (currentStage === 'negociacao') {
+            autoReply = `Entendi tudo, ${firstName}! Já estou repassando para o Markinhos fechar a estimativa e o sinal de garantia para reservarmos sua data na agenda 🎨`;
+          } else if (currentStage === 'agendado') {
+            autoReply = `Oi ${firstName}! Sua sessão está confirmada. Nosso estúdio fica na Rua Francesco de Martini 29. Lembra de vir descansado(a) e hidratado(a). Nos vemos lá! 🤘`;
+          } else if (currentStage === 'pos_venda' || currentStage === 'concluido') {
+            autoReply = `Fala ${firstName}! Passando para saber como está a cicatrização da sua tattoo. Qualquer dúvida sobre os cuidados ou a pomada, só me avisar! ✨`;
+          }
+
+          if (autoReply) {
+            await sendWhatsAppMessage(senderPhone, autoReply);
+
+            // Salva a resposta do robô no CRM
+            try {
+              const msgDocUrl = `${FIRESTORE_BASE}/crm_messages?key=${FIREBASE_API_KEY}`;
+              await fetch(msgDocUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fields: {
+                    telefone: { stringValue: senderPhone },
+                    clienteNome: { stringValue: senderName },
+                    mensagem: { stringValue: autoReply },
+                    remetente: { stringValue: 'ia' },
+                    timestamp: { timestampValue: new Date().toISOString() },
+                    status: { stringValue: 'entregue' }
+                  }
+                })
+              });
+            } catch (rErr) {
+              console.warn('Erro ao salvar resposta da IA:', rErr);
+            }
+          }
+
+          return res.status(200).json({ status: 'client_handled_by_agent', stage: currentStage });
+        }
+
+        // Se piloto estiver desligado, apenas registrou no CRM para atendimento humano
+        return res.status(200).json({ status: 'client_saved_to_crm', message: 'Mensagem registrada no chat do CRM.' });
       }
 
       const text = userText.toLowerCase();

@@ -29,7 +29,10 @@ import {
   AlertTriangle,
   Zap,
   Play,
-  Ban
+  Ban,
+  UserCheck,
+  CalendarCheck,
+  HelpCircle
 } from 'lucide-react';
 
 type ActiveTab = 'carteira' | 'funil' | 'estrategias';
@@ -63,6 +66,9 @@ export const CRMDashboardPage: React.FC = () => {
   const [isSimuladorOpen, setIsSimuladorOpen] = useState(false);
   const [estrategiaParaSimular, setEstrategiaParaSimular] = useState<EstrategiaCampanha | null>(null);
 
+  const [sessoesParaConfirmar, setSessoesParaConfirmar] = useState<any[]>([]);
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
+
   // Toast
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -74,19 +80,38 @@ export const CRMDashboardPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [leadsData, clientesData, metricsData] = await Promise.all([
+      const [leadsData, clientesData, metricsData, sessoesData] = await Promise.all([
         crmService.getLeads(),
         crmService.getClientes(),
-        crmService.getDashboardMetrics()
+        crmService.getDashboardMetrics(),
+        crmService.getSessoesParaConfirmar()
       ]);
       setLeads(leadsData);
       setClientes(clientesData);
       setMetrics(metricsData);
+      setSessoesParaConfirmar(sessoesData);
     } catch (err: any) {
       console.error('Erro ao carregar dados do CRM:', err);
       showToast('error', 'Erro ao carregar registros do CRM.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmarPresenca = async (sessao: any, compareceu: boolean) => {
+    setConfirmandoId(sessao.id);
+    try {
+      await crmService.confirmarPresencaBooking(sessao.id, compareceu, sessao.booking);
+      if (compareceu) {
+        showToast('success', `✅ Presença de ${sessao.nome} confirmada! Lead movido para Pós-Venda (Cicatrização).`);
+      } else {
+        showToast('error', `❌ Falta registrada para ${sessao.nome}. Lead movido para Resgate / Follow-up.`);
+      }
+      await loadData();
+    } catch (err: any) {
+      showToast('error', `Falha ao registrar presença: ${err?.message}`);
+    } finally {
+      setConfirmandoId(null);
     }
   };
 
@@ -291,6 +316,63 @@ export const CRMDashboardPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ── BANNER GOOGLE PROMPT: Confirmação de Presença de Sessão ── */}
+      {sessoesParaConfirmar.length > 0 && (
+        <div className="space-y-3">
+          {sessoesParaConfirmar.map(sessao => (
+            <div
+              key={sessao.id}
+              className="relative overflow-hidden rounded-2xl border-2 border-amber-500/50 bg-gradient-to-r from-amber-950/60 via-background to-amber-950/40 p-4 sm:p-5 shadow-2xl shadow-amber-500/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-3 duration-300"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-3 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded-2xl flex-shrink-0 animate-pulse">
+                    <CalendarCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-headline font-black uppercase tracking-wider border border-amber-500/40 flex items-center gap-1">
+                        <HelpCircle className="w-3 h-3 text-amber-400" />
+                        Confirmação de Presença
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {sessao.data ? sessao.data.split('-').reverse().join('/') : 'Hoje'} às {sessao.hora}
+                      </span>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-headline font-black text-foreground">
+                      O cliente <span className="text-amber-400 underline decoration-amber-500/60 underline-offset-4">{sessao.nome}</span> compareceu à sessão?
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Tattoo {sessao.tamanho} {sessao.estilo ? `(${sessao.estilo})` : ''} · Telefone: {sessao.telefone || 'Não informado'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                  <button
+                    disabled={confirmandoId === sessao.id}
+                    onClick={() => handleConfirmarPresenca(sessao, true)}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-headline font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/30 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <UserCheck className="w-4 h-4 stroke-[2.5]" />
+                    {confirmandoId === sessao.id ? 'Gravando...' : 'Sim, Compareceu & Tatuou'}
+                  </button>
+
+                  <button
+                    disabled={confirmandoId === sessao.id}
+                    onClick={() => handleConfirmarPresenca(sessao, false)}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 font-headline font-bold text-xs uppercase tracking-wider rounded-xl active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <AlertCircle className="w-4 h-4 text-rose-400" />
+                    Não Compareceu (Faltou)
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

@@ -152,7 +152,7 @@ export const crmService = {
 
       // 1. Agendados futuros/hoje:
       activeBookings.forEach(b => {
-        const rawPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
+        const rawPhone = b.userPhone || (b as any).clientPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
         const cleanPhone = rawPhone.replace(/\D/g, '');
         if (!cleanPhone || !existingPhones.has(cleanPhone)) {
           let estagio: LeadStage = 'agendado';
@@ -162,7 +162,7 @@ export const crmService = {
           const dataFmt = b.date ? b.date.split('-').reverse().join('/') : '';
           leadsFromBookings.push({
             id: `booking_${b.id}`,
-            nome: b.userName || 'Cliente da Agenda',
+            nome: b.userName || (b as any).clientName || 'Cliente da Agenda',
             telefone: rawPhone,
             origem: 'site',
             estagio,
@@ -187,13 +187,13 @@ export const crmService = {
 
       // 2. Recém-concluídos (< 15 dias) em Pós-Venda:
       recentBookings.forEach(b => {
-        const rawPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
+        const rawPhone = b.userPhone || (b as any).clientPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
         const cleanPhone = rawPhone.replace(/\D/g, '');
         if (!cleanPhone || !existingPhones.has(cleanPhone)) {
           const dataFmt = b.date ? b.date.split('-').reverse().join('/') : '';
           leadsFromBookings.push({
             id: `booking_${b.id}`,
-            nome: b.userName || 'Cliente da Agenda',
+            nome: b.userName || (b as any).clientName || 'Cliente da Agenda',
             telefone: rawPhone,
             origem: 'site',
             estagio: 'pos_venda',
@@ -571,15 +571,56 @@ export const crmService = {
     }
   },
 
-  async getMensagensChat(clienteId: string): Promise<any[]> {
+  async getMensagensChat(clienteId: string, telefone?: string): Promise<any[]> {
+    const mensagens: any[] = [];
+    const idsVistos = new Set<string>();
+
+    const cleanPhone = telefone ? telefone.replace(/\D/g, '') : '';
+
+    // 1. Tenta buscar da subcoleção em users/{clienteId}/crm_messages se clienteId for ID de usuário válido
     try {
-      const subCol = collection(db, USERS_COLLECTION, clienteId, 'crm_messages');
-      const q = query(subCol, orderBy('timestamp', 'asc'));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (clienteId && !clienteId.startsWith('booking_')) {
+        const subCol = collection(db, USERS_COLLECTION, clienteId, 'crm_messages');
+        const q = query(subCol, orderBy('timestamp', 'asc'));
+        const snap = await getDocs(q);
+        snap.docs.forEach(d => {
+          if (!idsVistos.has(d.id)) {
+            idsVistos.add(d.id);
+            mensagens.push({ id: d.id, ...d.data() });
+          }
+        });
+      }
     } catch (e) {
-      return [];
+      // Ignora erro se subcoleção não existir
     }
+
+    // 2. Busca na coleção unificada crm_messages pelo telefone normalizado
+    if (cleanPhone) {
+      try {
+        const qPhone = query(
+          collection(db, 'crm_messages'),
+          where('telefone', '==', cleanPhone)
+        );
+        const snapPhone = await getDocs(qPhone);
+        snapPhone.docs.forEach(d => {
+          if (!idsVistos.has(d.id)) {
+            idsVistos.add(d.id);
+            mensagens.push({ id: d.id, ...d.data() });
+          }
+        });
+      } catch (err) {
+        console.warn('Aviso ao buscar crm_messages por telefone:', err);
+      }
+    }
+
+    // Ordena mensagens cronologicamente
+    mensagens.sort((a, b) => {
+      const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp || 0).getTime();
+      const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : new Date(b.timestamp || 0).getTime();
+      return tA - tB;
+    });
+
+    return mensagens;
   },
 
   async enviarMensagemChat(
@@ -588,25 +629,41 @@ export const crmService = {
     remetente: 'cliente' | 'ia' | 'tatuador',
     telefone?: string
   ): Promise<any> {
+    const cleanPhone = telefone ? telefone.replace(/\D/g, '') : '';
     const msgPayload: any = {
       clienteId,
+      telefone: cleanPhone,
       remetente,
       mensagem,
       timestamp: new Date(),
       status: 'enviado'
     };
 
+    // 1. Salva na coleção unificada crm_messages
     try {
-      const subCol = collection(db, USERS_COLLECTION, clienteId, 'crm_messages');
-      await addDoc(subCol, { ...msgPayload, timestamp: serverTimestamp() });
+      await addDoc(collection(db, 'crm_messages'), {
+        ...msgPayload,
+        timestamp: serverTimestamp()
+      });
       msgPayload.status = 'entregue';
     } catch (e) {
-      console.warn('Aviso ao salvar mensagem no Firestore:', e);
+      console.warn('Aviso ao salvar mensagem em crm_messages:', e);
     }
 
-    if ((remetente === 'tatuador' || remetente === 'ia') && telefone) {
+    // 2. Salva na subcoleção do usuário se clienteId for um user real
+    if (clienteId && !clienteId.startsWith('booking_')) {
       try {
-        whatsappService.sendMessage(telefone, mensagem, null, 'followup').catch(err => {
+        const subCol = collection(db, USERS_COLLECTION, clienteId, 'crm_messages');
+        await addDoc(subCol, { ...msgPayload, timestamp: serverTimestamp() });
+      } catch (e) {
+        // silencioso
+      }
+    }
+
+    // 3. Dispara no WhatsApp via Evolution API se for envio do tatuador ou IA
+    if ((remetente === 'tatuador' || remetente === 'ia') && cleanPhone) {
+      try {
+        whatsappService.sendMessage(cleanPhone, mensagem, null, 'followup').catch(err => {
           console.warn('Aviso no disparo via WhatsApp Evolution:', err);
         });
       } catch (err) {
@@ -935,5 +992,77 @@ export const crmService = {
   async getContatosIgnorados(): Promise<{ telefone: string; motivo: string; dataIgnorado: any }[]> {
     const snap = await getDocs(collection(db, 'contatos_ignorados'));
     return snap.docs.map(d => ({ telefone: d.id, ...d.data() } as any));
+  },
+
+  // ==========================================
+  // CONFIRMAÇÃO DE PRESENÇA ESTILO GOOGLE (1-CLIQUE)
+  // ==========================================
+  async getSessoesParaConfirmar(): Promise<{
+    id: string;
+    nome: string;
+    telefone: string;
+    data: string;
+    hora: string;
+    tamanho: string;
+    estilo?: string;
+    status: string;
+    booking: Booking;
+  }[]> {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const snap = await getDocs(collection(db, BOOKINGS_COLLECTION));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+
+      // Filtra agendamentos cuja data seja hoje ou até 7 dias atrás e que ainda estejam aprovados/pendentes de confirmação
+      const pendentes = all.filter(b => {
+        const st = String(b.status || '').toLowerCase().replace('-', '_').trim();
+        const isApproved = st === 'approved' || st === 'deposit_paid';
+        if (!isApproved) return false;
+        const bDate = (b.date || '').split('T')[0];
+        if (!bDate) return false;
+        return bDate <= todayStr;
+      });
+
+      return pendentes.map(b => ({
+        id: b.id,
+        nome: b.userName || b.clientName || 'Cliente Estúdio',
+        telefone: b.userPhone || b.clientPhone || '',
+        data: b.date,
+        hora: b.time || '10:00',
+        tamanho: b.size || 'Média',
+        estilo: b.estilo || '',
+        status: b.status,
+        booking: b
+      }));
+    } catch (e) {
+      console.warn('Erro ao buscar sessoesParaConfirmar:', e);
+      return [];
+    }
+  },
+
+  async confirmarPresencaBooking(bookingId: string, compareceu: boolean, bookingData?: any): Promise<void> {
+    const nextStatus = compareceu ? BookingStatus.COMPLETED : BookingStatus.NO_SHOW;
+    const bookingRef = doc(db, BOOKINGS_COLLECTION, bookingId);
+
+    // 1. Atualiza status do agendamento
+    await updateDoc(bookingRef, {
+      status: nextStatus,
+      updatedAt: serverTimestamp()
+    });
+
+    // 2. Busca dados completos se não vieram
+    let bData = bookingData;
+    if (!bData) {
+      const bSnap = await getDoc(bookingRef);
+      if (bSnap.exists()) {
+        bData = { id: bSnap.id, ...bSnap.data() };
+      }
+    }
+
+    // 3. Dispara sincronização em cadeia com Funil e Carteira de Temperatura
+    if (bData) {
+      await this.syncBookingToCRM(bData, nextStatus);
+    }
   }
 };
+

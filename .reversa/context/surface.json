@@ -1,0 +1,69 @@
+{
+  "project_name": "Somos 1 Tattoo Studio / Indica Aí",
+  "target_dir": "c:/Users/Pc/.gemini/antigravity/scratch/Projetos/IndicaAi-SuperApp-Preview",
+  "languages": {
+    "sem_extensao": 5,
+    ".example": 1,
+    ".local": 1,
+    ".xml": 9,
+    ".iml": 1,
+    ".html": 2,
+    ".js": 6,
+    ".txt": 2,
+    ".ts": 56,
+    ".cjs": 21,
+    ".md": 2,
+    ".json": 10,
+    ".rules": 1,
+    ".png": 22,
+    ".toml": 1,
+    ".sh": 1,
+    ".ico": 1,
+    ".mp4": 2,
+    ".mjs": 1,
+    ".tsx": 114,
+    ".css": 2,
+    ".py": 1
+  },
+  "total_files": 262,
+  "total_estimated_lines": 53963,
+  "frameworks": [
+    "React 19",
+    "Vite",
+    "TypeScript",
+    "Tailwind CSS 4",
+    "Firebase Firestore",
+    "Express (Node.js)",
+    "Capacitor (Android)",
+    "Lucide React"
+  ],
+  "entry_points": [
+    "index.html",
+    "src/main.tsx",
+    "src/App.tsx",
+    "server.js",
+    "api/agentService.js"
+  ],
+  "modules": [
+    "CRM & Funil Comercial",
+    "Indica Aí (Afiliados & Recomendações)",
+    "Agenda & Booking",
+    "Automação WhatsApp & n8n",
+    "Galeria & Portfólio",
+    "Painel Admin & Configurações"
+  ],
+  "organization_suggestion": {
+    "granularity": "module",
+    "rationale": "O projeto é um SuperApp modularizado composto por Funil Comercial CRM, Motor de Afiliados Indica Aí, Agenda de Sessões e Motor de Disparo WhatsApp.",
+    "signals": [
+      {
+        "type": "core_business",
+        "evidence": [
+          "CRM Dual Funnel",
+          "IndicaAi Referral Tree",
+          "Evolution WhatsApp Bot"
+        ]
+      }
+    ]
+  }
+}

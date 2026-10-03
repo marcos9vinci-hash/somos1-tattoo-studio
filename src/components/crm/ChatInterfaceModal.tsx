@@ -46,6 +46,18 @@ const ESTAGIOS_CONFIG: { id: LeadStage; label: string; cor: string; emoji: strin
   { id: 'followup', label: 'Follow-up / Resgate', cor: 'bg-rose-500/20 text-rose-300 border-rose-500/40', emoji: '🚨' }
 ];
 
+const AGENTES_POR_ESTAGIO: Record<LeadStage, { nome: string; papel: string; cor: string; emoji: string }> = {
+  novo: { nome: 'Agente Boas-Vindas', papel: 'Acolhimento & Sondagem Inicial', cor: 'text-blue-400 bg-blue-500/10 border-blue-500/30', emoji: '✨' },
+  qualificacao: { nome: 'Agente Ideia & Estilo', papel: 'Referências Visuais & Região do Corpo', cor: 'text-amber-400 bg-amber-500/10 border-amber-500/30', emoji: '🎯' },
+  negociacao: { nome: 'Agente Fechamento & Sinal', papel: 'Estimativa de Valor & Trava de Agenda', cor: 'text-purple-400 bg-purple-500/10 border-purple-500/30', emoji: '💰' },
+  agendado: { nome: 'Agente Pré-Sessão', papel: 'Endereço (Rua Francesco de Martini 29) & Preparo', cor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', emoji: '🗓️' },
+  concluido: { nome: 'Agente Cicatrização (15 dias)', papel: 'Cuidados Pós-Tattoo, Pomada & Fotos', cor: 'text-teal-400 bg-teal-500/10 border-teal-500/30', emoji: '🏆' },
+  pos_venda: { nome: 'Agente Cicatrização (15 dias)', papel: 'Cuidados Pós-Tattoo, Pomada & Fotos', cor: 'text-teal-400 bg-teal-500/10 border-teal-500/30', emoji: '🏆' },
+  pronto: { nome: 'Agente Agendamento Imediato', papel: 'Escolha de Horário Disponível', cor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', emoji: '⚡' },
+  perdido: { nome: 'Agente Arquivo Morto', papel: 'Cliente Desistente', cor: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30', emoji: '⛔' },
+  followup: { nome: 'Agente Resgate', papel: 'Reativação com Condição Especial', cor: 'text-rose-400 bg-rose-500/10 border-rose-500/30', emoji: '🚨' }
+};
+
 export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -62,6 +74,8 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({
   const [enviando, setEnviando] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [estagioAtual, setEstagioAtual] = useState<LeadStage>(cliente?.estagio || 'novo');
+  const [pilotoIAAtivo, setPilotoIAAtivo] = useState<boolean>(false);
+  const [avisoTransferencia, setAvisoTransferencia] = useState<string | null>(null);
   
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,12 +86,16 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({
     }
   }, [cliente?.estagio]);
 
-  // Carrega histórico de mensagens do cliente
+  // Carrega histórico de mensagens do cliente e mantém sincronizado
   useEffect(() => {
-    if (cliente?.id && isOpen) {
-      setCarregando(true);
-      crmService.getMensagensChat(cliente.id)
+    if (!cliente?.id || !isOpen) return;
+
+    let isMounted = true;
+    const fetchMensagens = (mostrarLoading = false) => {
+      if (mostrarLoading) setCarregando(true);
+      crmService.getMensagensChat(cliente.id, cliente.telefone)
         .then(hist => {
+          if (!isMounted) return;
           if (hist && hist.length > 0) {
             setMensagens(hist);
           } else {
@@ -95,9 +113,23 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({
             ]);
           }
         })
-        .finally(() => setCarregando(false));
-    }
-  }, [cliente?.id, isOpen]);
+        .finally(() => {
+          if (isMounted && mostrarLoading) setCarregando(false);
+        });
+    };
+
+    fetchMensagens(true);
+
+    // Polling a cada 4 segundos para receber respostas do cliente via WhatsApp em tempo real
+    const intervalId = setInterval(() => {
+      fetchMensagens(false);
+    }, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [cliente?.id, cliente?.telefone, isOpen]);
 
   // Auto scroll para o final das mensagens
   useEffect(() => {
@@ -182,6 +214,10 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({
 
   const handleMudarEstagio = async (novo: LeadStage) => {
     setEstagioAtual(novo);
+    const agente = AGENTES_POR_ESTAGIO[novo] || AGENTES_POR_ESTAGIO.novo;
+    setAvisoTransferencia(`Conversa transferida para: ${agente.emoji} ${agente.nome} (${agente.papel})`);
+    setTimeout(() => setAvisoTransferencia(null), 5000);
+
     if (onStageChange) {
       onStageChange(cliente.id, novo);
     }
@@ -327,42 +363,90 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({
             </div>
           </div>
 
-          {/* ── Barra de Nível do Funil Interativa ── */}
-          <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-zinc-400 font-headline uppercase tracking-wider font-bold">
-                Nível no Funil:
-              </span>
-              <select
-                value={estagioAtual}
-                onChange={e => handleMudarEstagio(e.target.value as LeadStage)}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-headline font-bold border cursor-pointer focus:outline-none transition-all",
-                  configEstagio.cor
-                )}
-              >
-                {ESTAGIOS_CONFIG.map(st => (
-                  <option key={st.id} value={st.id} className="bg-zinc-900 text-white">
-                    {st.emoji} {st.label}
-                  </option>
-                ))}
-              </select>
+          {/* ── Barra de Nível do Funil Interativa & Agente Responsável ── */}
+          <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-zinc-400 font-headline uppercase tracking-wider font-bold">
+                  Nível no Funil:
+                </span>
+                <select
+                  value={estagioAtual}
+                  onChange={e => handleMudarEstagio(e.target.value as LeadStage)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-headline font-bold border cursor-pointer focus:outline-none transition-all",
+                    configEstagio.cor
+                  )}
+                >
+                  {ESTAGIOS_CONFIG.map(st => (
+                    <option key={st.id} value={st.id} className="bg-zinc-900 text-white">
+                      {st.emoji} {st.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {/* Toggle de Piloto Automático da IA */}
+                <button
+                  type="button"
+                  onClick={() => setPilotoIAAtivo(!pilotoIAAtivo)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[11px] font-headline font-black flex items-center gap-1.5 border transition-all active:scale-95 shadow-sm",
+                    pilotoIAAtivo
+                      ? "bg-emerald-600/30 text-emerald-300 border-emerald-500/50 shadow-emerald-500/20"
+                      : "bg-zinc-800 text-zinc-400 border-white/10 hover:text-white"
+                  )}
+                  title={pilotoIAAtivo ? "Piloto IA ATIVO: O robô responde automaticamente mensagens deste cliente" : "Piloto IA DESLIGADO: Você responde manualmente"}
+                >
+                  <Bot className={cn("w-3.5 h-3.5", pilotoIAAtivo ? "text-emerald-400 animate-pulse" : "text-zinc-500")} />
+                  <span>{pilotoIAAtivo ? 'Piloto IA: ON' : 'Piloto IA: OFF'}</span>
+                </button>
+
+                {/* Botão de Sugestão de IA (Meta Style) */}
+                <button
+                  type="button"
+                  onClick={() => setShowSugestoesIA(!showSugestoesIA)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[11px] font-headline font-black flex items-center gap-1 border transition-all active:scale-95 shadow-sm",
+                    showSugestoesIA
+                      ? "bg-purple-600 text-white border-purple-400 shadow-purple-600/30"
+                      : "bg-purple-600/20 text-purple-300 border-purple-500/40 hover:bg-purple-600/30"
+                  )}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Sugestões</span>
+                </button>
+              </div>
             </div>
 
-            {/* Botão de Sugestão de IA (Meta Style) */}
-            <button
-              type="button"
-              onClick={() => setShowSugestoesIA(!showSugestoesIA)}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs font-headline font-black flex items-center gap-1.5 border transition-all active:scale-95 shadow-sm",
-                showSugestoesIA
-                  ? "bg-purple-600 text-white border-purple-400 shadow-purple-600/30"
-                  : "bg-purple-600/20 text-purple-300 border-purple-500/40 hover:bg-purple-600/30"
-              )}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Co-Piloto IA</span>
-            </button>
+            {/* Badge do Agente Especialista Ativo */}
+            {(() => {
+              const agente = AGENTES_POR_ESTAGIO[estagioAtual] || AGENTES_POR_ESTAGIO.novo;
+              return (
+                <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-zinc-950/80 border border-white/5">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span>{agente.emoji}</span>
+                    <span className="font-headline font-bold text-zinc-200">{agente.nome}:</span>
+                    <span className="text-zinc-400 truncate text-[10px]">{agente.papel}</span>
+                  </div>
+                  <span className={cn(
+                    "text-[9px] uppercase font-mono px-1.5 py-0.5 rounded font-bold shrink-0",
+                    pilotoIAAtivo ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-zinc-800 text-zinc-400"
+                  )}>
+                    {pilotoIAAtivo ? 'Auto-pilot' : 'Manual'}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Aviso Animado de Transferência de Agente */}
+            {avisoTransferencia && (
+              <div className="p-2 rounded-xl bg-purple-950/70 border border-purple-500/50 text-purple-200 text-xs flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300 shadow-lg shadow-purple-900/30">
+                <Bot className="w-4 h-4 text-purple-400 shrink-0 animate-bounce" />
+                <span className="font-headline font-semibold">{avisoTransferencia}</span>
+              </div>
+            )}
           </div>
 
           {/* Card Contextual da Ideia do Projeto */}
