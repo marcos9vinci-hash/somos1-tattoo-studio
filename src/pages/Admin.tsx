@@ -258,8 +258,25 @@ export default function Admin() {
       fetchData(true);
       fetchSettings();
     }, 60000);
-    return () => clearInterval(interval);
-  }, [isAdmin, settings?.automation?.enabled]);
+
+    const handleNavegarAgenda = (e: any) => {
+      setAgendaSubTab('calendar');
+      const detail = e.detail || {};
+      if (detail.leadId) {
+        const cleanBookingId = String(detail.leadId).replace('booking_', '');
+        const targetBooking = bookings.find(b => b.id === cleanBookingId || (detail.nome && b.userName === detail.nome));
+        if (targetBooking) {
+          setSelectedBooking(targetBooking);
+        }
+      }
+    };
+    window.addEventListener('somos1:navegar_agenda', handleNavegarAgenda);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('somos1:navegar_agenda', handleNavegarAgenda);
+    };
+  }, [isAdmin, settings?.automation?.enabled, bookings]);
 
   const handleSendWhatsApp = (booking: Booking, type: 'confirmacao' | 'lembrete' | 'followup' = 'confirmacao') => {
     let phone = booking.userPhone || users.find(u => u.uid === booking.userId)?.phone;
@@ -1448,7 +1465,16 @@ export default function Admin() {
                 <div className="space-y-6">
                   {agendaSubTab === 'crm' && (
                     <ModuleErrorBoundary moduleName="Dashboard CRM">
-                      <CRMDashboardPage />
+                      <CRMDashboardPage
+                        onNavigateToCalendar={(id) => {
+                          setAgendaSubTab('calendar');
+                          if (id) {
+                            const cleanId = String(id).replace('booking_', '');
+                            const target = bookings.find(b => b.id === cleanId);
+                            if (target) setSelectedBooking(target);
+                          }
+                        }}
+                      />
                     </ModuleErrorBoundary>
                   )}
 

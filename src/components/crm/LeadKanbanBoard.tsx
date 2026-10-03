@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lead, LeadStage, ColunaAIAgentConfig } from '../../types/crm';
 import { crmService } from '../../lib/crmService';
 import { 
@@ -16,6 +16,8 @@ import {
   Send,
   MessageSquare,
   ChevronRight,
+  ChevronLeft,
+  ArrowUpRight,
   Bot,
   Sliders,
   Ban
@@ -30,6 +32,7 @@ interface LeadKanbanBoardProps {
   onNewLeadClick: () => void;
   onAbrirChat?: (lead: Lead) => void;
   onIgnorarContato?: (lead: Lead) => void;
+  onAbrirAgenda?: (lead: Lead) => void;
 }
 
 const STAGES: { id: LeadStage; title: string; color: string; badge: string; icon: any }[] = [
@@ -48,10 +51,51 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
   onSelectLead,
   onNewLeadClick,
   onAbrirChat,
-  onIgnorarContato
+  onIgnorarContato,
+  onAbrirAgenda
 }) => {
   const [agentsConfig, setAgentsConfig] = useState<Record<LeadStage, ColunaAIAgentConfig>>(STAGE_AGENTS_NAIA);
   const [selectedAgentForModal, setSelectedAgentForModal] = useState<ColunaAIAgentConfig | null>(null);
+
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('[draggable="true"]')) {
+      return;
+    }
+    setIsMouseDown(true);
+    if (boardRef.current) {
+      setStartX(e.pageX - boardRef.current.offsetLeft);
+      setScrollLeftState(boardRef.current.scrollLeft);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDown || !boardRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - boardRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    boardRef.current.scrollLeft = scrollLeftState - walk;
+  };
+
+  const scrollBoard = (direction: 'left' | 'right') => {
+    if (boardRef.current) {
+      const amount = direction === 'left' ? -350 : 350;
+      boardRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
 
   useEffect(() => {
     crmService.getStageAgents().then(loaded => {
@@ -103,27 +147,63 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-400" />
             Funil Comercial de Leads
           </h2>
           <p className="text-xs text-zinc-400">
-            Arraste os cards entre as etapas, chame no WhatsApp ou clique no ícone do robô para ajustar as skills da IA.
+            Arraste os cards entre as etapas, role livremente com o mouse ou use os botões para navegar entre as colunas.
           </p>
         </div>
-        <button
-          onClick={onNewLeadClick}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold rounded-lg transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Lead
-        </button>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Botões de Rolagem Rápida Superior */}
+          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5">
+            <button
+              type="button"
+              onClick={() => scrollBoard('left')}
+              className="p-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-all active:scale-90"
+              title="Rolar Colunas para Esquerda"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[10px] text-zinc-500 font-headline font-bold px-1.5 uppercase">
+              Colunas
+            </span>
+            <button
+              type="button"
+              onClick={() => scrollBoard('right')}
+              className="p-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-all active:scale-90"
+              title="Rolar Colunas para Direita"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <button
+            onClick={onNewLeadClick}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Lead
+          </button>
+        </div>
       </div>
 
-      {/* Grid horizontal do Kanban com scroll fluido */}
-      <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x">
+      {/* Grid horizontal do Kanban com mouse drag-to-scroll */}
+      <div
+        ref={boardRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        className={cn(
+          "flex gap-4 overflow-x-auto pb-4 pt-1 snap-x select-none",
+          isMouseDown ? "cursor-grabbing" : "cursor-grab"
+        )}
+      >
         {STAGES.map((stage) => {
           const stageLeads = leads.filter((lead) => lead.estagio === stage.id);
           const Icon = stage.icon;
@@ -223,6 +303,37 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                         <p className="text-[11px] text-zinc-300 line-clamp-2 italic bg-zinc-950/40 p-1.5 rounded-lg border border-white/5">
                           "{lead.ideiaProjeto}"
                         </p>
+                      )}
+
+                      {/* Badge de Agendamento Clicável (Acesso Rápido ao Calendário & Editor) */}
+                      {(lead.estagio === 'agendado' || lead.id.startsWith('booking_') || /às\s*\d{2}:\d{2}|\d{2}\/\d{2}/i.test(lead.ideiaProjeto || '')) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onAbrirAgenda) {
+                              onAbrirAgenda(lead);
+                            } else {
+                              window.dispatchEvent(new CustomEvent('somos1:navegar_agenda', {
+                                detail: { leadId: lead.id, leadNome: lead.nome, date: (lead as any).dataAgendada || (lead as any).date }
+                              }));
+                            }
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-sky-950/60 hover:bg-sky-900/80 border border-sky-500/40 text-sky-200 text-[11px] font-headline font-bold transition-all group/agenda shadow-xs active:scale-98"
+                          title="Clique para abrir na Agenda e editar/reagendar horário deste cliente"
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Calendar className="w-3.5 h-3.5 text-sky-400 shrink-0 group-hover/agenda:scale-110 transition-transform" />
+                            <span className="truncate font-mono">
+                              {lead.ideiaProjeto?.match(/\d{2}\/\d{2}.*?(?:às\s*\d{2}:\d{2})?/i)?.[0] || 
+                               ((lead as any).date && (lead as any).time ? `${(lead as any).date.split('-').reverse().join('/')} às ${(lead as any).time}` : 'Ver no Calendário')}
+                            </span>
+                          </div>
+                          <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold shrink-0 flex items-center gap-0.5">
+                            <span>Editar</span>
+                            <ArrowUpRight className="w-2.5 h-2.5" />
+                          </span>
+                        </button>
                       )}
 
                       {/* Metadados / SPIN */}

@@ -221,6 +221,71 @@ async function createBooking(data) {
   return { success: res.status === 200, status: res.status };
 }
 
+async function findActiveBookingForClient(clientName, clientPhone) {
+  try {
+    const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
+    const res = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'bookings' }],
+          limit: 100
+        }
+      })
+    });
+    const items = await res.json();
+    if (!Array.isArray(items)) return null;
+
+    const normName = (clientName || '').toLowerCase().trim();
+    const cleanPhone = (clientPhone || '').replace(/\D/g, '');
+
+    for (const item of items) {
+      if (!item.document || !item.document.fields) continue;
+      const f = item.document.fields;
+      const st = f.status?.stringValue || '';
+      if (st === 'cancelled' || st === 'no_show' || st === 'completed') continue;
+
+      const bName = (f.userName?.stringValue || f.clientName?.stringValue || '').toLowerCase().trim();
+      const bPhone = (f.userPhone?.stringValue || f.clientPhone?.stringValue || '').replace(/\D/g, '');
+
+      const phoneMatch = cleanPhone && bPhone && (cleanPhone === bPhone || cleanPhone.endsWith(bPhone) || bPhone.endsWith(cleanPhone));
+      const nameMatch = normName && bName && (normName.includes(bName) || bName.includes(normName));
+
+      if (phoneMatch || nameMatch) {
+        const docName = item.document.name;
+        const id = docName.split('/').pop();
+        return { id, fields: f, docName };
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn('Erro ao buscar booking ativo:', err);
+    return null;
+  }
+}
+
+async function updateBookingDateTime(bookingId, newDate, newTime) {
+  try {
+    const patchUrl = `${FIRESTORE_BASE}/bookings/${bookingId}?updateMask.fieldPaths=date&updateMask.fieldPaths=time&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`;
+    const res = await fetch(patchUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fields: {
+          date: { stringValue: newDate },
+          time: { stringValue: newTime },
+          updatedAt: { timestampValue: new Date().toISOString() }
+        }
+      })
+    });
+    return res.status === 200;
+  } catch (err) {
+    console.warn('Erro ao atualizar booking:', err);
+    return false;
+  }
+}
+
 async function sendWhatsAppMessage(number, text) {
   const url = `https://${EVOLUTION_HOST}/message/sendText/${EVOLUTION_INSTANCE}`;
   const res = await fetch(url, {
@@ -464,38 +529,54 @@ export default async function handler(req, res) {
         }
       }
 
-      // B. Agendar
-      else if ((text.includes('agenda') || text.includes('agendar') || text.includes('marcar') || text.includes('marca')) && targetDate && targetTime) {
+      // B. Agendar / Reagendar
+      else if ((text.includes('agenda') || text.includes('agendar') || text.includes('marcar') || text.includes('marca') || text.includes('reagenda') || text.includes('remarca') || text.includes('muda') || text.includes('troca')) && targetDate && targetTime) {
         let clientName = senderName;
         if (isAdmin) {
-          const matchName = userText.match(/(?:agenda(?:r)?|marca(?:r)?)\s+(?:o|a)?\s*([a-zA-ZÀ-ÿ]+)/i);
+          const matchName = userText.match(/(?:agenda(?:r)?|marca(?:r)?|reagenda(?:r)?|remarca(?:r)?|muda(?:r)?|troca(?:r)?)\s+(?:o|a|de|hor[aá]rio\s+d[oa])?\s*([a-zA-ZÀ-ÿ]+)/i);
           if (matchName && matchName[1] && !['uma', 'pra', 'para', 'com', 'no', 'na', 'minha'].includes(matchName[1].toLowerCase())) {
             clientName = matchName[1].charAt(0).toUpperCase() + matchName[1].slice(1);
           }
         }
 
-        const price = parsePrice(text);
-        const deposit = parseDeposit(text);
-
-        await createBooking({
-          clientName,
-          clientPhone: isAdmin ? '' : senderPhone,
-          date: targetDate,
-          time: targetTime,
-          size: targetSize,
-          priceEstimated: price,
-          depositPaid: deposit,
-          description: `Tatuagem ${targetSize}${price > 0 ? ` (R$ ${price})` : ''}`,
-          status: isAdmin ? 'approved' : 'pending_approval'
-        });
-
+        const isReagendamento = text.includes('reagenda') || text.includes('remarca') || text.includes('muda') || text.includes('troca') || text.includes('altera');
         const [y, m, d] = targetDate.split('-');
         const formattedDate = `${d}/${m}/${y}`;
 
-        if (isAdmin) {
-          replyText = `✅ *Agendamento Confirmado pelo Chefe!*\n\n👤 *Cliente:* ${clientName}\n📅 *Data:* ${formattedDate} às *${targetTime}*\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Valor:* R$ ${price}` : ''}${deposit > 0 ? ` (Sinal: R$ ${deposit})` : ''}\n✍️ *Artista:* Markinhos\n\nJá está gravado no sistema e bloqueado na agenda! 🚀`;
+        // Verifica se já existe um agendamento ativo para esse cliente para não duplicar!
+        const existingBooking = await findActiveBookingForClient(clientName, isAdmin ? '' : senderPhone);
+
+        if (existingBooking && (isReagendamento || existingBooking.fields?.date?.stringValue === targetDate)) {
+          // ATUALIZA O AGENDAMENTO EXISTENTE (Sem duplicar!)
+          await updateBookingDateTime(existingBooking.id, targetDate, targetTime);
+
+          if (isAdmin) {
+            replyText = `🔄 *Reagendamento Atualizado com Sucesso!*\n\n👤 *Cliente:* ${clientName}\n📅 *Novo Horário:* ${formattedDate} às *${targetTime}*\n\nO agendamento anterior foi remarcado na agenda sem duplicidade! 🚀`;
+          } else {
+            replyText = `🔄 *Horário Alterado com Sucesso, ${clientName}!* 🖤\n\nSeu agendamento foi atualizado para *${formattedDate} às ${targetTime}*.\n📍 *Local:* Rua Francesco de Martini 29. Até lá! 🤘✨`;
+          }
         } else {
-          replyText = `🎉 *Agendamento Recebido com Sucesso, ${clientName}!* 🖤\n\n📅 *Data:* ${formattedDate}\n⏰ *Horário:* ${targetTime}\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Estimativa:* R$ ${price}` : ''}\n✍️ *Artista:* Markinhos\n📍 *Local:* Rua Francesco de Martini 29, São Caetano do Sul\n\nSeu horário está pré-reservado. Qualquer dúvida ou imprevisto, é só me chamar por aqui! Te esperamos 🤘✨`;
+          // Cria novo agendamento
+          const price = parsePrice(text);
+          const deposit = parseDeposit(text);
+
+          await createBooking({
+            clientName,
+            clientPhone: isAdmin ? '' : senderPhone,
+            date: targetDate,
+            time: targetTime,
+            size: targetSize,
+            priceEstimated: price,
+            depositPaid: deposit,
+            description: `Tatuagem ${targetSize}${price > 0 ? ` (R$ ${price})` : ''}`,
+            status: isAdmin ? 'approved' : 'pending_approval'
+          });
+
+          if (isAdmin) {
+            replyText = `✅ *Agendamento Confirmado pelo Chefe!*\n\n👤 *Cliente:* ${clientName}\n📅 *Data:* ${formattedDate} às *${targetTime}*\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Valor:* R$ ${price}` : ''}${deposit > 0 ? ` (Sinal: R$ ${deposit})` : ''}\n✍️ *Artista:* Markinhos\n\nJá está gravado no sistema e bloqueado na agenda! 🚀`;
+          } else {
+            replyText = `🎉 *Agendamento Recebido com Sucesso, ${clientName}!* 🖤\n\n📅 *Data:* ${formattedDate}\n⏰ *Horário:* ${targetTime}\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Estimativa:* R$ ${price}` : ''}\n✍️ *Artista:* Markinhos\n📍 *Local:* Rua Francesco de Martini 29, São Caetano do Sul\n\nSeu horário está pré-reservado. Qualquer dúvida ou imprevisto, é só me chamar por aqui! Te esperamos 🤘✨`;
+          }
         }
       }
 

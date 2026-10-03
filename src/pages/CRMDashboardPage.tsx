@@ -37,7 +37,11 @@ import {
 
 type ActiveTab = 'carteira' | 'funil' | 'estrategias';
 
-export const CRMDashboardPage: React.FC = () => {
+interface CRMDashboardPageProps {
+  onNavigateToCalendar?: (bookingIdOrDate?: string) => void;
+}
+
+export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateToCalendar }) => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('carteira');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [clientes, setClientes] = useState<ClienteCRM[]>([]);
@@ -581,6 +585,15 @@ export const CRMDashboardPage: React.FC = () => {
             onSelectLead={(l) => { setSelectedLead(l); setIsLeadModalOpen(true); }}
             onNewLeadClick={() => { setSelectedLead(null); setIsLeadModalOpen(true); }}
             onIgnorarContato={handleIgnorarContato}
+            onAbrirAgenda={(l) => {
+              if (onNavigateToCalendar) {
+                onNavigateToCalendar(l.id);
+              } else {
+                window.dispatchEvent(new CustomEvent('somos1:navegar_agenda', {
+                  detail: { leadId: l.id, nome: l.nome }
+                }));
+              }
+            }}
             onAbrirChat={(l) => setClienteParaChat({ 
               id: l.id, 
               nome: l.nome, 

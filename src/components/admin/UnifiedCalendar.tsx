@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Ban, X, Clock, User, Ruler, Plus, UserPlus, Settings as SettingsIcon, Sliders } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Ban, X, Clock, User, Ruler, Plus, UserPlus, Settings as SettingsIcon, Sliders, Flame, Snowflake, Sun, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Booking, StudioSettings, BookingStatus } from '../../types';
 import { db } from '../../lib/firebase';
+import { crmService } from '../../lib/crmService';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import NovoAgendamentoWizard from './NovoAgendamentoWizard';
 import DetalhesAgendamentoModal from './DetalhesAgendamentoModal';
@@ -99,6 +100,46 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
   React.useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
+
+  // Mapa de temperatura dos clientes sincronizado com o CRM
+  const [temperaturaMap, setTemperaturaMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    crmService.getClientes().then(clientes => {
+      const mapa: Record<string, string> = {};
+      clientes.forEach(c => {
+        const cleanPhone = (c.telefone || '').replace(/\D/g, '');
+        const cleanName = (c.nome || '').trim().toLowerCase();
+        if (cleanPhone) mapa[cleanPhone] = c.bucketTemperatura;
+        if (cleanName) mapa[cleanName] = c.bucketTemperatura;
+      });
+      setTemperaturaMap(mapa);
+    }).catch(err => console.warn('Erro ao carregar mapa de temperatura no calendário:', err));
+  }, [bookings]);
+
+  const getTemperaturaBooking = (b: Booking) => {
+    const cleanPhone = (b.userPhone || (b as any).clientPhone || '').replace(/\D/g, '');
+    const cleanName = (b.userName || (b as any).clientName || '').trim().toLowerCase();
+    const temp = (cleanPhone && temperaturaMap[cleanPhone]) || (cleanName && temperaturaMap[cleanName]);
+    return temp || 'quente';
+  };
+
+  const getTemperaturaBadge = (temp: string) => {
+    switch (temp) {
+      case 'quente':
+        return { emoji: '🔥', label: 'Quente', color: 'text-rose-400 bg-rose-500/20 border-rose-500/40' };
+      case 'morno':
+        return { emoji: '☀️', label: 'Morno', color: 'text-amber-400 bg-amber-500/20 border-amber-500/40' };
+      case 'esfriando':
+        return { emoji: '❄️', label: 'Esfriando', color: 'text-sky-400 bg-sky-500/20 border-sky-500/40' };
+      case 'alerta':
+        return { emoji: '⚠️', label: 'Alerta', color: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/40' };
+      case 'desmarcou':
+        return { emoji: '🚨', label: 'Desmarcou', color: 'text-red-400 bg-red-500/20 border-red-500/40' };
+      default:
+        return { emoji: '🔥', label: 'Quente', color: 'text-rose-400 bg-rose-500/20 border-rose-500/40' };
+    }
+  };
 
   const handleSaveSettings = async () => {
     try {
@@ -244,18 +285,23 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
               <div className="mt-1.5 space-y-0.5">
                 {dayBookings.slice(0, 3).map(b => {
                   const theme = getBookingStatusTheme(b.status);
+                  const temp = getTemperaturaBooking(b);
+                  const tempBadge = getTemperaturaBadge(temp);
                   return (
                     <div 
                       key={b.id} 
                       onClick={(e) => { e.stopPropagation(); setSelectedBookingDetails(b); }}
                       className={cn(
-                        "text-[8px] px-1.5 py-0.5 rounded truncate font-headline uppercase transition-all z-20 cursor-pointer font-bold flex items-center gap-1",
+                        "text-[8px] px-1.5 py-0.5 rounded truncate font-headline uppercase transition-all z-20 cursor-pointer font-bold flex items-center justify-between gap-1",
                         theme.badgeBg
                       )}
-                      title={`${b.userName} - ${theme.label}`}
+                      title={`${b.userName} (${tempBadge.label}) - ${theme.label}`}
                     >
+                      <div className="flex items-center gap-1 truncate min-w-0">
+                        <span className="shrink-0 text-[9px]">{tempBadge.emoji}</span>
+                        <span className="truncate">{b.time} · {b.userName || 'Tattoo'}</span>
+                      </div>
                       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", theme.dotColor)} />
-                      <span className="truncate">{b.time} · {b.userName || 'Tattoo'}</span>
                     </div>
                   );
                 })}
@@ -337,6 +383,8 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
                     )}
                     {booking && (() => {
                       const theme = getBookingStatusTheme(booking.status);
+                      const temp = getTemperaturaBooking(booking);
+                      const tempBadge = getTemperaturaBadge(temp);
                       return (
                         <div 
                           className={cn(
@@ -347,7 +395,10 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
                           onClick={(e) => { e.stopPropagation(); setSelectedBookingDetails(booking); }}
                         >
                           <div className="flex items-center justify-between gap-1">
-                            <p className="text-[8px] font-black uppercase truncate">{booking.userName}</p>
+                            <p className="text-[8px] font-black uppercase truncate flex items-center gap-1">
+                              <span className="text-[9px]">{tempBadge.emoji}</span>
+                              <span className="truncate">{booking.userName}</span>
+                            </p>
                             <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", theme.dotColor)} />
                           </div>
                           <p className="text-[7px] opacity-80 uppercase">{booking.time} · {theme.label}</p>
@@ -423,12 +474,18 @@ export default function UnifiedCalendar({ bookings, settings, onDateSelect, onBo
                   <div className="flex-1">
                     {booking ? (() => {
                       const theme = getBookingStatusTheme(booking.status);
+                      const temp = getTemperaturaBooking(booking);
+                      const tempBadge = getTemperaturaBadge(temp);
                       return (
                         <div className="flex items-center justify-between cursor-pointer" onClick={() => setSelectedBookingDetails(booking)}>
                           <div>
                             <div className="flex items-center gap-2">
                               <span className={cn("w-2 h-2 rounded-full", theme.dotColor)} />
                               <p className="text-xs font-black uppercase tracking-widest">{booking.userName}</p>
+                              <span className={cn("text-[9px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border", tempBadge.color)}>
+                                <span>{tempBadge.emoji}</span>
+                                <span>{tempBadge.label}</span>
+                              </span>
                             </div>
                             <p className="text-[10px] opacity-80 uppercase mt-0.5">{booking.time} · {booking.size} · R$ {booking.priceEstimated}</p>
                           </div>
