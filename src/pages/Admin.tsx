@@ -30,6 +30,7 @@ import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
 import LoadingScreen from '../components/layout/LoadingScreen';
 import { CRMDashboardPage } from './CRMDashboardPage';
 import { crmService } from '../lib/crmService';
+import AdminFinanceiroModule from '../components/admin/AdminFinanceiroModule';
 
 // Error Boundary isolador por módulo
 class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: string }, { hasError: boolean; error: Error | null }> {
@@ -71,7 +72,7 @@ class ModuleErrorBoundary extends Component<{ children: ReactNode; moduleName: s
   }
 }
 
-type MainModule = 'agenda' | 'indicaai' | 'studio' | 'galeria' | 'system';
+type MainModule = 'agenda' | 'indicaai' | 'studio' | 'galeria' | 'financeiro' | 'system';
 type AgendaSubTab = 'crm' | 'calendar' | 'members' | 'hours';
 type IndicaSubTab = 'dashboard' | 'credits' | 'campaigns' | 'invites' | 'rules' | 'tree';
 type SystemSubTab = 'automation' | 'templates' | 'logs';
@@ -103,6 +104,7 @@ export default function Admin() {
     indicaai: true,
     studio: true,
     galeria: true,
+    financeiro: true,
     system: true
   });
 
@@ -992,6 +994,35 @@ export default function Admin() {
             )}
           </div>
 
+          {/* ================= CATEGORIA: FINANCEIRO & REPASSES ================= */}
+          <div className="border border-white/5 rounded-2xl bg-white/[0.01] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setCurrentModule('financeiro')}
+              className={cn(
+                "w-full flex items-center justify-between p-3 transition-colors text-left",
+                currentModule === 'financeiro' ? "bg-amber-500/15 text-white" : "hover:bg-white/5 text-zinc-400"
+              )}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                {!sidebarCollapsed && (
+                  <div>
+                    <h4 className="font-headline font-black text-xs uppercase tracking-wider text-white">Financeiro & Caixa</h4>
+                    <p className="text-[9px] text-zinc-500 font-headline">Comissões & Repasses</p>
+                  </div>
+                )}
+              </div>
+              {!sidebarCollapsed && (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  ERP
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* ================= CATEGORIA 5: SISTEMA & AUTOMAÇÃO ================= */}
           <div className="border border-white/5 rounded-2xl bg-white/[0.01] overflow-hidden">
             <button
@@ -1161,9 +1192,17 @@ export default function Admin() {
                 </button>
               </div>
 
+              {/* Financeiro */}
+              <div className="border border-border rounded-xl p-2 bg-muted/20">
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">5. Financeiro & ERP</p>
+                <button onClick={() => { setCurrentModule('financeiro'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
+                  <DollarSign className="w-3.5 h-3.5 text-amber-400" /> Gestão de Comissões & Repasses
+                </button>
+              </div>
+
               {/* Sistema */}
               <div className="border border-border rounded-xl p-2 bg-muted/20 space-y-1">
-                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">5. Infraestrutura & WhatsApp</p>
+                <p className="text-[9px] font-headline font-black uppercase tracking-widest text-muted-foreground mb-1 px-1">6. Infraestrutura & WhatsApp</p>
                 <button onClick={() => { setCurrentModule('system'); setSystemSubTab('automation'); setIsMobileDrawerOpen(false); }} className="w-full text-left p-2 rounded-lg text-xs font-headline font-bold text-foreground flex items-center gap-2 hover:bg-muted">
                   <Bot className="w-3.5 h-3.5 text-foreground" /> Automação Evolution API
                 </button>
@@ -1210,6 +1249,7 @@ export default function Admin() {
                   {currentModule === 'indicaai' && '👑 PROGRAMA DE INDICAÇÃO & VIP'}
                   {currentModule === 'studio' && '🎨 TATTOO ENGINE PRO'}
                   {currentModule === 'galeria' && '📸 GALERIA IA & SOCIAL STUDIO'}
+                  {currentModule === 'financeiro' && '💰 GESTÃO FINANCEIRA & COMISSÕES'}
                   {currentModule === 'system' && '🤖 SISTEMA & AUTOMAÇÃO'}
                 </h1>
                 <span className="hidden sm:inline-block text-[9px] bg-muted text-foreground border border-border px-2 py-0.5 rounded-full font-headline font-black">
@@ -1236,7 +1276,7 @@ export default function Admin() {
         </header>
 
         {/* SUB-TABS NAVIGATION (Pills no Topo para Módulos de Múltiplas Funções) */}
-        {currentModule !== 'studio' && (
+        {currentModule !== 'studio' && currentModule !== 'financeiro' && (
           <div className="px-6 pt-3 pb-2 border-b border-border bg-background">
             <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
               
@@ -2017,6 +2057,13 @@ export default function Admin() {
                 </div>
               )}
 
+              {/* ==================== MÓDULO 6: FINANCEIRO & COMISSÕES ==================== */}
+              {currentModule === 'financeiro' && (
+                <ModuleErrorBoundary moduleName="Financeiro & Comissões">
+                  <AdminFinanceiroModule />
+                </ModuleErrorBoundary>
+              )}
+
             </div>
           )}
 
@@ -2313,6 +2360,18 @@ export default function Admin() {
         >
           <Camera className="w-4 h-4" />
           <span className="text-[8px] font-headline uppercase">Galeria IA</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentModule('financeiro')}
+          className={cn(
+            "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all",
+            currentModule === 'financeiro' ? "text-amber-400 font-black" : "text-zinc-500 hover:text-zinc-300"
+          )}
+        >
+          <DollarSign className="w-4 h-4" />
+          <span className="text-[8px] font-headline uppercase">Financeiro</span>
         </button>
 
         <button
