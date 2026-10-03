@@ -93,7 +93,7 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({
     let isMounted = true;
     const fetchMensagens = (mostrarLoading = false) => {
       if (mostrarLoading) setCarregando(true);
-      crmService.getMensagensChat(cliente.id, cliente.telefone)
+      crmService.getMensagensChat(cliente.id, cliente.telefone, cliente.nome)
         .then(hist => {
           if (!isMounted) return;
           if (hist && hist.length > 0) {
@@ -142,8 +142,44 @@ export const ChatInterfaceModal: React.FC<ChatInterfaceModalProps> = ({
 
   const primeiroNome = cliente.nome.split(' ')[0] || cliente.nome;
 
-  // Sugestões inteligentes do Co-Piloto Meta Style adaptadas ao estágio
+  // Sugestões inteligentes do Co-Piloto Meta Style adaptadas ao contexto real da conversa
   const getSugestoesIA = () => {
+    // 1. Contexto inteligente: analisa a última mensagem do cliente
+    const msgsCliente = mensagens.filter(m => m.remetente === 'cliente');
+    const ultimaMsg = msgsCliente.length > 0 ? msgsCliente[msgsCliente.length - 1].mensagem.toLowerCase() : '';
+
+    // Se a cliente está falando de Piercing / Jóia / Furo / Queda de piercing:
+    if (ultimaMsg.includes('piercing') || ultimaMsg.includes('furo') || ultimaMsg.includes('caiu') || ultimaMsg.includes('joia') || ultimaMsg.includes('jóia') || ultimaMsg.includes('nariz') || ultimaMsg.includes('orelha') || ultimaMsg.includes('umbigo') || ultimaMsg.includes('tampar') || ultimaMsg.includes('fechar')) {
+      return [
+        {
+          titulo: 'Alerta de fechamento rápido & Repor jóia',
+          texto: `Oi ${primeiroNome}! Como o furo tem pouco mais de 1 mês, ele costuma fechar bem rápido (às vezes em poucas horas). Consegue dar um pulinho aqui no estúdio hoje para recolocarmos uma nova jóia com segurança antes de fechar de vez?`
+        },
+        {
+          titulo: 'Orientação de segurança (Não forçar)',
+          texto: `Olá ${primeiroNome}! O ideal é não tentar forçar nada em casa para não machucar ou inflamar o canal. Quer passar aqui no estúdio hoje à tarde para nosso profissional dar uma olhada e repor certinho?`
+        },
+        {
+          titulo: 'Agendar avaliação com o piercer',
+          texto: `Oi ${primeiroNome}! Nosso piercer tá atendendo no estúdio hoje. Quer que eu reserve um horário pra você dar uma passada rápida agora à tarde?`
+        }
+      ];
+    }
+
+    // Se o cliente perguntou sobre orçamento / valores / flash / promoção:
+    if (ultimaMsg.includes('valor') || ultimaMsg.includes('preço') || ultimaMsg.includes('quanto') || ultimaMsg.includes('promoção') || ultimaMsg.includes('promocao') || ultimaMsg.includes('flash') || ultimaMsg.includes('orçamento')) {
+      return [
+        {
+          titulo: 'Explicar promoção & tamanho',
+          texto: `Oi ${primeiroNome}! A promoção é válida para artes selecionadas e tamanhos de até 6cm a 8cm com traços finos. Quer me mandar a imagem que você tem em mente pra eu ver se entra certinho?`
+        },
+        {
+          titulo: 'Sondar ideia para orçamento',
+          texto: `Fala ${primeiroNome}! Consigo te passar a estimativa certinha. Me conta mais sobre a ideia e o local do corpo onde você quer mandar!`
+        }
+      ];
+    }
+
     switch (estagioAtual) {
       case 'novo':
       case 'qualificacao':

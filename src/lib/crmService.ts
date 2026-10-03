@@ -571,11 +571,12 @@ export const crmService = {
     }
   },
 
-  async getMensagensChat(clienteId: string, telefone?: string): Promise<any[]> {
+  async getMensagensChat(clienteId: string, telefone?: string, nome?: string): Promise<any[]> {
     const mensagens: any[] = [];
     const idsVistos = new Set<string>();
 
     const cleanPhone = telefone ? telefone.replace(/\D/g, '') : '';
+    const searchName = (nome || '').toLowerCase().trim();
 
     // 1. Tenta buscar da subcoleção em users/{clienteId}/crm_messages se clienteId for ID de usuário válido
     try {
@@ -613,6 +614,22 @@ export const crmService = {
       }
     }
 
+    // 3. SINCRONIZAÇÃO AO VIVO COM WHATSAPP (EVOLUTION API):
+    // Busca as mensagens reais trocadas pelo WhatsApp (suporta tanto telefones regulares quanto @lid)
+    try {
+      const evoMessages = await this.buscarMensagensEvolutionAoVivo(cleanPhone, searchName);
+      if (evoMessages && evoMessages.length > 0) {
+        for (const em of evoMessages) {
+          if (!idsVistos.has(em.id)) {
+            idsVistos.add(em.id);
+            mensagens.push(em);
+          }
+        }
+      }
+    } catch (evoErr) {
+      console.warn('Aviso ao buscar mensagens ao vivo na Evolution API:', evoErr);
+    }
+
     // Ordena mensagens cronologicamente
     mensagens.sort((a, b) => {
       const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp || 0).getTime();
@@ -621,6 +638,75 @@ export const crmService = {
     });
 
     return mensagens;
+  },
+
+  async buscarMensagensEvolutionAoVivo(cleanPhone: string, searchName: string): Promise<any[]> {
+    const EVOLUTION_HOST = 'p01--evolution--6n2dx6dsdlsf.code.run';
+    const EVOLUTION_APIKEY = '020F2F224360-40F7-B022-D17AB8E529E2';
+    const EVOLUTION_INSTANCE = 'wats';
+
+    const chatsRes = await fetch(`https://${EVOLUTION_HOST}/chat/findChats/${EVOLUTION_INSTANCE}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_APIKEY },
+      body: JSON.stringify({})
+    });
+    if (!chatsRes.ok) return [];
+
+    const chatsData = await chatsRes.json();
+    const allChats: any[] = Array.isArray(chatsData) ? chatsData : (chatsData.chats || chatsData.records || []);
+
+    let targetChat: any = null;
+    if (cleanPhone) {
+      const normClean = cleanPhone.replace(/^55/, '');
+      targetChat = allChats.find(c => {
+        const jid = c.remoteJid || c.id || '';
+        const alt = c.lastMessage?.key?.remoteJidAlt || '';
+        return jid.includes(cleanPhone) || jid.includes(normClean) || alt.includes(cleanPhone) || alt.includes(normClean);
+      });
+    }
+
+    if (!targetChat && searchName) {
+      const first = searchName.split(' ')[0].toLowerCase();
+      targetChat = allChats.find(c => {
+        const pName = (c.pushName || c.name || '').toLowerCase();
+        return pName.includes(first) || first.includes(pName);
+      });
+    }
+
+    if (!targetChat) return [];
+
+    const remoteJid = targetChat.remoteJid || targetChat.id;
+    if (!remoteJid) return [];
+
+    const msgRes = await fetch(`https://${EVOLUTION_HOST}/chat/findMessages/${EVOLUTION_INSTANCE}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_APIKEY },
+      body: JSON.stringify({
+        where: { key: { remoteJid } },
+        limit: 30
+      })
+    });
+    if (!msgRes.ok) return [];
+
+    const msgData = await msgRes.json();
+    const records: any[] = msgData.messages?.records || [];
+
+    return records.map(r => {
+      const fromMe = r.key?.fromMe;
+      const msgObj = r.message || {};
+      let text = msgObj.conversation || msgObj.extendedTextMessage?.text || '';
+      if (!text && msgObj.imageMessage) text = '📸 [Foto enviada]';
+      if (!text && msgObj.audioMessage) text = '🎵 [Áudio enviado]';
+      if (!text) text = '[Mensagem]';
+
+      return {
+        id: r.key?.id || r.id,
+        remetente: fromMe ? 'tatuador' : 'cliente',
+        mensagem: text,
+        timestamp: new Date((r.messageTimestamp || Date.now() / 1000) * 1000),
+        status: 'entregue'
+      };
+    });
   },
 
   async enviarMensagemChat(
