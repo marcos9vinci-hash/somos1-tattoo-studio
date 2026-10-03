@@ -27,7 +27,12 @@ import { FinanceSummary, Commission, ContaPagar, ContaReceber } from '../../lib/
 
 type ActiveTab = 'geral' | 'pagar' | 'receber' | 'comissoes';
 
-export default function AdminFinanceiroModule() {
+interface AdminFinanceiroModuleProps {
+  bookings?: any[];
+  users?: any[];
+}
+
+export default function AdminFinanceiroModule({ bookings = [], users = [] }: AdminFinanceiroModuleProps) {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('geral');
@@ -74,7 +79,7 @@ export default function AdminFinanceiroModule() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await getFinancialSummary();
+      const data = await getFinancialSummary(bookings);
       setSummary(data);
     } catch (err) {
       console.error('Erro ao carregar dados financeiros:', err);
@@ -85,7 +90,7 @@ export default function AdminFinanceiroModule() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [bookings]);
 
   const showSuccess = (msg: string) => {
     setSuccessMessage(msg);

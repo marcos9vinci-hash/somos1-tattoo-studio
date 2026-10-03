@@ -2060,7 +2060,7 @@ export default function Admin() {
               {/* ==================== MÓDULO 6: FINANCEIRO & COMISSÕES ==================== */}
               {currentModule === 'financeiro' && (
                 <ModuleErrorBoundary moduleName="Financeiro & Comissões">
-                  <AdminFinanceiroModule />
+                  <AdminFinanceiroModule bookings={bookings} users={users} />
                 </ModuleErrorBoundary>
               )}
 

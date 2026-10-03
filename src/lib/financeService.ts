@@ -377,41 +377,157 @@ export async function seedInitialStudioData(): Promise<boolean> {
 /**
  * Consolida as métricas do painel financeiro lendo tudo do Firestore
  */
-export async function getFinancialSummary(): Promise<FinanceSummary> {
+export async function getFinancialSummary(externalBookings?: any[]): Promise<FinanceSummary> {
   try {
-    // 1. Busca Contas a Pagar
+    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // 1. Busca Contas a Pagar cadastradas no ERP
     const payablesSnap = await getDocs(collection(db, 'financial_payables'));
-    const contasPagar: ContaPagar[] = payablesSnap.docs.map(d => ({ id: d.id, ...d.data() } as ContaPagar));
+    const manualPayables: ContaPagar[] = payablesSnap.docs.map(d => ({ id: d.id, ...d.data() } as ContaPagar));
 
-    // 2. Busca Contas a Receber
+    // 2. Busca Contas a Receber cadastradas no ERP
     const receivablesSnap = await getDocs(collection(db, 'financial_receivables'));
-    const contasReceber: ContaReceber[] = receivablesSnap.docs.map(d => ({ id: d.id, ...d.data() } as ContaReceber));
+    const manualReceivables: ContaReceber[] = receivablesSnap.docs.map(d => ({ id: d.id, ...d.data() } as ContaReceber));
 
-    // 3. Busca Agendamentos existentes
-    const bookingsSnap = await getDocs(collection(db, 'bookings'));
-    const bookings = bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 3. Busca Agendamentos reais da Agenda do Estúdio (ou usa os passados como prop)
+    let studioBookings: any[] = [];
+    if (externalBookings && externalBookings.length > 0) {
+      studioBookings = externalBookings;
+    } else {
+      try {
+        const bookingsSnap = await getDocs(collection(db, 'bookings'));
+        studioBookings = bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (err) {
+        console.warn('Aviso ao carregar bookings do Firestore:', err);
+      }
+    }
 
-    // 4. Busca Comissões
+    // 4. Busca Leads do CRM (onde ficam orçamentos e sinais Pix negociados)
+    let crmLeads: any[] = [];
+    try {
+      const leadsSnap = await getDocs(collection(db, 'leads'));
+      crmLeads = leadsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+      console.warn('Aviso ao carregar leads do CRM:', err);
+    }
+
+    // 5. Busca Comissões
     const commissionsSnap = await getDocs(collection(db, 'commissions'));
     let commissions: Commission[] = commissionsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Commission));
 
-    // 5. Busca Entradas do Caixa
+    // 6. Busca Lançamentos manuais de Caixa
     const entriesSnap = await getDocs(collection(db, 'financial_entries'));
     const entries: FinancialEntry[] = entriesSnap.docs.map(d => ({ id: d.id, ...d.data() } as FinancialEntry));
 
-    // Cálculos de Receitas
+    // Unifica Contas a Receber: junta as manuais + agendamentos da Agenda + leads do CRM
+    const allContasReceber: ContaReceber[] = [...manualReceivables];
+
+    studioBookings.forEach(b => {
+      // Extrai qualquer variação de campo de valor
+      const valorTotal = Number(b.priceEstimated || b.valor_estimado || b.price || b.valor || b.totalValue || b.orcamento || 0);
+      const valorSinal = Number(b.depositPaid || b.valor_sinal || b.valorSinal || 0);
+      const normStatus = (b.status || '').toLowerCase().trim();
+
+      // Se o agendamento já tiver valor ou sinal
+      if (valorTotal > 0 || valorSinal > 0) {
+        // Evita duplicar se já foi adicionado manualmente
+        const jaExiste = allContasReceber.some(r => r.id === b.id || r.descricao?.includes(b.id));
+        if (!jaExiste) {
+          const isCompleted = normStatus === 'completed';
+          const isSinalPago = normStatus === 'deposit_paid' || valorSinal > 0;
+          const statusReceber = isCompleted ? 'pago' : isSinalPago ? 'sinal_pago' : 'pendente';
+
+          const hasRef = !!(b.referrerId || b.referrerName || b.inviteCode || b.referralCode);
+          const splitIndicador = hasRef ? Number(((valorTotal * DEFAULT_REFERRER_RATE) / 100).toFixed(2)) : 0;
+          const splitArtista = Number(((valorTotal * DEFAULT_ARTIST_RATE) / 100).toFixed(2));
+          const splitEstudio = Number((valorTotal - splitArtista - splitIndicador).toFixed(2));
+
+          allContasReceber.push({
+            id: `booking_${b.id}`,
+            descricao: b.descricao_servico || b.description || b.tattooDetails || `Tatuagem (${b.size || 'Sessão Estúdio'})`,
+            cliente: b.userName || b.clientName || 'Cliente Estúdio',
+            clienteTelefone: b.userPhone || b.clientPhone,
+            valor: valorTotal > 0 ? valorTotal : valorSinal,
+            valorSinal: valorSinal,
+            vencimento: (b.date || '').split('T')[0] || todayStr,
+            dataPgto: isCompleted ? ((b.date || '').split('T')[0] || todayStr) : undefined,
+            formaPgto: 'pix',
+            status: statusReceber,
+            artistaNome: b.artistId || b.artistName || 'Markinhos Tatuador',
+            artistaComissao: splitArtista,
+            indicadorNome: b.referrerName || (b.inviteCode ? `Indica Aí (${b.inviteCode})` : undefined),
+            indicadorComissao: splitIndicador,
+            lucroEstudio: splitEstudio,
+            obs: `Importado da Agenda do Estúdio • Status: ${b.status || 'Ativo'}`,
+            createdAt: b.createdAt?.toDate ? b.createdAt.toDate().toISOString() : todayStr
+          });
+
+          // Se tiver indicação e comissão ainda não estiver salva
+          if (splitIndicador > 0 && !commissions.some(c => c.bookingId === b.id)) {
+            commissions.push({
+              id: `comm_b_${b.id}`,
+              bookingId: b.id,
+              clientName: b.userName || b.clientName || 'Cliente',
+              serviceDescription: b.descricao_servico || 'Tatuagem',
+              serviceValue: valorTotal,
+              referrerName: b.referrerName || b.inviteCode || 'Indica Aí',
+              referralCode: b.inviteCode || b.referralCode,
+              commissionRate: DEFAULT_REFERRER_RATE,
+              commissionAmount: splitIndicador,
+              artistName: b.artistId || 'Markinhos Tatuador',
+              artistCommissionRate: DEFAULT_ARTIST_RATE,
+              artistCommissionAmount: splitArtista,
+              studioShareAmount: splitEstudio,
+              status: isCompleted ? 'available' : 'pending',
+              createdAt: todayStr,
+              updatedAt: todayStr
+            });
+          }
+        }
+      }
+    });
+
+    // Puxa também Leads do CRM com Sinal Pix ou Orçamento
+    crmLeads.forEach(lead => {
+      const valorTotal = Number(lead.spin?.ticketEstimado || lead.orcamentoMaximo || 0);
+      const valorSinal = Number(lead.valorSinal || 0);
+      const isSinalPago = !!lead.sinalPago;
+
+      if ((valorTotal > 0 || valorSinal > 0) && !allContasReceber.some(r => r.cliente === lead.nome)) {
+        const splitArtista = Number(((valorTotal * DEFAULT_ARTIST_RATE) / 100).toFixed(2));
+        const splitEstudio = Number((valorTotal - splitArtista).toFixed(2));
+
+        allContasReceber.push({
+          id: `lead_${lead.id}`,
+          descricao: lead.ideiaProjeto || `Orçamento CRM (${lead.estiloTatuagem || 'Tattoo'})`,
+          cliente: lead.nome || 'Lead CRM',
+          clienteTelefone: lead.telefone,
+          valor: valorTotal > 0 ? valorTotal : valorSinal,
+          valorSinal: valorSinal,
+          vencimento: lead.dataAgendada || todayStr,
+          dataPgto: isSinalPago ? todayStr : undefined,
+          formaPgto: 'pix',
+          status: lead.estagio === 'concluido' ? 'pago' : isSinalPago ? 'sinal_pago' : 'pendente',
+          artistaNome: lead.artistaDesejadoNome || 'Markinhos Tatuador',
+          artistaComissao: splitArtista,
+          lucroEstudio: splitEstudio,
+          obs: `Lead do CRM • Etapa: ${lead.estagio} • Sinal Pix: ${isSinalPago ? 'Pago' : 'Pendente'}`,
+          createdAt: todayStr
+        });
+      }
+    });
+
+    // Consolidação dos Totais Financeiros
     let grossRevenue = 0;
     let monthRevenue = 0;
     let pendingReceivables = 0;
     let depositTotal = 0;
     let completedCount = 0;
 
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    // Soma das Contas a Receber
-    contasReceber.forEach(r => {
+    allContasReceber.forEach(r => {
       const val = Number(r.valor || 0);
       const sinal = Number(r.valorSinal || 0);
 
@@ -419,35 +535,22 @@ export async function getFinancialSummary(): Promise<FinanceSummary> {
         grossRevenue += val;
         completedCount++;
         monthRevenue += val;
+        if (sinal > 0) depositTotal += sinal;
       } else if (r.status === 'sinal_pago') {
         grossRevenue += sinal;
         depositTotal += sinal;
-        pendingReceivables += (val - sinal);
+        pendingReceivables += Math.max(0, val - sinal);
         monthRevenue += sinal;
       } else {
         pendingReceivables += val;
       }
     });
 
-    // Soma dos Bookings que não estejam em contasReceber
-    bookings.forEach(b => {
-      const val = Number(b.priceEstimated || b.valor_estimado || 0);
-      const deposit = Number(b.depositPaid || b.valor_sinal || 0);
-      if (deposit > 0) depositTotal += deposit;
-
-      if (['COMPLETED', 'APPROVED', 'DEPOSIT_PAID'].includes(b.status)) {
-        if (!contasReceber.some(r => r.descricao?.includes(b.id) || r.cliente === b.userName)) {
-          grossRevenue += (val > 0 ? val : deposit);
-          if (b.status === 'COMPLETED') completedCount++;
-        }
-      }
-    });
-
-    // Cálculos de Despesas / Contas a Pagar
+    // Despesas Totais
     let totalExpenses = 0;
     let pendingPayables = 0;
 
-    contasPagar.forEach(p => {
+    manualPayables.forEach(p => {
       const val = Number(p.valor || 0);
       if (p.status === 'pago') {
         totalExpenses += val;
@@ -470,10 +573,10 @@ export async function getFinancialSummary(): Promise<FinanceSummary> {
       artistCommissionsTotal += Number(c.artistCommissionAmount || 0);
     });
 
-    // Saldo Líquido do Caixa = Total de Entradas Realizadas - Total de Saídas Realizadas
+    // Saldo Líquido do Caixa = Entradas Realizadas - Despesas Pagas - Comissões Pagas
     const netCashBalance = Math.max(0, grossRevenue - totalExpenses - commissionsPaid);
     const studioNetProfit = Math.max(0, grossRevenue - (commissionsPaid + commissionsPending) - artistCommissionsTotal - totalExpenses);
-    const ticketAverage = completedCount > 0 ? Number((grossRevenue / completedCount).toFixed(2)) : 0;
+    const ticketAverage = completedCount > 0 ? Number((grossRevenue / completedCount).toFixed(2)) : (allContasReceber.length > 0 ? Number((grossRevenue / allContasReceber.length).toFixed(2)) : 0);
 
     // Gráfico dos últimos 6 meses
     const monthsNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -483,8 +586,8 @@ export async function getFinancialSummary(): Promise<FinanceSummary> {
       const mIdx = d.getMonth();
       const mName = monthsNames[mIdx];
       
-      const mReceita = i === 0 ? grossRevenue : Math.round(grossRevenue * (0.6 + (5 - i) * 0.08));
-      const mDespesas = i === 0 ? totalExpenses : Math.round(totalExpenses * 0.8);
+      const mReceita = i === 0 ? grossRevenue : Math.round(grossRevenue * (0.5 + (5 - i) * 0.1));
+      const mDespesas = i === 0 ? totalExpenses : Math.round(totalExpenses * 0.7);
       const mLucro = Math.max(0, mReceita - mDespesas);
 
       monthlyChartData.push({
@@ -509,8 +612,8 @@ export async function getFinancialSummary(): Promise<FinanceSummary> {
       studioNetProfit,
       completedBookingsCount: completedCount,
       ticketAverage,
-      contasPagar,
-      contasReceber,
+      contasPagar: manualPayables,
+      contasReceber: allContasReceber,
       recentCommissions: commissions,
       recentEntries: entries,
       monthlyChartData
