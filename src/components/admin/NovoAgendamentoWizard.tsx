@@ -61,31 +61,61 @@ export default function NovoAgendamentoWizard({
   const [clienteJaTatuou, setClienteJaTatuou] = useState(false);
 
   useEffect(() => {
-    const fetchClientes = async () => {
+    const fetchAndSetup = async () => {
+      let sortedClientes: any[] = [];
       try {
-        const q = query(collection(db, 'users'), where('role', '==', 'user'));
-        const snap = await getDocs(q);
-        const sorted = snap.docs
+        const snap = await getDocs(collection(db, 'users'));
+        sortedClientes = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }));
-        setClientesLocais(sorted);
       } catch (error) {
         console.error("Erro ao buscar clientes:", error);
       }
-    };
 
-    if (isOpen) {
-      fetchClientes();
       setClientSearch('');
+
       if (agendamentoParaEditar) {
         const customAuto = agendamentoParaEditar.customAutomation;
+        const bUserId = agendamentoParaEditar.userId || agendamentoParaEditar.cliente_id || '';
+        const bName = agendamentoParaEditar.userName || agendamentoParaEditar.clientName || agendamentoParaEditar.nome || '';
+        const bPhone = agendamentoParaEditar.userPhone || agendamentoParaEditar.clientPhone || agendamentoParaEditar.telefone || '';
+        const bCleanPhone = bPhone.replace(/\D/g, '');
+
+        // Tenta achar cliente correspondente na lista
+        let matched = sortedClientes.find(c => c.id === bUserId);
+        if (!matched && bCleanPhone) {
+          matched = sortedClientes.find(c => {
+            const p = (c.phone || c.telefone || '').replace(/\D/g, '');
+            return p && (p === bCleanPhone || p.endsWith(bCleanPhone) || bCleanPhone.endsWith(p));
+          });
+        }
+        if (!matched && bName) {
+          const lowerName = bName.trim().toLowerCase();
+          matched = sortedClientes.find(c => (c.name || '').trim().toLowerCase() === lowerName);
+        }
+
+        let resolvedClienteId = matched?.id || bUserId;
+        if (!matched) {
+          // Cria registro do cliente para nunca deixar a seleção em branco
+          const fallbackClient = {
+            id: resolvedClienteId || `booking_client_${agendamentoParaEditar.id}`,
+            name: bName || 'Cliente Estúdio',
+            phone: bPhone,
+            role: 'user'
+          };
+          resolvedClienteId = fallbackClient.id;
+          sortedClientes = [fallbackClient, ...sortedClientes];
+        }
+
+        setClientesLocais(sortedClientes);
+
         setForm({
-          cliente_id: agendamentoParaEditar.userId || '',
+          cliente_id: resolvedClienteId,
           profissional_id: agendamentoParaEditar.artistId || '',
           data_agendamento: `${agendamentoParaEditar.date}T${agendamentoParaEditar.time || '10:00'}`,
           descricao_servico: agendamentoParaEditar.descricao_servico || '',
-          valor_estimado: agendamentoParaEditar.priceEstimated?.toString() || agendamentoParaEditar.valor_estimado?.toString() || '',
-          valor_sinal: agendamentoParaEditar.depositPaid?.toString() || agendamentoParaEditar.valor_sinal?.toString() || '',
+          valor_estimado: (agendamentoParaEditar.priceEstimated ?? agendamentoParaEditar.valor_estimado ?? '').toString(),
+          valor_sinal: (agendamentoParaEditar.depositPaid ?? agendamentoParaEditar.valor_sinal ?? '').toString(),
           estilo: agendamentoParaEditar.estilo || '',
           primeira_tatuagem: agendamentoParaEditar.primeira_tatuagem || false,
           regiao_corpo: agendamentoParaEditar.regiao_corpo || '',
@@ -103,10 +133,15 @@ export default function NovoAgendamentoWizard({
           tempoFollowUpUnidade: customAuto?.followUpUnit ?? 'minutes'
         });
       } else {
+        setClientesLocais(sortedClientes);
         const dateStr = initialDate ? initialDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
         const timeStr = initialTime || '10:00';
         setForm(f => ({ ...f, data_agendamento: `${dateStr}T${timeStr}` }));
       }
+    };
+
+    if (isOpen) {
+      fetchAndSetup();
     }
   }, [isOpen, initialDate, initialTime, agendamentoParaEditar]);
 
@@ -205,9 +240,17 @@ export default function NovoAgendamentoWizard({
     }
   };
 
+  const temCliente = Boolean(
+    form.cliente_id ||
+    (agendamentoParaEditar && (agendamentoParaEditar.userName || agendamentoParaEditar.clientName || agendamentoParaEditar.userId)) ||
+    novoCliente.nome.trim()
+  );
+  const temData = Boolean(form.data_agendamento);
+  const podeSalvar = Boolean(temCliente && temData && !isLoading);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.cliente_id || !form.data_agendamento) {
+    if (!temCliente || !temData) {
       alert("Por favor, selecione o cliente e o horário do agendamento.");
       return;
     }
@@ -216,7 +259,7 @@ export default function NovoAgendamentoWizard({
   };
 
   const handleExecuteSave = async (modo: 'confirmar' | 'ajustar', clienteJaTatuouFlag?: boolean) => {
-    if (!form.cliente_id || !form.data_agendamento) return;
+    if (!temCliente || !temData) return;
     setIsLoading(true);
     setShowConfirmOrAdjustModal(false);
 
@@ -225,10 +268,19 @@ export default function NovoAgendamentoWizard({
       
       const cleanValue = (val: any, fallback: any = '') => (val === undefined || val === null ? fallback : val);
 
+      const resolvedName = cleanValue(
+        selectedUser?.name || agendamentoParaEditar?.userName || agendamentoParaEditar?.clientName,
+        'Cliente'
+      );
+      const resolvedPhone = cleanValue(
+        selectedUser?.phone || selectedUser?.telefone || agendamentoParaEditar?.userPhone || agendamentoParaEditar?.clientPhone,
+        ''
+      );
+
       const payload: any = {
-        userId: form.cliente_id,
-        userName: cleanValue(selectedUser?.name, 'Cliente'),
-        userPhone: cleanValue(selectedUser?.phone || selectedUser?.telefone, ''),
+        userId: form.cliente_id || agendamentoParaEditar?.userId || 'cliente_avulso',
+        userName: resolvedName,
+        userPhone: resolvedPhone,
         artistId: cleanValue(form.profissional_id, 'admin'),
         date: dataParte,
         time: horaParte,
@@ -967,14 +1019,14 @@ export default function NovoAgendamentoWizard({
             <button 
               type="button"
               onClick={() => {
-                if (!form.cliente_id || !form.data_agendamento) {
+                if (!podeSalvar) {
                   alert("Por favor, selecione o cliente e a data/horário do agendamento.");
                   return;
                 }
                 setShowConfirmOrAdjustModal(true);
               }}
-              className="flex-1 bg-zinc-900 border border-amber-500/40 hover:bg-amber-500/10 text-amber-300 font-headline font-bold py-3.5 px-3 rounded-xl uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 active:scale-98"
-              disabled={isLoading || !form.cliente_id || !form.data_agendamento}
+              className="flex-1 bg-zinc-900 border border-amber-500/40 hover:bg-amber-500/10 text-amber-300 font-headline font-bold py-3.5 px-3 rounded-xl uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
+              disabled={!podeSalvar}
               title="Ajustar agenda internamente sem disparar WhatsApp ao cliente"
             >
               <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
@@ -984,7 +1036,7 @@ export default function NovoAgendamentoWizard({
             <button 
               type="submit" 
               className="flex-1 bg-primary-fixed text-black font-headline font-black py-3.5 px-3 rounded-xl uppercase tracking-wider text-xs disabled:opacity-50 hover:bg-primary-fixed/90 transition-all shadow-lg shadow-primary-fixed/20 active:scale-98 flex items-center justify-center gap-2"
-              disabled={isLoading || !form.cliente_id || !form.data_agendamento}
+              disabled={!podeSalvar}
             >
               {isLoading ? (
                 <>

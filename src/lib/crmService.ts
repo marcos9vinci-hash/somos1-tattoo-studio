@@ -1087,15 +1087,21 @@ export const crmService = {
       const novoEstagio: LeadStage = norm === 'completed' ? 'pos_venda' : 'followup';
       const novaTemp: 'quente' | 'morno' = norm === 'completed' ? 'quente' : 'morno';
 
+      const orcamentoEstimado = booking.priceEstimated || booking.valor_estimado;
+
       if (leadDocRef) {
-        await updateDoc(leadDocRef, {
+        const leadUpdate: Record<string, any> = {
           estagio: novoEstagio,
           temperatura: novaTemp,
           updatedAt: serverTimestamp()
-        });
+        };
+        if (orcamentoEstimado) {
+          leadUpdate.orcamentoMaximo = Number(orcamentoEstimado);
+        }
+        await updateDoc(leadDocRef, leadUpdate);
       } else {
         // Se ainda não existia lead correspondente, cria para que apareça na coluna certa do Funil
-        await addDoc(collection(db, LEADS_COLLECTION), {
+        const newLeadPayload: any = {
           nome: booking.userName || 'Cliente Estúdio',
           telefone: booking.userPhone || '',
           estagio: novoEstagio,
@@ -1105,7 +1111,11 @@ export const crmService = {
           pilotoIA: false,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
-        });
+        };
+        if (orcamentoEstimado) {
+          newLeadPayload.orcamentoMaximo = Number(orcamentoEstimado);
+        }
+        await addDoc(collection(db, LEADS_COLLECTION), newLeadPayload);
       }
     } catch (err) {
       console.warn('syncBookingToCRM [lead]:', err);
