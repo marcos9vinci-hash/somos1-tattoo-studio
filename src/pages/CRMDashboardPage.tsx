@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { crmService } from '../lib/crmService';
+import { whatsappService } from '../lib/whatsappService';
+import { executeBatchScan50Chats } from '../lib/whatsappBatchScanner';
 import { Lead, ClienteCRM, LeadStage, CRMDashboardMetrics, EstrategiaCampanha } from '../types/crm';
 import { LeadKanbanBoard } from '../components/crm/LeadKanbanBoard';
 import { CarteiraClientesKanban } from '../components/crm/CarteiraClientesKanban';
@@ -81,9 +83,36 @@ export const CRMDashboardPage: React.FC = () => {
     }
   };
 
+  const [isScanning, setIsScanning] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleScan50Chats = async () => {
+    setIsScanning(true);
+    try {
+      const settings = await whatsappService.getSettings();
+      const baseUrl = settings?.automation?.evolutionBaseUrl || (import.meta as any).env?.VITE_EVOLUTION_BASE_URL || '';
+      const apiKey = settings?.automation?.evolutionApiKey || (import.meta as any).env?.VITE_EVOLUTION_API_KEY || '';
+      const instance = settings?.automation?.evolutionInstance || 'wats';
+
+      if (!baseUrl || !apiKey) {
+        showToast('error', 'URL ou Chave da Evolution API ausente em Studio Settings.');
+        setIsScanning(false);
+        return;
+      }
+
+      showToast('success', 'Iniciando leitura segura das últimas 50 conversas...');
+      const report = await executeBatchScan50Chats(baseUrl, apiKey, instance);
+      showToast('success', `Varredura concluída! ${report.novosLeadsCapturados} novos leads, ${report.leadsAtualizados} atualizados.`);
+      await loadData();
+    } catch (err: any) {
+      showToast('error', `Falha ao escanear conversas: ${err?.message || 'Erro de conexão'}`);
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   // ── Handlers Leads ──────────────────────────────────────────────────────────
 
@@ -233,6 +262,16 @@ export const CRMDashboardPage: React.FC = () => {
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Sincronizar
+          </button>
+
+          <button
+            onClick={handleScan50Chats}
+            disabled={isScanning || loading}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl text-xs font-headline font-bold transition-all active:scale-95 disabled:opacity-50"
+            title="Lê as últimas 50 conversas do WhatsApp na Evolution API e classifica leads no Funil sem queimar tokens"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-400 ${isScanning ? 'animate-spin' : ''}`} />
+            {isScanning ? 'Lendo 50 Chats...' : 'Scan 50 Conversas'}
           </button>
 
           <button
