@@ -394,54 +394,96 @@ export default function NovoAgendamentoWizard({
         return;
       }
 
-      // ================= NOVO AGENDAMENTO =================
-      payload.size = 'Média';
-      payload.creditsUsed = 0;
-      payload.status = (modo === 'ajustar' && clienteJaTatuouFlag) ? BookingStatus.COMPLETED : BookingStatus.APPROVED;
-      payload.createdAt = serverTimestamp();
+      // ================= NOVO AGENDAMENTO (COM PROTEÇÃO CONTRA DUPLICATAS) =================
+      const cleanPhone = (payload.userPhone || '').replace(/\D/g, '').replace(/^55/, '');
+      const lowerName = (payload.userName || '').trim().toLowerCase();
 
-      const docRef = await addDoc(collection(db, 'bookings'), payload);
-      await crmService.syncBookingToCRM({ id: docRef.id, ...payload } as any, payload.status);
+      // Antes de criar, verifica se já existe agendamento ativo desse cliente nessa data
+      let docIdToUse: string | null = null;
+      try {
+        const existingSnap = await getDocs(query(collection(db, 'bookings'), where('date', '==', dataParte)));
+        const existingDuplicate = existingSnap.docs.find(d => {
+          const data = d.data();
+          if (data.status === BookingStatus.REJECTED || (data as any).duplicado) return false;
+          const dPhone = (data.userPhone || '').replace(/\D/g, '').replace(/^55/, '');
+          const dName = (data.userName || '').trim().toLowerCase();
+          const samePhone = Boolean(cleanPhone && dPhone && (dPhone === cleanPhone || dPhone.endsWith(cleanPhone) || cleanPhone.endsWith(dPhone)));
+          const sameName = Boolean(lowerName && dName && (lowerName === dName || lowerName.includes(dName) || dName.includes(lowerName)));
+          return samePhone || sameName;
+        });
+        if (existingDuplicate) {
+          docIdToUse = existingDuplicate.id;
+        }
+      } catch (errCheck) {
+        console.warn('Aviso ao checar duplicata existente:', errCheck);
+      }
 
-      if (modo === 'ajustar') {
+      if (docIdToUse) {
+        // Já existe um agendamento para este cliente nesta data! Apenas atualiza valores, sinal e detalhes sem duplicar!
+        const updatePayload: any = {
+          ...payload,
+          updatedAt: serverTimestamp()
+        };
+        if (clienteJaTatuouFlag) {
+          updatePayload.status = BookingStatus.COMPLETED;
+        }
+        await updateDoc(doc(db, 'bookings', docIdToUse), updatePayload);
+        await crmService.syncBookingToCRM({ id: docIdToUse, ...updatePayload } as any, updatePayload.status || BookingStatus.APPROVED);
+
         alert(
           clienteJaTatuouFlag
-            ? "✅ Agendamento registrado como CONCLUÍDO na esteira (sem disparar WhatsApp ao cliente)!"
-            : "✅ Agendamento registrado silenciosamente na agenda (sem disparar WhatsApp ao cliente)!"
+            ? "✅ Agendamento atualizado com novo valor e marcado como CONCLUÍDO na esteira!"
+            : "✅ Detalhes da tattoo (valor, sinal e arte) salvos no agendamento existente com sucesso!"
         );
       } else {
-        alert("Agendamento realizado e confirmado com sucesso!");
+        payload.size = 'Média';
+        payload.creditsUsed = 0;
+        payload.status = (modo === 'ajustar' && clienteJaTatuouFlag) ? BookingStatus.COMPLETED : BookingStatus.APPROVED;
+        payload.createdAt = serverTimestamp();
 
-        if (selectedUser) {
-          const dynamicSettings = {
-            automation: {
-              enabled: true,
-              confirmationEnabled: form.enviarConfirmacao,
-              reminderEnabled: form.enviarLembrete,
-              reminderValue: Number(form.tempoLembreteValor) || 2,
-              reminderUnit: form.tempoLembreteUnidade,
-              followUpEnabled: form.enviarFollowUp,
-              followUpValue: Number(form.tempoFollowUpValor) || 2,
-              followUpUnit: form.tempoFollowUpUnidade,
-              evolutionInstance: 'wats'
-            }
-          };
+        const docRef = await addDoc(collection(db, 'bookings'), payload);
+        await crmService.syncBookingToCRM({ id: docRef.id, ...payload } as any, payload.status);
 
-          const bookingData = {
-            id: docRef.id,
-            userName: selectedUser.name || 'Cliente',
-            userPhone: selectedUser.phone || selectedUser.telefone || '',
-            date: dataParte,
-            time: horaParte,
-            descricao_servico: form.descricao_servico,
-            artistId: form.profissional_id,
-            priceEstimated: payload.priceEstimated,
-            depositPaid: payload.depositPaid
-          };
+        if (modo === 'ajustar') {
+          alert(
+            clienteJaTatuouFlag
+              ? "✅ Agendamento registrado como CONCLUÍDO na esteira (sem disparar WhatsApp ao cliente)!"
+              : "✅ Detalhes da tattoo salvos na agenda com sucesso (sem disparar WhatsApp ao cliente)!"
+          );
+        } else {
+          alert("Agendamento realizado e confirmado com sucesso!");
 
-          whatsappService.triggerBookingLifecycle(bookingData, false, dynamicSettings as any).catch(err => {
-            console.warn("Aviso no disparo do ciclo de automação:", err);
-          });
+          if (selectedUser) {
+            const dynamicSettings = {
+              automation: {
+                enabled: true,
+                confirmationEnabled: form.enviarConfirmacao,
+                reminderEnabled: form.enviarLembrete,
+                reminderValue: Number(form.tempoLembreteValor) || 2,
+                reminderUnit: form.tempoLembreteUnidade,
+                followUpEnabled: form.enviarFollowUp,
+                followUpValue: Number(form.tempoFollowUpValor) || 2,
+                followUpUnit: form.tempoFollowUpUnidade,
+                evolutionInstance: 'wats'
+              }
+            };
+
+            const bookingData = {
+              id: docRef.id,
+              userName: selectedUser.name || 'Cliente',
+              userPhone: selectedUser.phone || selectedUser.telefone || '',
+              date: dataParte,
+              time: horaParte,
+              descricao_servico: form.descricao_servico,
+              artistId: form.profissional_id,
+              priceEstimated: payload.priceEstimated,
+              depositPaid: payload.depositPaid
+            };
+
+            whatsappService.triggerBookingLifecycle(bookingData, false, dynamicSettings as any).catch(err => {
+              console.warn("Aviso no disparo do ciclo de automação:", err);
+            });
+          }
         }
       }
 
@@ -1027,10 +1069,10 @@ export default function NovoAgendamentoWizard({
               }}
               className="flex-1 bg-zinc-900 border border-amber-500/40 hover:bg-amber-500/10 text-amber-300 font-headline font-bold py-3.5 px-3 rounded-xl uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
               disabled={!podeSalvar}
-              title="Ajustar agenda internamente sem disparar WhatsApp ao cliente"
+              title="Salva valor do trampo, sinal e referências sem disparar WhatsApp ao cliente"
             >
               <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Apenas Ajustar Agenda (Sem Zap)</span>
+              <span>💾 Salvar Valores & Arte (Sem Zap)</span>
             </button>
 
             <button 
@@ -1046,7 +1088,7 @@ export default function NovoAgendamentoWizard({
               ) : (
                 <>
                   <Send className="w-4 h-4 shrink-0" />
-                  <span>{agendamentoParaEditar ? "Confirmar / Ajustar" : "Confirmar Agendamento"}</span>
+                  <span>{agendamentoParaEditar ? "📱 Salvar & Avisar no Zap" : "Confirmar Agendamento"}</span>
                 </>
               )}
             </button>
@@ -1064,12 +1106,19 @@ export default function NovoAgendamentoWizard({
               </div>
               <div className="flex-1">
                 <h3 className="font-headline font-bold text-white text-base uppercase leading-snug">
-                  Como deseja salvar este horário?
+                  Como deseja salvar este agendamento?
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
                   Cliente: <strong className="text-white">{clientesLocais.find(c => c.id === form.cliente_id)?.name || 'Cliente'}</strong>
                   <br />
                   Data: <span className="text-amber-400 font-bold">{dataParte ? dataParte.split('-').reverse().join('/') : ''}</span> às <span className="text-amber-400 font-bold">{horaParte}</span>
+                  {form.valor_estimado ? (
+                    <>
+                      <br />
+                      Valor da Tattoo: <strong className="text-emerald-400">R$ {form.valor_estimado}</strong>
+                      {form.valor_sinal ? <span className="text-zinc-400"> (Sinal: R$ {form.valor_sinal})</span> : null}
+                    </>
+                  ) : null}
                 </p>
               </div>
               <button
@@ -1082,7 +1131,7 @@ export default function NovoAgendamentoWizard({
             </div>
 
             <div className="space-y-3">
-              {/* OPÇÃO 1: APENAS AJUSTAR AGENDA (SILENCIOSO / CLIENTE JÁ TATUOU) */}
+              {/* OPÇÃO 1: APENAS AJUSTAR VALORES E DETALHES (SILENCIOSO) */}
               <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] hover:bg-amber-500/[0.12] transition-all space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
@@ -1091,14 +1140,14 @@ export default function NovoAgendamentoWizard({
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <span className="font-headline font-bold text-amber-300 text-xs uppercase tracking-wide">
-                        📝 Apenas Ajustar Agenda
+                        💾 Salvar Detalhes (Valor, Sinal & Arte)
                       </span>
                       <span className="text-[9px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
                         Silencioso (Sem Zap)
                       </span>
                     </div>
                     <p className="text-[11px] text-zinc-300 mt-1 leading-relaxed">
-                      Atualiza a agenda interna <strong>sem enviar nada no WhatsApp</strong> do cliente. Ideal para ajustes internos ou quando você esqueceu de marcar na hora.
+                      Atualiza o valor da tattoo, o sinal pago e as referências <strong>sem enviar mensagem no WhatsApp</strong> do cliente. Ideal para ajustes internos.
                     </p>
                   </div>
                 </div>
@@ -1116,7 +1165,7 @@ export default function NovoAgendamentoWizard({
                     htmlFor="clienteJaTatuouCheck" 
                     className="text-xs text-zinc-200 font-medium cursor-pointer select-none"
                   >
-                    Cliente já fez a tattoo? (Marcar como <strong className="text-emerald-400">🟢 Concluído / Trabalho Realizado</strong>)
+                    Cliente já fez a tattoo? (Marcar como <strong className="text-emerald-400">🟢 Concluído / Pós-Venda</strong>)
                   </label>
                 </div>
 
@@ -1127,7 +1176,7 @@ export default function NovoAgendamentoWizard({
                   className="w-full py-2.5 bg-amber-500 text-black font-headline font-black text-xs uppercase tracking-wider rounded-lg hover:bg-amber-400 transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5"
                 >
                   <Check className="w-4 h-4 stroke-[3]" />
-                  <span>Confirmar Apenas Ajuste (Sem WhatsApp)</span>
+                  <span>Confirmar & Salvar Detalhes (Sem WhatsApp)</span>
                 </button>
               </div>
 

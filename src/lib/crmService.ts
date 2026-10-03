@@ -83,19 +83,28 @@ export const crmService = {
         return isCompleted && (isRecentDate || !bDate);
       });
 
-      // Mapeia por telefone normalizado
+      const normPhone = (raw: string) => (raw || '').replace(/\D/g, '').replace(/^55/, '');
+      const normName = (raw: string) => (raw || '').trim().toLowerCase();
+
+      // Mapeia por telefone e nome normalizados
       const activeBookingsByPhone = new Map<string, Booking>();
+      const activeBookingsByName = new Map<string, Booking>();
       activeBookings.forEach(b => {
-        const rawPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
-        const cleanPhone = rawPhone.replace(/\D/g, '');
+        const rawPhone = b.userPhone || (b as any).clientPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
+        const cleanPhone = normPhone(rawPhone);
         if (cleanPhone) activeBookingsByPhone.set(cleanPhone, b);
+        const cleanName = normName(b.userName || (b as any).clientName);
+        if (cleanName) activeBookingsByName.set(cleanName, b);
       });
 
       const recentBookingsByPhone = new Map<string, Booking>();
+      const recentBookingsByName = new Map<string, Booking>();
       recentBookings.forEach(b => {
-        const rawPhone = b.userPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
-        const cleanPhone = rawPhone.replace(/\D/g, '');
+        const rawPhone = b.userPhone || (b as any).clientPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
+        const cleanPhone = normPhone(rawPhone);
         if (cleanPhone) recentBookingsByPhone.set(cleanPhone, b);
+        const cleanName = normName(b.userName || (b as any).clientName);
+        if (cleanName) recentBookingsByName.set(cleanName, b);
       });
 
       // Atualiza leads manuais existentes: se houver agendamento ativo futuro ou pós-venda recente
@@ -111,9 +120,10 @@ export const crmService = {
           return true;
         })
         .map(lead => {
-          const cleanPhone = (lead.telefone || '').replace(/\D/g, '');
-          const matchingActive = cleanPhone ? activeBookingsByPhone.get(cleanPhone) : null;
-          const matchingRecent = cleanPhone ? recentBookingsByPhone.get(cleanPhone) : null;
+          const cleanPhone = normPhone(lead.telefone || '');
+          const cleanName = normName(lead.nome || '');
+          const matchingActive = (cleanPhone ? activeBookingsByPhone.get(cleanPhone) : null) || (cleanName ? activeBookingsByName.get(cleanName) : null);
+          const matchingRecent = (cleanPhone ? recentBookingsByPhone.get(cleanPhone) : null) || (cleanName ? recentBookingsByName.get(cleanName) : null);
 
           if (matchingActive) {
             const dataFmt = matchingActive.date ? matchingActive.date.split('-').reverse().join('/') : '';
@@ -146,15 +156,19 @@ export const crmService = {
           return lead;
         });
 
-      // E para os bookings que não têm lead manual, cria os cards
-      const existingPhones = new Set(updatedLeadsManuais.map(l => (l.telefone || '').replace(/\D/g, '')).filter(Boolean));
+      // E para os bookings que não têm lead manual, cria os cards sem duplicar
+      const existingPhones = new Set(updatedLeadsManuais.map(l => normPhone(l.telefone || '')).filter(Boolean));
+      const existingNames = new Set(updatedLeadsManuais.map(l => normName(l.nome || '')).filter(Boolean));
       const leadsFromBookings: Lead[] = [];
 
       // 1. Agendados futuros/hoje:
       activeBookings.forEach(b => {
         const rawPhone = b.userPhone || (b as any).clientPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
-        const cleanPhone = rawPhone.replace(/\D/g, '');
-        if (!cleanPhone || !existingPhones.has(cleanPhone)) {
+        const cleanPhone = normPhone(rawPhone);
+        const cleanName = normName(b.userName || (b as any).clientName);
+        const alreadyExists = (cleanPhone && existingPhones.has(cleanPhone)) || (cleanName && existingNames.has(cleanName));
+
+        if (!alreadyExists) {
           let estagio: LeadStage = 'agendado';
           if (b.status === BookingStatus.PENDING_APPROVAL) estagio = 'negociacao';
           else if (b.status === BookingStatus.REJECTED || b.status === BookingStatus.NO_SHOW) estagio = 'followup';
@@ -182,14 +196,18 @@ export const crmService = {
           } as Lead);
 
           if (cleanPhone) existingPhones.add(cleanPhone);
+          if (cleanName) existingNames.add(cleanName);
         }
       });
 
       // 2. Recém-concluídos (< 15 dias) em Pós-Venda:
       recentBookings.forEach(b => {
         const rawPhone = b.userPhone || (b as any).clientPhone || (b.userId ? userPhoneMap.get(b.userId) : '') || '';
-        const cleanPhone = rawPhone.replace(/\D/g, '');
-        if (!cleanPhone || !existingPhones.has(cleanPhone)) {
+        const cleanPhone = normPhone(rawPhone);
+        const cleanName = normName(b.userName || (b as any).clientName);
+        const alreadyExists = (cleanPhone && existingPhones.has(cleanPhone)) || (cleanName && existingNames.has(cleanName));
+
+        if (!alreadyExists) {
           const dataFmt = b.date ? b.date.split('-').reverse().join('/') : '';
           leadsFromBookings.push({
             id: `booking_${b.id}`,
@@ -207,12 +225,13 @@ export const crmService = {
               ticketEstimado: b.priceEstimated || b.valor_estimado || 0,
               urgencia: 'media'
             },
-            responsavelAtendimento: 'Agenda Oficial',
+            responsavelAtendimento: 'Pós-Venda Cicatrização',
             createdAt: b.createdAt || new Date().toISOString(),
             updatedAt: b.createdAt || new Date().toISOString()
           } as Lead);
 
           if (cleanPhone) existingPhones.add(cleanPhone);
+          if (cleanName) existingNames.add(cleanName);
         }
       });
 
