@@ -60,6 +60,70 @@ async function getActiveGeminiKey() {
   return GEMINI_KEY;
 }
 
+async function callAIModel({ systemPrompt, userMessage, temperature = 0.3 }) {
+  // 1. Tenta OmniRoute (se configurado no Firestore ou ENV)
+  try {
+    const snap = await getDoc(doc(db, 'leads', '_config_ai'));
+    if (snap.exists()) {
+      const data = snap.data() || {};
+      const omniUrl = (data.omnirouteUrl || process.env.OMNIROUTE_URL || '').replace(/\/+$/, '');
+      const omniKey = data.omnirouteKey || process.env.OMNIROUTE_KEY || '';
+      const omniModel = data.omnirouteModel || process.env.OMNIROUTE_MODEL || 'auto/best-chat';
+
+      if (omniUrl && omniKey) {
+        const fullEndpoint = omniUrl.endsWith('/v1') ? `${omniUrl}/chat/completions` : `${omniUrl}/v1/chat/completions`;
+        const res = await fetch(fullEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${omniKey}`
+          },
+          body: JSON.stringify({
+            model: omniModel,
+            messages: [
+              ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+              { role: 'user', content: userMessage }
+            ],
+            temperature: temperature
+          })
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          const content = resData.choices?.[0]?.message?.content?.trim();
+          if (content && content.length > 2) {
+            return content;
+          }
+        }
+      }
+    }
+  } catch (errOmni) {
+    console.warn('Aviso OmniRoute:', errOmni);
+  }
+
+  // 2. Fallback para Google Gemini Flash
+  try {
+    const activeKey = await getActiveGeminiKey();
+    const promptCompleto = systemPrompt ? `${systemPrompt}\n\n${userMessage}` : userMessage;
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: promptCompleto }] }],
+        generationConfig: { temperature: temperature }
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (texto && texto.length > 2) return texto;
+    }
+  } catch (errGemini) {
+    console.warn('Aviso Gemini Flash API:', errGemini);
+  }
+
+  return null;
+}
+
 // ─── HELPERS GERAIS ─────────────────────────────────────────────────────────
 
 function formatPhone(phone) {
@@ -449,20 +513,14 @@ ${detalhesExtras ? `Observações do estúdio: ${detalhesExtras}` : ''}
 Retorne APENAS o texto da resposta para o WhatsApp do cliente. Sem aspas adicionais, sem preâmbulos.`;
 
   try {
-    const activeKey = await getActiveGeminiKey();
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: promptCompleto }] }],
-        generationConfig: { temperature: 0.3 }
-      })
+    const textoGerado = await callAIModel({
+      systemPrompt: promptSystem,
+      userMessage: `Contexto do histórico recente:\n${historicoFormatado || 'Início de conversa.'}\n\nÚltima mensagem enviada por ${clienteNome}:\n"${mensagemAtual}"\n\n${detalhesExtras ? `Observações do estúdio: ${detalhesExtras}` : ''}\n\nRetorne APENAS o texto da resposta para o WhatsApp do cliente. Sem aspas adicionais, sem preâmbulos.`,
+      temperature: 0.3
     });
-    const data = await res.json();
-    const textoGerado = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (textoGerado && textoGerado.length > 5) return textoGerado;
   } catch (err) {
-    console.warn('Aviso Gemini Flash API:', err);
+    console.warn('Aviso AI Model Persona:', err);
   }
 
   // Fallbacks de alta conversão
@@ -755,30 +813,80 @@ async function conversarComMiguelAdmin(textoMarcos, chatId, threadId) {
     }
   }
 
-  // 2. Fallback com Gemini Flash (usando chave ativa)
-  const geminiApiKey = await getActiveGeminiKey();
+  // 1.2 Configuração direta do OmniRoute pelo chat
+  const matchOmni = (textoMarcos || '').match(/(?:config(?:urar)?_omni|omniroute)\s+(https?:\/\/[^\s]+)(?:\s+(sk-[^\s]+))?/i);
+  if (matchOmni) {
+    const rawUrl = matchOmni[1].trim();
+    const rawKey = (matchOmni[2] || 'sk-7adee0ff3c0430dd-cb1702-8e51b511').trim();
+    await sendTelegramMessage(chatId, '🔄 *Testando conexão com o seu provedor OmniRoute...*', null, threadId);
+    try {
+      const fullEndpoint = rawUrl.endsWith('/v1') ? `${rawUrl}/chat/completions` : `${rawUrl}/v1/chat/completions`;
+      const testRes = await fetch(fullEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${rawKey}`
+        },
+        body: JSON.stringify({
+          model: 'auto/best-chat',
+          messages: [{ role: 'user', content: 'Diga apenas: OMNIROUTE OK' }]
+        })
+      });
+      const testData = await testRes.json();
+      const content = testData.choices?.[0]?.message?.content?.trim();
+      if (testRes.ok && content) {
+        await setDoc(doc(db, 'leads', '_config_ai'), {
+          omnirouteUrl: rawUrl,
+          omnirouteKey: rawKey,
+          omnirouteModel: 'auto/best-chat',
+          status: 'omniroute_online',
+          atualizadoEm: serverTimestamp()
+        }, { merge: true });
+
+        await sendTelegramMessage(
+          chatId,
+          `🎉 *CONECTADO AO OMNIROUTE COM SUCESSO!* 🚀\n\n` +
+          `O cérebro do estúdio agora roda direto pelo seu *OmniRoute Gateway*!\n` +
+          `Modelo ativo: \`auto/best-chat\` (com roteamento inteligente e combos).\n` +
+          `Resposta do teste: _"${content}"_`,
+          null,
+          threadId
+        );
+        return;
+      } else {
+        const erroMsg = testData.error?.message || 'Falha ao responder do OmniRoute.';
+        await sendTelegramMessage(
+          chatId,
+          `❌ *Falha na conexão com OmniRoute:*\n_${erroMsg}_\n\nVerifique se o túnel Cloudflare está ativo e a chave está correta.`,
+          null,
+          threadId
+        );
+        return;
+      }
+    } catch (errOmni) {
+      await sendTelegramMessage(chatId, `❌ Erro de rede ao conectar no OmniRoute: ${errOmni.message}`, null, threadId);
+      return;
+    }
+  }
+
+  // 2. Fallback com Motor de IA (OmniRoute ou Gemini Flash)
   const promptMiguel = `Você é Miguel, o Assessor Executivo Pessoal e Co-Piloto Inteligente do tatuador Markinhos (Somos 1 Tattoo Studio).
 Markinhos está falando com você diretamente pelo Telegram dele.
 Ele falou: "${textoMarcos}"
 Responda de forma ágil, executiva e amigável em tom de braço direito do tatuador. Máximo 2 a 3 frases.`;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: promptMiguel }] }],
-        generationConfig: { temperature: 0.3 }
-      })
+    const rawText = await callAIModel({
+      systemPrompt: promptMiguel,
+      userMessage: textoMarcos,
+      temperature: 0.3
     });
-    const data = await res.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (rawText && rawText.length > 3) {
       await sendTelegramMessage(chatId, `🎩 *Miguel:* ${rawText}`, null, threadId);
       return;
     }
   } catch (e) {
-    console.warn('Aviso Gemini Miguel:', e);
+    console.warn('Aviso AI Miguel:', e);
   }
 
   // Fallback padrão amigável
