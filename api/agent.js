@@ -190,6 +190,23 @@ async function criarTodosOsTopicos(chatId) {
     }
   }
 
+  // Se nenhum tópico pôde ser criado devido a falta de permissão no Telegram
+  if (Object.keys(mapTopicos).length === 0) {
+    const errorMsg =
+      `⚠️ *FALTOU A PERMISSÃO DE "GERENCIAR TÓPICOS"!* 🛑\n\n` +
+      `O Telegram recusou a criação com o erro: _"not enough rights to create a topic"_.\n\n` +
+      `👉 *Como liberar em 10 segundos no Telegram:* \n` +
+      `1️⃣ Clique no nome do grupo *SOMOS 1 TATTOO* no topo.\n` +
+      `2️⃣ Clique no lápis (Editar Grupo) ➔ *Administradores*.\n` +
+      `3️⃣ Toque no bot *@somos1tattoo_bot*.\n` +
+      `4️⃣ ATIVE a chave: *Gerenciar Tópicos* (ou *Manage Topics*).\n` +
+      `5️⃣ Salve e digite */criar_topicos* aqui no grupo novamente!\n\n` +
+      `Assim que você ligar essa chave, os 7 tópicos aparecerão na barra lateral igual ao do Somos 1 O Despertar! 🚀`;
+
+    await sendTelegramMessage(chatId, errorMsg);
+    return mapTopicos;
+  }
+
   // Grava mapeamento no Firestore (usando coleção leads com permissão autorizada)
   await setDoc(doc(db, 'leads', '_config_telegram_topics'), {
     groupId: String(chatId),
