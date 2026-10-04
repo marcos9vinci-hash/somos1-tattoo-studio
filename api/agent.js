@@ -45,6 +45,21 @@ const TELEGRAM_ADMIN_CHAT_ID = '894069351'; // Marcos Vinicius
 
 const GEMINI_KEY = 'AIzaSyBdWdWmBaY4b-Z8A0l-WlCod1yhtID3VU4';
 
+async function getActiveGeminiKey() {
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10) {
+    return process.env.GEMINI_API_KEY.trim();
+  }
+  try {
+    const snap = await getDoc(doc(db, 'leads', '_config_ai'));
+    if (snap.exists() && snap.data()?.geminiApiKey) {
+      return snap.data().geminiApiKey.trim();
+    }
+  } catch (e) {
+    console.warn('Erro ao consultar chave de IA no Firestore:', e);
+  }
+  return GEMINI_KEY;
+}
+
 // ─── HELPERS GERAIS ─────────────────────────────────────────────────────────
 
 function formatPhone(phone) {
@@ -184,11 +199,34 @@ async function criarTodosOsTopicos(chatId) {
     }
   ];
 
-  const mapTopicos = {};
+  // 1. Verifica se já existem tópicos configurados no Firestore
+  let existingTopics = {};
+  try {
+    const configSnap = await getDoc(doc(db, 'leads', '_config_telegram_topics'));
+    if (configSnap.exists() && configSnap.data().topics) {
+      existingTopics = configSnap.data().topics || {};
+    }
+  } catch (e) {
+    console.warn('Erro ao ler _config_telegram_topics:', e);
+  }
 
-  await sendTelegramMessage(chatId, '⚙️ *INICIANDO CRIAÇÃO AUTOMÁTICA DOS 8 TÓPICOS NO GRUPO...*\n_Criando canais dedicados para cada Agente de IA e Fechamento de Caixa..._');
+  const mapTopicos = { ...existingTopics };
+  const pendentes = TOPICOS_DEFINICAO.filter(t => !mapTopicos[t.key]);
 
-  for (const t of TOPICOS_DEFINICAO) {
+  // Se já tem todos os tópicos criados e ativos, não duplica no Telegram!
+  if (pendentes.length === 0 && Object.keys(mapTopicos).length > 0) {
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ *OS TÓPICOS JÁ ESTÃO CONFIGURADOS!* 🛡️\n\n` +
+      `Todos os canais dos agentes e fechamento diário já estão vinculados no sistema.\n\n` +
+      `💡 *Dica sobre tópicos duplicados:* Como o Telegram não apaga tópicos antigos sozinho, caso tenham ficado tópicos repetidos na lista lateral, basta dar um toque longo (ou botão direito) sobre o tópico duplicado e escolher *Excluir Tópico* para limpar a visualização!`
+    );
+    return mapTopicos;
+  }
+
+  await sendTelegramMessage(chatId, `⚙️ *VINCULANDO TÓPICOS DO QUARTEL GENERAL...*\n_Criando canais pendentes (${pendentes.length})..._`);
+
+  for (const t of pendentes) {
     const threadId = await createTelegramForumTopic(chatId, t.name, t.color);
     if (threadId) {
       mapTopicos[t.key] = threadId;
@@ -207,7 +245,7 @@ async function criarTodosOsTopicos(chatId) {
       `3️⃣ Toque no bot *@somos1tattoo_bot*.\n` +
       `4️⃣ ATIVE a chave: *Gerenciar Tópicos* (ou *Manage Topics*).\n` +
       `5️⃣ Salve e digite */criar_topicos* aqui no grupo novamente!\n\n` +
-      `Assim que você ligar essa chave, os 7 tópicos aparecerão na barra lateral igual ao do Somos 1 O Despertar! 🚀`;
+      `Assim que você ligar essa chave, os 8 tópicos aparecerão na barra lateral igual ao do Somos 1 O Despertar! 🚀`;
 
     await sendTelegramMessage(chatId, errorMsg);
     return mapTopicos;
@@ -222,10 +260,11 @@ async function criarTodosOsTopicos(chatId) {
   }, { merge: true });
 
   const finalMsg = 
-    `🎉 *PRONTO, MARKINHOS! TODOS OS 7 TÓPICOS FORAM CRIADOS E CONECTADOS!* 🚀\n\n` +
+    `🎉 *PRONTO, MARKINHOS! TODOS OS 8 TÓPICOS ESTÃO CONECTADOS!* 🚀\n\n` +
     `A partir de agora:\n` +
     `• Cada notificação do WhatsApp cairá no tópico exato do seu agente responsável.\n` +
-    `• Você pode me dar ordens na janela *🎩 7. Falar com Miguel* ou em qualquer tópico!\n\n` +
+    `• Você pode me dar ordens na janela *🎩 7. Falar com Miguel* ou em qualquer tópico!\n` +
+    `• O *📊 8. Fechamento Diário & Caixa* receberá o resumo diário automaticamente.\n\n` +
     `_O Quartel General da Somos 1 Tattoo está 100% blindado e operacional._`;
 
   await sendTelegramMessage(chatId, finalMsg);
@@ -410,7 +449,8 @@ ${detalhesExtras ? `Observações do estúdio: ${detalhesExtras}` : ''}
 Retorne APENAS o texto da resposta para o WhatsApp do cliente. Sem aspas adicionais, sem preâmbulos.`;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+    const activeKey = await getActiveGeminiKey();
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -669,8 +709,54 @@ async function conversarComMiguelAdmin(textoMarcos, chatId, threadId) {
     }
   }
 
-  // 2. Fallback com Gemini Flash (quando houver chave configurada)
-  const geminiApiKey = process.env.GEMINI_API_KEY || GEMINI_KEY;
+  // 1.1 Configuração direta de chave de IA pelo chat
+  const matchKey = (textoMarcos || '').match(/(?:(?:config(?:urar)?_ia|chave_ia|ia_chave|token_ia)\s+|chave\s+gemini\s*:?\s*|)(AIzaSy[a-zA-Z0-9_-]{33})/i);
+  if (matchKey) {
+    const novaChave = matchKey[1];
+    await sendTelegramMessage(chatId, '🔄 *Testando nova chave com os servidores do Google Gemini...*', null, threadId);
+    try {
+      const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${novaChave}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Responda apenas: CONECTADO' }] }]
+        })
+      });
+      const testData = await testRes.json();
+      if (testRes.ok && testData.candidates?.[0]?.content?.parts?.[0]?.text) {
+        await setDoc(doc(db, 'leads', '_config_ai'), {
+          geminiApiKey: novaChave,
+          status: 'online',
+          atualizadoEm: serverTimestamp()
+        }, { merge: true });
+
+        await sendTelegramMessage(
+          chatId,
+          `🎉 *CHAVE DE IA VALIDADA E ATIVADA COM SUCESSO!* 🚀\n\n` +
+          `O cérebro do estúdio (Gemini 2.5 Flash) agora está *100% online, ultra-fluído e sem limites*!\n\n` +
+          `A partir de agora eu respondo qualquer assunto com fluência natural, e os agentes do WhatsApp também usarão esta chave.`,
+          null,
+          threadId
+        );
+        return;
+      } else {
+        const erroMsg = testData.error?.message || 'Chave inválida ou recusada pelo Google.';
+        await sendTelegramMessage(
+          chatId,
+          `❌ *Falha na ativação da chave:*\n_${erroMsg}_\n\nVerifique se a chave no Google AI Studio está ativa.`,
+          null,
+          threadId
+        );
+        return;
+      }
+    } catch (errKey) {
+      await sendTelegramMessage(chatId, `❌ Erro ao validar chave: ${errKey.message}`, null, threadId);
+      return;
+    }
+  }
+
+  // 2. Fallback com Gemini Flash (usando chave ativa)
+  const geminiApiKey = await getActiveGeminiKey();
   const promptMiguel = `Você é Miguel, o Assessor Executivo Pessoal e Co-Piloto Inteligente do tatuador Markinhos (Somos 1 Tattoo Studio).
 Markinhos está falando com você diretamente pelo Telegram dele.
 Ele falou: "${textoMarcos}"
