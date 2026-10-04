@@ -26,6 +26,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/agent(.*)", "destination": "/api/agent.js" },
+    { "source": "/api/webhook(.*)", "destination": "/api/agent.js" },
     { "source": "/api/:path*", "destination": "/api/index.js" },
     { "source": "/admin(.*)", "destination": "/admin.html" },
     { "source": "/studio(.*)", "destination": "/admin.html" },
