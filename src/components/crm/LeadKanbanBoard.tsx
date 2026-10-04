@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { STAGE_AGENTS_NAIA } from '../../lib/naiaAgentsConfig';
 import { ColunaAgentConfigModal } from './ColunaAgentConfigModal';
+import { PixReceiptAiModal } from './PixReceiptAiModal';
 
 interface LeadKanbanBoardProps {
   leads: Lead[];
@@ -61,6 +62,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
 }) => {
   const [agentsConfig, setAgentsConfig] = useState<Record<LeadStage, ColunaAIAgentConfig>>(STAGE_AGENTS_NAIA);
   const [selectedAgentForModal, setSelectedAgentForModal] = useState<ColunaAIAgentConfig | null>(null);
+  const [selectedLeadForPixReceipt, setSelectedLeadForPixReceipt] = useState<Lead | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
   const [isMouseDown, setIsMouseDown] = useState(false);
@@ -392,11 +394,23 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                                       e.stopPropagation();
                                       handleCopiarPixSinal(lead, valorSinal, valorTotal);
                                     }}
-                                    className="flex-1 py-1 px-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/30 rounded text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95"
+                                    className="py-1 px-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/30 rounded text-[9px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95"
                                     title="Copiar mensagem com chave PIX para enviar no WhatsApp"
                                   >
                                     <Copy className="w-2.5 h-2.5 text-purple-300" />
-                                    Copiar PIX
+                                    PIX
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedLeadForPixReceipt(lead);
+                                    }}
+                                    className="flex-1 py-1 px-1.5 bg-gradient-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/35 hover:to-purple-500/35 text-amber-200 border border-amber-400/40 rounded text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 shadow-xs"
+                                    title="Escanear ou colar print do comprovante PIX com IA"
+                                  >
+                                    <Sparkles className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
+                                    Ler Print IA
                                   </button>
                                   <button
                                     type="button"
@@ -404,11 +418,11 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                                       e.stopPropagation();
                                       handleConfirmarSinal(lead, valorSinal);
                                     }}
-                                    className="py-1 px-2 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-400/30 rounded text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95"
+                                    className="py-1 px-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-400/30 rounded text-[9px] font-bold flex items-center justify-center gap-0.5 transition-all active:scale-95"
                                     title="Marcar sinal pago e avançar para Agendado"
                                   >
                                     <Check className="w-2.5 h-2.5 text-emerald-400" />
-                                    Sinal Pago
+                                    Pago
                                   </button>
                                 </>
                               )}
@@ -551,6 +565,32 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
         onClose={() => setSelectedAgentForModal(null)}
         config={selectedAgentForModal}
         onSave={handleSaveAgentConfig}
+      />
+
+      {/* Modal de Leitura de Comprovante PIX com IA */}
+      <PixReceiptAiModal
+        isOpen={!!selectedLeadForPixReceipt}
+        onClose={() => setSelectedLeadForPixReceipt(null)}
+        lead={selectedLeadForPixReceipt}
+        onSuccess={async (analysis) => {
+          if (selectedLeadForPixReceipt) {
+            if (onUpdateLead) {
+              await onUpdateLead(selectedLeadForPixReceipt.id, {
+                sinalPago: true,
+                valorSinal: analysis.valor,
+                estagio: 'agendado'
+              });
+            } else {
+              await crmService.updateLead(selectedLeadForPixReceipt.id, {
+                sinalPago: true,
+                valorSinal: analysis.valor,
+                estagio: 'agendado'
+              });
+              onStageChange(selectedLeadForPixReceipt.id, 'agendado');
+            }
+          }
+          setSelectedLeadForPixReceipt(null);
+        }}
       />
     </div>
   );

@@ -115,6 +115,57 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, processed: true, intent: result.intent, replyText: result.replyText });
     }
 
+    // ==================== SCANNER DE COMPROVANTE PIX (IA) ====================
+    if (path === '/receipt/analyze' && req.method === 'POST') {
+      const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const { image, mimeType = 'image/jpeg', text } = data || {};
+
+      const apiKey = process.env.GEMINI_API_KEY || "AIzaSyAhIXcG4ReuncxNBZSqjXYOu7Exka_TNo0";
+      const systemPrompt = `Você é um auditor financeiro do Somos 1 Tattoo Studio. Analise a imagem ou texto do comprovante e responda com JSON puro: {"sucesso":true,"tipo":"entrada","valor":150.00,"valorFormatado":"R$ 150,00","data":"YYYY-MM-DD","hora":"HH:MM","pagador":"Nome","favorecido":"Somos 1","banco":"Nubank","idTransacao":"E2E...","categoriaSugerida":"sinal_tattoo","descricaoSugerida":"Sinal PIX","confianca":0.95}`;
+
+      try {
+        let contents = [];
+        if (image) {
+          const cleanBase64 = image.includes('base64,') ? image.split('base64,')[1] : image;
+          contents = [{
+            role: 'user',
+            parts: [
+              { text: systemPrompt },
+              { inline_data: { mime_type: mimeType, data: cleanBase64 } }
+            ]
+          }];
+        } else if (text) {
+          contents = [{
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\nTexto:\n${text}` }]
+          }];
+        } else {
+          return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
+        }
+
+        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
+          })
+        });
+
+        if (!gRes.ok) {
+          const errBody = await gRes.text();
+          return res.status(500).json({ error: 'Erro Gemini API', details: errBody });
+        }
+
+        const gData = await gRes.json();
+        const rawJson = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parsed = JSON.parse(rawJson.replace(/```json/gi, '').replace(/```/g, '').trim());
+        return res.status(200).json(parsed);
+      } catch (err) {
+        return res.status(500).json({ error: String(err) });
+      }
+    }
+
     if (path === '/auth/facebook/delete' || path === '/auth/facebook/deauthorize') {
       return res.status(200).json({
         url: `https://${req.headers.host}/deletion-status`,

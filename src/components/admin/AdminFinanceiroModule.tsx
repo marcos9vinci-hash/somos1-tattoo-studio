@@ -24,6 +24,7 @@ import {
   DEFAULT_STUDIO_RATE
 } from '../../lib/financeService';
 import { FinanceSummary, Commission, ContaPagar, ContaReceber } from '../../lib/financeTypes';
+import { PixReceiptAiModal } from '../crm/PixReceiptAiModal';
 
 type ActiveTab = 'geral' | 'pagar' | 'receber' | 'comissoes';
 
@@ -42,6 +43,7 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
   // Modais de Abertura
   const [isModalPagarOpen, setIsModalPagarOpen] = useState(false);
   const [isModalReceberOpen, setIsModalReceberOpen] = useState(false);
+  const [scannerTarget, setScannerTarget] = useState<'pagar' | 'receber' | null>(null);
 
   // Formulário Nova Conta a Pagar
   const [novoPagar, setNovoPagar] = useState({
@@ -95,6 +97,34 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
   const showSuccess = (msg: string) => {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(null), 4000);
+  };
+
+  const handleApplyScannerResult = (analysis: any) => {
+    if (scannerTarget === 'pagar') {
+      setNovoPagar(prev => ({
+        ...prev,
+        descricao: prev.descricao || analysis.descricaoSugerida || 'Despesa PIX',
+        fornecedor: analysis.favorecido || prev.fornecedor,
+        valor: String(analysis.valor || prev.valor),
+        vencimento: analysis.data || prev.vencimento,
+        formaPgto: 'pix',
+        obs: analysis.idTransacao ? `Autenticação PIX: ${analysis.idTransacao}` : prev.obs
+      }));
+      showSuccess(`Dados do comprovante de R$ ${analysis.valor.toFixed(2)} preenchidos com sucesso!`);
+    } else if (scannerTarget === 'receber') {
+      setNovoReceber(prev => ({
+        ...prev,
+        cliente: analysis.pagador || prev.cliente,
+        valor: prev.valor || String(analysis.valor),
+        valorSinal: String(analysis.valor),
+        status: prev.valor && Number(prev.valor) > analysis.valor ? 'sinal_pago' : 'pago',
+        vencimento: analysis.data || prev.vencimento,
+        formaPgto: 'pix',
+        obs: analysis.idTransacao ? `Autenticação PIX: ${analysis.idTransacao} (${analysis.banco || ''})` : prev.obs
+      }));
+      showSuccess(`Comprovante PIX de R$ ${analysis.valor.toFixed(2)} lido e preenchido!`);
+    }
+    setScannerTarget(null);
   };
 
   // --- Handlers Contas a Pagar ---
@@ -950,6 +980,16 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
               </button>
             </div>
 
+            {/* Botão de Leitura de Comprovante com IA */}
+            <button
+              type="button"
+              onClick={() => setScannerTarget('pagar')}
+              className="w-full py-2 px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/35 text-purple-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              Ler Comprovante com IA (Preencher Automático)
+            </button>
+
             <form onSubmit={handleSavePagar} className="space-y-3 text-xs">
               <div>
                 <label className="block text-zinc-400 mb-1 font-semibold">Descrição do Gasto *</label>
@@ -1081,6 +1121,16 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Botão de Leitura de Comprovante com IA */}
+            <button
+              type="button"
+              onClick={() => setScannerTarget('receber')}
+              className="w-full py-2 px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/35 text-purple-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              Ler Comprovante PIX do Cliente com IA
+            </button>
 
             <form onSubmit={handleSaveReceber} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
@@ -1246,6 +1296,13 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
           </div>
         </div>
       )}
+
+      {/* Modal Scanner de Comprovante PIX com IA */}
+      <PixReceiptAiModal
+        isOpen={!!scannerTarget}
+        onClose={() => setScannerTarget(null)}
+        onApplyToFinance={handleApplyScannerResult}
+      />
     </div>
   );
 }
