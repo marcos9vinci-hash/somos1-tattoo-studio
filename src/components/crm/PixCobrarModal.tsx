@@ -45,9 +45,17 @@ export const PixCobrarModal: React.FC<PixCobrarModalProps> = ({
   defaultDescricao = 'Atendimento Tattoo',
   onConfirmedPayment
 }) => {
-  const [chavePix, setChavePix] = useState('somos1tattoo@gmail.com');
-  const [nomeRecebedor, setNomeRecebedor] = useState('SOMOS 1 TATTOO');
-  const [cidade, setCidade] = useState('SAO PAULO');
+  const [chavePix, setChavePix] = useState(() => localStorage.getItem('somos1_pix_chave') || 'somos1tattoo@gmail.com');
+  const [nomeRecebedor, setNomeRecebedor] = useState(() => localStorage.getItem('somos1_pix_nome') || 'SOMOS 1 TATTOO');
+  const [cidade, setCidade] = useState(() => localStorage.getItem('somos1_pix_cidade') || 'SAO PAULO');
+  const [isEditingKey, setIsEditingKey] = useState(false);
+
+  const handleSaveChavePix = () => {
+    localStorage.setItem('somos1_pix_chave', chavePix.trim());
+    localStorage.setItem('somos1_pix_nome', nomeRecebedor.trim());
+    localStorage.setItem('somos1_pix_cidade', cidade.trim());
+    setIsEditingKey(false);
+  };
   
   const clienteNome = lead?.nome || defaultClienteNome;
   const clienteTelefone = lead?.telefone || defaultTelefone;
@@ -227,6 +235,71 @@ export const PixCobrarModal: React.FC<PixCobrarModalProps> = ({
 
         {/* Corpo */}
         <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar">
+          {/* Caixa de Configuração da Conta de Destino */}
+          <div className="bg-zinc-900/90 border border-purple-500/20 rounded-xl p-3 text-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold block">
+                    Conta de Destino (Onde cai o dinheiro):
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-emerald-300 font-mono">{chavePix}</span>
+                    <span className="text-zinc-500 text-[11px]">• {nomeRecebedor}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingKey(!isEditingKey)}
+                className="text-[11px] text-purple-400 hover:text-purple-300 font-bold underline px-1 py-0.5 rounded hover:bg-purple-500/10 transition-colors"
+              >
+                {isEditingKey ? 'Cancelar' : 'Alterar Minha Chave'}
+              </button>
+            </div>
+
+            {isEditingKey && (
+              <div className="mt-2 pt-2.5 border-t border-zinc-800 space-y-2.5 animate-fadeIn">
+                <p className="text-[11px] text-zinc-300">
+                  Insira a sua <strong>chave PIX real</strong> (CPF, Celular, E-mail ou Chave Aleatória) do seu banco:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-zinc-400 font-bold block mb-1">Chave PIX:</label>
+                    <input
+                      type="text"
+                      value={chavePix}
+                      onChange={(e) => setChavePix(e.target.value)}
+                      placeholder="Ex: 11999998888, CPF ou email"
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white text-xs outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400 font-bold block mb-1">Nome no Banco:</label>
+                    <input
+                      type="text"
+                      value={nomeRecebedor}
+                      onChange={(e) => setNomeRecebedor(e.target.value)}
+                      placeholder="Ex: Marcos Vinicius ou Somos 1"
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white text-xs outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveChavePix}
+                    className="py-1 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1"
+                  >
+                    <Check className="w-3 h-3" />
+                    Salvar e Atualizar QR Code
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Seletor de Valor */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
