@@ -11,7 +11,8 @@ import { ChatInterfaceModal } from '../components/crm/ChatInterfaceModal';
 import { LeadModal } from '../components/crm/LeadModal';
 import { ClienteModal } from '../components/crm/ClienteModal';
 import { EstrategiasReativacaoPanel } from '../components/crm/EstrategiasReativacaoPanel';
-import { SimuladorFluxoWhatsAppModal } from '../components/crm/SimuladorFluxoWhatsAppModal';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { telegramService } from '../lib/telegramService';
 import {
   Users,
@@ -223,6 +224,68 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
                     await telegramService.responderCallback(cq.id, 'Enviando pergunta de presença...');
                     await telegramService.enviarAlertaPresenca(sessao);
                   }
+                }
+              } else if (cqData.startsWith('lead:enviar:')) {
+                const leadId = cqData.replace('lead:enviar:', '');
+                await telegramService.responderCallback(cq.id, 'Disparando no WhatsApp...');
+                try {
+                  const sugDoc = await getDoc(doc(db, 'pending_suggestions', leadId));
+                  if (sugDoc.exists()) {
+                    const data = sugDoc.data();
+                    if (data.telefone && data.sugestaoResposta) {
+                      await crmService.enviarMensagemWhatsApp(data.telefone, data.sugestaoResposta);
+                      if (chatId && msgId) {
+                        await telegramService.editarMensagemTexto(
+                          chatId,
+                          msgId,
+                          `✅ *MENSAGEM ENVIADA NO WHATSAPP COM SUCESSO!* 🚀\n\n` +
+                          `👤 *Cliente:* ${data.clienteNome || 'Cliente'}\n` +
+                          `💬 *Enviado:* "${data.sugestaoResposta}"`
+                        );
+                      }
+                      showToast('success', `🚀 Mensagem enviada para ${data.clienteNome || 'o cliente'} via WhatsApp!`);
+                      await loadData();
+                    }
+                  }
+                } catch (e: any) {
+                  showToast('error', `Falha ao enviar sugestão: ${e?.message}`);
+                }
+              } else if (cqData.startsWith('lead:sinal:') || cqData.startsWith('sinal:pago:')) {
+                const leadId = cqData.replace('lead:sinal:', '').replace('sinal:pago:', '');
+                await telegramService.responderCallback(cq.id, '💰 Sinal confirmado!');
+                try {
+                  await crmService.atualizarLead(leadId, {
+                    sinalPago: true,
+                    estagio: 'agendado'
+                  });
+                  if (chatId && msgId) {
+                    await telegramService.editarMensagemTexto(
+                      chatId,
+                      msgId,
+                      `💰 *SINAL DE 30% CONFIRMADO!* ✅\n\nVaga garantida e lead movido para *📅 Sessão Agendada* no funil!`
+                    );
+                  }
+                  showToast('success', '💰 Sinal confirmado! Lead movido para Agendado.');
+                  await loadData();
+                } catch (e: any) {
+                  showToast('error', `Falha ao confirmar sinal: ${e?.message}`);
+                }
+              } else if (cqData.startsWith('lead:ignorar:')) {
+                const senderPhone = cqData.replace('lead:ignorar:', '').replace(/\D/g, '');
+                await telegramService.responderCallback(cq.id, '🚫 Contato ignorado!');
+                try {
+                  await crmService.ignorarContato(senderPhone, 'Ignorado via Telegram Bot');
+                  if (chatId && msgId) {
+                    await telegramService.editarMensagemTexto(
+                      chatId,
+                      msgId,
+                      `🚫 *CONTATO IGNORADO & REMOVIDO!* 🗑️\n\nO número foi bloqueado de futuras importações no CRM.`
+                    );
+                  }
+                  showToast('success', `🚫 Contato ${senderPhone} ignorado e removido do CRM.`);
+                  await loadData();
+                } catch (e: any) {
+                  showToast('error', `Falha ao ignorar contato: ${e?.message}`);
                 }
               } else if (cqData.startsWith('agente:') || cqData === 'estudio:status') {
                 const tipo = cqData.replace('agente:', '');

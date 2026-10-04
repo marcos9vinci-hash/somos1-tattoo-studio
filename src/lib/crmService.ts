@@ -1089,24 +1089,41 @@ export const crmService = {
         }
       }
 
-      if (!leadDocRef && cleanBookingPhone) {
-        const qSnap = await getDocs(query(collection(db, LEADS_COLLECTION), where('telefone', '==', cleanBookingPhone)));
-        if (!qSnap.empty) {
-          leadDocRef = doc(db, LEADS_COLLECTION, qSnap.docs[0].id);
+      const rawPhone = (booking.userPhone || (booking as any).clientPhone || '').replace(/\D/g, '');
+      const last9Digits = rawPhone.length >= 9 ? rawPhone.slice(-9) : rawPhone;
+      const cleanBookingName = (booking.userName || (booking as any).clientName || '').trim().toLowerCase();
+
+      if (!leadDocRef) {
+        const allLeadsSnap = await getDocs(collection(db, LEADS_COLLECTION));
+        const matched = allLeadsSnap.docs.find(d => {
+          const lData = d.data();
+          const lPhone = (lData.telefone || '').replace(/\D/g, '');
+          const lName = (lData.nome || '').trim().toLowerCase();
+          const phoneMatches = last9Digits && lPhone && (lPhone.endsWith(last9Digits) || last9Digits.endsWith(lPhone.slice(-9)));
+          const nameMatches = cleanBookingName && lName && (cleanBookingName === lName || (cleanBookingName.length > 4 && lName.includes(cleanBookingName)));
+          return phoneMatches || nameMatches;
+        });
+        if (matched) {
+          leadDocRef = doc(db, LEADS_COLLECTION, matched.id);
         }
       }
 
-      if (!leadDocRef && booking.userName) {
-        const qSnap = await getDocs(query(collection(db, LEADS_COLLECTION), where('nome', '==', booking.userName)));
-        if (!qSnap.empty) {
-          leadDocRef = doc(db, LEADS_COLLECTION, qSnap.docs[0].id);
-        }
+      let novoEstagio: LeadStage = 'agendado';
+      let novaTemp: 'quente' | 'morno' | 'frio' = 'quente';
+
+      if (norm === 'completed') {
+        novoEstagio = 'pos_venda';
+        novaTemp = 'quente';
+      } else if (norm === 'no_show' || norm === 'rejected' || norm === 'cancelled') {
+        novoEstagio = 'followup';
+        novaTemp = 'frio';
+      } else if (norm === 'approved' || norm === 'confirmed' || norm === 'deposit_paid' || norm === 'rescheduled' || norm === 'pending_approval') {
+        novoEstagio = 'agendado';
+        novaTemp = 'quente';
       }
 
-      const novoEstagio: LeadStage = norm === 'completed' ? 'pos_venda' : 'followup';
-      const novaTemp: 'quente' | 'morno' = norm === 'completed' ? 'quente' : 'morno';
-
-      const orcamentoEstimado = booking.priceEstimated || booking.valor_estimado;
+      const orcamentoEstimado = booking.priceEstimated || (booking as any).valor_estimado;
+      const valorSinal = booking.depositPaid || (booking as any).valor_sinal;
 
       if (leadDocRef) {
         const leadUpdate: Record<string, any> = {
@@ -1117,24 +1134,42 @@ export const crmService = {
         if (orcamentoEstimado) {
           leadUpdate.orcamentoMaximo = Number(orcamentoEstimado);
         }
+        if (valorSinal !== undefined) {
+          leadUpdate.valorSinal = Number(valorSinal);
+          if (leadUpdate.valorSinal > 0) leadUpdate.sinalPago = true;
+        }
+        if (booking.date) leadUpdate.dataAgendada = booking.date;
+        if (booking.time) leadUpdate.horaAgendada = booking.time;
+        if (booking.fotos_referencia && Array.isArray(booking.fotos_referencia)) {
+          leadUpdate.fotosReferencia = booking.fotos_referencia;
+        }
         await updateDoc(leadDocRef, leadUpdate);
-      } else {
-        // Se ainda não existia lead correspondente, cria para que apareça na coluna certa do Funil
+      } else if (booking.id) {
+        // Se ainda não existia lead correspondente, cria usando ID determinístico para idempotência total (NUNCA duplica)
+        const deterministicLeadRef = doc(db, LEADS_COLLECTION, `booking_${booking.id}`);
         const newLeadPayload: any = {
+          id: `booking_${booking.id}`,
           nome: booking.userName || 'Cliente Estúdio',
           telefone: booking.userPhone || '',
           estagio: novoEstagio,
           temperatura: novaTemp,
           origem: 'agenda',
-          ultimaMensagem: norm === 'completed' ? 'Sessão concluída com sucesso!' : 'Cliente não compareceu à sessão.',
+          ultimaMensagem: norm === 'completed' ? 'Sessão concluída com sucesso!' : 'Sessão agendada no estúdio.',
           pilotoIA: false,
+          dataAgendada: booking.date || '',
+          horaAgendada: booking.time || '',
+          fotosReferencia: booking.fotos_referencia || [],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
         if (orcamentoEstimado) {
           newLeadPayload.orcamentoMaximo = Number(orcamentoEstimado);
         }
-        await addDoc(collection(db, LEADS_COLLECTION), newLeadPayload);
+        if (valorSinal !== undefined) {
+          newLeadPayload.valorSinal = Number(valorSinal);
+          if (newLeadPayload.valorSinal > 0) newLeadPayload.sinalPago = true;
+        }
+        await setDoc(deterministicLeadRef, newLeadPayload, { merge: true });
       }
     } catch (err) {
       console.warn('syncBookingToCRM [lead]:', err);

@@ -1,5 +1,7 @@
-// Standalone Vercel Serverless Function for WhatsApp AI Agent
-// Zero npm dependencies - Uses native fetch and Firestore REST API directly.
+// ============================================================================
+// SOMOS 1 TATTOO STUDIO — NATIVE AI AGENT ENGINE (VERCEL SERVERLESS)
+// 100% NATIVO — SUBSTITUI O N8N EM DEFINITIVO (ZERO MEMÓRIA NO NORTHFLANK)
+// ============================================================================
 
 const FIREBASE_API_KEY = "AIzaSyAhIXcG4ReuncxNBZSqjXYOu7Exka_TNo0";
 const FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/memorizeai-7b8fd/databases/ai-studio-dcd3cc7e-f58b-453b-a948-88e194766ac9/documents";
@@ -7,6 +9,25 @@ const FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/memorizeai-
 const EVOLUTION_HOST = 'p01--evolution--6n2dx6dsdlsf.code.run';
 const EVOLUTION_APIKEY = '020F2F224360-40F7-B022-D17AB8E529E2';
 const EVOLUTION_INSTANCE = 'wats';
+
+const TELEGRAM_TOKEN = '8824178251:AAFu-yv94YS-XGKHXh1t_Q-EIrThiYLXYC4';
+const TELEGRAM_ADMIN_CHAT_ID = '894069351'; // Marcos Vinicius
+
+const GEMINI_KEY = 'AIzaSyBdWdWmBaY4b-Z8A0l-WlCod1yhtID3VU4';
+
+// ─── HELPERS GERAIS ─────────────────────────────────────────────────────────
+
+function formatPhone(phone) {
+  if (!phone || phone === '00000000000') return 'Sem WhatsApp';
+  const digits = String(phone).replace(/\D/g, '');
+  const local = digits.startsWith('55') ? digits.slice(2) : digits;
+  if (local.length === 11) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  } else if (local.length === 10) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  }
+  return phone;
+}
 
 function timeToMins(str) {
   if (!str) return 0;
@@ -29,9 +50,7 @@ function parseDate(t) {
     const y = matchBr[3] ? (matchBr[3].length === 2 ? '20' + matchBr[3] : matchBr[3]) : String(now.getFullYear());
     return `${y}-${m}-${d}`;
   }
-  if (t.includes('hoje')) {
-    return now.toISOString().split('T')[0];
-  }
+  if (t.includes('hoje')) return now.toISOString().split('T')[0];
   if (t.includes('amanha') || t.includes('amanhã')) {
     const tm = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     return tm.toISOString().split('T')[0];
@@ -76,152 +95,219 @@ function parseDeposit(t) {
   return m ? parseFloat(m[1]) : 0;
 }
 
-async function getAvailableSlots(targetDate, targetSize = 'Pequena') {
-  const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
-  const queryBody = {
-    structuredQuery: {
-      from: [{ collectionId: 'bookings' }],
-      where: {
-        fieldFilter: {
-          field: { fieldPath: 'date' },
-          op: 'EQUAL',
-          value: { stringValue: targetDate }
-        }
-      }
-    }
-  };
-  const res = await fetch(queryUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(queryBody)
-  });
-  const items = await res.json();
-  const busyIntervals = (Array.isArray(items) ? items : [])
-    .filter(i => i.document && i.document.fields)
-    .map(i => {
-      const f = i.document.fields;
-      const start = timeToMins(f.time?.stringValue || '00:00');
-      const dur = Number(f.duration?.integerValue || 60);
-      return { start, end: start + dur, status: f.status?.stringValue || '' };
-    })
-    .filter(i => i.status !== 'cancelled');
+// ─── DISPAROS EXTERNOS ──────────────────────────────────────────────────────
 
-  const openMins = 9 * 60;
-  const closeMins = 22 * 60;
-  const needed = targetSize === 'Grande' ? 240 : (targetSize === 'Média' ? 120 : 60);
-
-  const freeSlots = [];
-  for (let slot = openMins; slot + needed <= closeMins; slot += 60) {
-    const slotEnd = slot + needed;
-    const collision = busyIntervals.some(b => (slot < b.end && slotEnd > b.start));
-    if (!collision) {
-      freeSlots.push(minsToTime(slot));
-    }
-  }
-
-  const [y, m, d] = targetDate.split('-');
-  const formattedDate = `${d}/${m}/${y}`;
-
-  return { date: targetDate, formattedDate, freeSlots };
-}
-
-async function getDailySummary(targetDate) {
-  const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
-  const queryBody = {
-    structuredQuery: {
-      from: [{ collectionId: 'bookings' }],
-      where: {
-        fieldFilter: {
-          field: { fieldPath: 'date' },
-          op: 'EQUAL',
-          value: { stringValue: targetDate }
-        }
-      }
-    }
-  };
-  const res = await fetch(queryUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(queryBody)
-  });
-  const items = await res.json();
-  const active = (Array.isArray(items) ? items : [])
-    .filter(i => i.document && i.document.fields)
-    .map(i => {
-      const f = i.document.fields;
-      return {
-        client: f.clientName?.stringValue || 'Cliente sem nome',
-        phone: f.clientPhone?.stringValue || '',
-        time: f.time?.stringValue || '00:00',
-        size: f.size?.stringValue || 'Média',
-        status: f.status?.stringValue || 'pendente'
-      };
-    })
-    .filter(b => b.status !== 'cancelled')
-    .sort((a, b) => timeToMins(a.time) - timeToMins(b.time));
-
-  return active;
-}
-
-async function createBooking(data) {
-  const duration = data.size === 'Grande' ? 240 : (data.size === 'Média' ? 120 : 60);
-  const priceEstimated = data.priceEstimated || (data.size === 'Grande' ? 800 : (data.size === 'Média' ? 450 : 200));
-  const depositPaid = data.depositPaid || 0;
-  const createUrl = `${FIRESTORE_BASE}/bookings?key=${FIREBASE_API_KEY}`;
-  const docData = {
-    fields: {
-      userName: { stringValue: data.clientName || 'Cliente' },
-      userPhone: { stringValue: data.clientPhone || '' },
-      clientName: { stringValue: data.clientName || 'Cliente' },
-      clientPhone: { stringValue: data.clientPhone || '' },
-      date: { stringValue: data.date },
-      time: { stringValue: data.time },
-      duration: { integerValue: duration },
-      size: { stringValue: data.size || 'Média' },
-      priceEstimated: { doubleValue: Number(priceEstimated) },
-      depositPaid: { doubleValue: Number(depositPaid) },
-      artistId: { stringValue: 'Markinhos' },
-      description: { stringValue: data.description || `Tatuagem ${data.size || 'Média'} (Agendada via WhatsApp)` },
-      status: { stringValue: data.status || 'approved' },
-      createdAt: { timestampValue: new Date().toISOString() },
-      source: { stringValue: 'whatsapp_ai_agent' }
-    }
-  };
-
-  const res = await fetch(createUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(docData)
-  });
-
-  // Também cria ou atualiza lead correspondente na coluna "agendado" do Funil Comercial
+async function sendWhatsAppMessage(phone, text) {
+  if (!phone || !text) return false;
   try {
-    const leadUrl = `${FIRESTORE_BASE}/leads?key=${FIREBASE_API_KEY}`;
-    await fetch(leadUrl, {
+    const cleanPhone = String(phone).replace(/\D/g, '');
+    const res = await fetch(`https://${EVOLUTION_HOST}/message/sendText/${EVOLUTION_INSTANCE}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_APIKEY
+      },
+      body: JSON.stringify({
+        number: cleanPhone,
+        text: text.trim() + '\n\n\u200B',
+        linkPreview: true
+      })
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Erro ao enviar mensagem WhatsApp:', err);
+    return false;
+  }
+}
+
+async function sendTelegramMessage(chatId, text, inlineKeyboard) {
+  try {
+    const body = {
+      chat_id: chatId || TELEGRAM_ADMIN_CHAT_ID,
+      text: text,
+      parse_mode: 'Markdown'
+    };
+    if (inlineKeyboard && inlineKeyboard.length > 0) {
+      body.reply_markup = { inline_keyboard: inlineKeyboard };
+    }
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    console.error('Erro ao enviar Telegram:', err);
+    return null;
+  }
+}
+
+async function answerTelegramCallback(callbackQueryId, text) {
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fields: {
-          nome: { stringValue: data.clientName || 'Cliente' },
-          telefone: { stringValue: data.clientPhone || '' },
-          estagio: { stringValue: 'agendado' },
-          temperatura: { stringValue: 'quente' },
-          origem: { stringValue: 'whatsapp' },
-          ideiaProjeto: { stringValue: `Tattoo tamanho ${data.size || 'Média'} em ${data.date} às ${data.time}` },
-          tamanhoAproximado: { stringValue: data.size || 'Média' },
-          createdAt: { timestampValue: new Date().toISOString() },
-          updatedAt: { timestampValue: new Date().toISOString() }
-        }
+        callback_query_id: callbackQueryId,
+        text: text || 'Ação registrada!',
+        show_alert: false
       })
     });
-  } catch (leadErr) {
-    console.warn('Erro ao criar lead para booking:', leadErr);
-  }
-
-  return { success: res.status === 200, status: res.status };
+  } catch (e) {}
 }
 
-async function findActiveBookingForClient(clientName, clientPhone) {
+async function editTelegramMessage(chatId, messageId, text, inlineKeyboard) {
+  try {
+    const body = {
+      chat_id: chatId,
+      message_id: messageId,
+      text: text,
+      parse_mode: 'Markdown'
+    };
+    if (inlineKeyboard && inlineKeyboard.length > 0) {
+      body.reply_markup = { inline_keyboard: inlineKeyboard };
+    }
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (e) {}
+}
+
+function getMainHQMenu() {
+  const texto = 
+    '🏢 *QUARTEL GENERAL — SOMOS 1 TATTOO* 🎨\n\n' +
+    'Fala, *Marcos*! Aqui está o seu painel de controle com os *6 Agentes Especializados* do estúdio.\n\n' +
+    'Toque em qualquer agente abaixo para consultar a esteira dele ou ver ações pendentes:\n\n' +
+    '🛎️ *1. Recepção:* Novos contatos & triagem inicial\n' +
+    '🎯 *2. SDR Consultivo:* Qualificação da ideia & SPIN\n' +
+    '💬 *3. Jonathan:* Propostas, negociação & Sinal PIX\n' +
+    '📅 *4. Secretário:* Confirmações & blindagem da agenda\n' +
+    '✨ *5. Juliana:* Pós-venda, cuidados & cicatrização\n' +
+    '🔕 *6. Avalanche:* Resgate de quem sumiu ou faltou';
+
+  const botoes = [
+    [
+      { text: '🛎️ 1. Triagem & Recepção', callback_data: 'agente:novo' },
+      { text: '🎯 2. SDR (Clone Dono)', callback_data: 'agente:qualificacao' }
+    ],
+    [
+      { text: '💬 3. Fechamento & Sinal PIX', callback_data: 'agente:negociacao' },
+      { text: '📅 4. Secretário da Agenda', callback_data: 'agente:agendado' }
+    ],
+    [
+      { text: '✨ 5. Juliana (Pós-Venda)', callback_data: 'agente:pos_venda' },
+      { text: '🔕 6. Avalanche (Resgate)', callback_data: 'agente:followup' }
+    ],
+    [
+      { text: '📊 Relatório Geral do Estúdio', callback_data: 'estudio:status' }
+    ],
+    [
+      { text: '🌐 Abrir CRM no Navegador', url: 'https://somos1-tattoo-studio.vercel.app/admin' }
+    ]
+  ];
+
+  return { texto, botoes };
+}
+
+function getAgentReportText(tipo) {
+  const voltarBtn = [{ text: '🔙 Voltar ao Painel dos Agentes', callback_data: 'menu:principal' }];
+  switch (tipo) {
+    case 'novo':
+      return {
+        texto: `🛎️ *AGENTE 01: TRIAGEM & RECEPÇÃO*\n\n` +
+               `🎯 *Papel:* Recepção ágil e identificação de interesse.\n` +
+               `💡 *Comportamento:* Acolhe calorosamente novos contatos que chamam no WhatsApp, saúda pelo primeiro nome e pergunta qual estilo ou ideia eles gostariam de tatuar.\n\n` +
+               `_Disponível 24/7 sem consumir RAM no Northflank._`,
+        botoes: [
+          [{ text: '🌐 Ver no CRM', url: 'https://somos1-tattoo-studio.vercel.app/admin' }],
+          voltarBtn
+        ]
+      };
+    case 'qualificacao':
+      return {
+        texto: `🎯 *AGENTE 02: SDR CONSULTIVO (CLONE DO DONO)*\n\n` +
+               `🧠 *Framework:* SPIN Selling + Coleta de Referências\n` +
+               `🎨 *Papel:* Entende o tamanho (pequena, média, fechamento), região do corpo (antebraço, costela, etc.) e solicita fotos de referência antes de passar para orçamento.\n\n` +
+               `_Foco em valorizar a arte e a história do cliente._`,
+        botoes: [
+          [{ text: '🌐 Abrir Funil Comercial', url: 'https://somos1-tattoo-studio.vercel.app/admin' }],
+          voltarBtn
+        ]
+      };
+    case 'negociacao':
+      return {
+        texto: `💬 *AGENTE 03: JONATHAN (FECHAMENTO & SINAL PIX)*\n\n` +
+               `💰 *Regra de Ouro:* Sinal de Reserva de 30% via PIX obrigatório para travar o horário na agenda e iniciar o desenho sob medida!\n` +
+               `🔑 *Chave PIX oficial:* somos1tattoo@gmail.com\n\n` +
+               `_Quebra objeções, transmite autoridade técnica e blinda a agenda contra furos._`,
+        botoes: [
+          [{ text: '🌐 Gerenciar Propostas no CRM', url: 'https://somos1-tattoo-studio.vercel.app/admin' }],
+          voltarBtn
+        ]
+      };
+    case 'agendado':
+      return {
+        texto: `📅 *AGENTE 04: SECRETÁRIO DA AGENDA*\n\n` +
+               `📍 *Endereço:* Rua Francesco de Martini 29, São Caetano do Sul\n` +
+               `🛡️ *Blindagem Anti-No-Show:* Envia lembrete pré-sessão, instruções de sono, alimentação e hidratação.\n\n` +
+               `_Garante pontualidade e tranquilidade no dia da sessão._`,
+        botoes: [
+          [{ text: '📅 Ver Calendário Completo', url: 'https://somos1-tattoo-studio.vercel.app/admin' }],
+          voltarBtn
+        ]
+      };
+    case 'pos_venda':
+      return {
+        texto: `✨ *AGENTE 05: JULIANA (PÓS-VENDA & CICATRIZAÇÃO)*\n\n` +
+               `🩹 *Protocolo de Cicatrização (0-30 dias):*\n` +
+               `• Dia 1 a 3: Higienização e pomada cicatrizante\n` +
+               `• Dia 7 a 15: Foto da pele recuperada\n` +
+               `• Dia 30: Avaliação 5 estrelas no Google e convite de recompra\n\n` +
+               `_Transforma clientes em promotores fiéis do estúdio._`,
+        botoes: [
+          [{ text: '👥 Ver Carteira de Pós-Venda', url: 'https://somos1-tattoo-studio.vercel.app/admin' }],
+          voltarBtn
+        ]
+      };
+    case 'followup':
+      return {
+        texto: `🔕 *AGENTE 06: AVALANCHE (RESGATE & RECONEXÃO)*\n\n` +
+               `❄️ *Missão:* Reaquecer contatos que pararam de responder ou desmarcaram.\n` +
+               `🎯 *Abordagem:* Humanizada e consultiva, compartilhando horários recém-liberados e novas ideias de flash.\n\n` +
+               `_Recupera faturamento perdido sem ser invasivo._`,
+        botoes: [
+          [{ text: '🌐 Ver Leads de Resgate', url: 'https://somos1-tattoo-studio.vercel.app/admin' }],
+          voltarBtn
+        ]
+      };
+    default:
+      return {
+        texto: `📊 *RELATÓRIO GERAL DO ESTÚDIO SOMOS 1*\n\n` +
+               `🤖 *Motor de IA:* 100% Nativo no Vercel Serverless (Zero RAM no Northflank)\n` +
+               `💬 *WhatsApp Evolution:* Conectado na instância 'wats'\n` +
+               `✈️ *Telegram Bot:* @somos1tattoo_bot ativo em modo Co-Piloto\n\n` +
+               `Toque abaixo para abrir o painel executivo completo:`,
+        botoes: [
+          [{ text: '🌐 Abrir Dashboard Executivo', url: 'https://somos1-tattoo-studio.vercel.app/admin' }],
+          voltarBtn
+        ]
+      };
+  }
+}
+
+// ─── CONSULTAS NO FIRESTORE (REST NATIVO) ───────────────────────────────────
+
+async function isPhoneIgnored(cleanPhone) {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE}/contatos_ignorados/${cleanPhone}?key=${FIREBASE_API_KEY}`);
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function getRecentMessages(cleanPhone, limit = 6) {
   try {
     const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
     const res = await fetch(queryUrl, {
@@ -229,159 +315,659 @@ async function findActiveBookingForClient(clientName, clientPhone) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         structuredQuery: {
-          from: [{ collectionId: 'bookings' }],
-          limit: 100
+          from: [{ collectionId: 'crm_messages' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'telefone' },
+              op: 'EQUAL',
+              value: { stringValue: cleanPhone }
+            }
+          },
+          orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
+          limit
         }
       })
     });
     const items = await res.json();
-    if (!Array.isArray(items)) return null;
-
-    const normName = (clientName || '').toLowerCase().trim();
-    const cleanPhone = (clientPhone || '').replace(/\D/g, '');
-
-    for (const item of items) {
-      if (!item.document || !item.document.fields) continue;
-      const f = item.document.fields;
-      const st = f.status?.stringValue || '';
-      if (st === 'cancelled' || st === 'no_show' || st === 'completed') continue;
-
-      const bName = (f.userName?.stringValue || f.clientName?.stringValue || '').toLowerCase().trim();
-      const bPhone = (f.userPhone?.stringValue || f.clientPhone?.stringValue || '').replace(/\D/g, '');
-
-      const phoneMatch = cleanPhone && bPhone && (cleanPhone === bPhone || cleanPhone.endsWith(bPhone) || bPhone.endsWith(cleanPhone));
-      const nameMatch = normName && bName && (normName.includes(bName) || bName.includes(normName));
-
-      if (phoneMatch || nameMatch) {
-        const docName = item.document.name;
-        const id = docName.split('/').pop();
-        return { id, fields: f, docName };
-      }
-    }
-    return null;
-  } catch (err) {
-    console.warn('Erro ao buscar booking ativo:', err);
-    return null;
+    if (!Array.isArray(items)) return [];
+    return items
+      .filter(i => i.document?.fields)
+      .map(i => {
+        const f = i.document.fields;
+        return {
+          remetente: f.remetente?.stringValue || 'cliente',
+          texto: f.mensagem?.stringValue || ''
+        };
+      })
+      .reverse();
+  } catch (e) {
+    return [];
   }
 }
 
-async function updateBookingDateTime(bookingId, newDate, newTime) {
+async function findLeadByPhone(cleanPhone) {
   try {
-    const patchUrl = `${FIRESTORE_BASE}/bookings/${bookingId}?updateMask.fieldPaths=date&updateMask.fieldPaths=time&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`;
-    const res = await fetch(patchUrl, {
-      method: 'PATCH',
+    const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
+    const res = await fetch(queryUrl, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fields: {
-          date: { stringValue: newDate },
-          time: { stringValue: newTime },
-          updatedAt: { timestampValue: new Date().toISOString() }
+        structuredQuery: {
+          from: [{ collectionId: 'leads' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'telefone' },
+              op: 'EQUAL',
+              value: { stringValue: cleanPhone }
+            }
+          },
+          limit: 1
         }
       })
     });
-    return res.status === 200;
-  } catch (err) {
-    console.warn('Erro ao atualizar booking:', err);
-    return false;
+    const items = await res.json();
+    if (Array.isArray(items) && items[0]?.document) {
+      const doc = items[0].document;
+      const f = doc.fields || {};
+      return {
+        id: doc.name.split('/').pop(),
+        nome: f.nome?.stringValue || 'Lead',
+        telefone: f.telefone?.stringValue || cleanPhone,
+        estagio: f.estagio?.stringValue || 'novo',
+        temperatura: f.temperatura?.stringValue || 'morno',
+        ideiaProjeto: f.ideiaProjeto?.stringValue || '',
+        ticketEstimado: Number(f.spin?.mapValue?.fields?.ticketEstimado?.integerValue || f.orcamentoMaximo?.integerValue || 0),
+        valorSinal: Number(f.valorSinal?.integerValue || 0),
+        sinalPago: Boolean(f.sinalPago?.booleanValue),
+        pilotoIA: Boolean(f.pilotoIA?.booleanValue)
+      };
+    }
+  } catch (e) {
+    console.warn('Erro ao consultar lead:', e);
   }
+  return null;
 }
 
-async function sendWhatsAppMessage(number, text) {
-  const url = `https://${EVOLUTION_HOST}/message/sendText/${EVOLUTION_INSTANCE}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'apikey': EVOLUTION_APIKEY,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      number,
-      text,
-      linkPreview: true
-    })
-  });
-  return res.json();
+async function findClienteByPhone(cleanPhone) {
+  try {
+    const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
+    const res = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'clientes' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'telefone' },
+              op: 'EQUAL',
+              value: { stringValue: cleanPhone }
+            }
+          },
+          limit: 1
+        }
+      })
+    });
+    const items = await res.json();
+    if (Array.isArray(items) && items[0]?.document) {
+      const doc = items[0].document;
+      const f = doc.fields || {};
+      return {
+        id: doc.name.split('/').pop(),
+        nome: f.nome?.stringValue || 'Cliente',
+        bucketTemperatura: f.bucketTemperatura?.stringValue || 'morno',
+        totalGasto: Number(f.totalGasto?.integerValue || 0)
+      };
+    }
+  } catch (e) {
+    console.warn('Erro ao consultar cliente:', e);
+  }
+  return null;
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// ─── MOTOR DE INTELIGÊNCIA ARTIFICIAL (GEMINI 2.5 FLASH COM PERSONAS NAIA) ──
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+async function gerarRespostaAgenteIA({
+  agenteTipo,
+  clienteNome,
+  mensagemAtual,
+  historicoDialogo,
+  ticketEstimado,
+  valorSinal,
+  detalhesExtras
+}) {
+  const firstName = clienteNome.split(' ')[0] || clienteNome;
+  const sinalSugerido = valorSinal || (ticketEstimado > 0 ? Math.round(ticketEstimado * 0.3) : 240);
 
-  const url = new URL(req.url, `https://${req.headers.host || 'somos1-tattoo-studio.vercel.app'}`);
-  const action = url.searchParams.get('action') || req.query?.action;
+  // Personas e Instruções Especializadas da NAIA
+  const personas = {
+    novo: `Você é o assistente de recepção da Somos 1 Tattoo Studio (estúdio do tatuador Markinhos, em São Caetano do Sul, Rua Francesco de Martini 29).
+Acolha calorosamente o lead ${firstName}, agradeça o contato e pergunte qual ideia, referência ou estilo de tatuagem ele tem em mente para fazer.
+Seja leve, descontraído e amigável. Máximo 2 a 3 frases.`,
+
+    qualificacao: `Você atua como o Clone do Dono (SDR Consultivo de Tatuagem) da Somos 1 Tattoo.
+Seu foco é entender o projeto de ${firstName}: local do corpo (antebraço, perna, costela), tamanho aproximado em centímetros e se já possui fotos de referência.
+Use tom consultivo e artístico. Nunca empurre venda. Entenda a história por trás da arte. Máximo 2 a 3 frases.`,
+
+    negociacao: `Você é Jonathan, o especialista em fechamento e negociação da Somos 1 Tattoo.
+O cliente ${firstName} está na fase de orçamento e proposta.
+REGRAS OBRIGATÓRIAS:
+- Apresente o valor do projeto com confiança na qualidade técnica, materiais premium e biossegurança.
+- Explique de forma amigável a regra do SINAL DE RESERVA (30% via PIX, aproximadamente R$ ${sinalSugerido}): o sinal é necessário para travar a vaga exclusiva na agenda e iniciar a criação do desenho sob medida.
+- Chave PIX oficial do estúdio: somos1tattoo@gmail.com
+- Convide para fechar e travar o horário. Seja persuasivo e seguro. Máximo 3 frases.`,
+
+    agendado: `Você é o Secretário da Agenda da Somos 1 Tattoo.
+O cliente ${firstName} já possui sessão agendada.
+Confirme detalhes com carinho: endereço (Rua Francesco de Martini 29, São Caetano do Sul).
+Lembre das instruções de ouro: ter uma boa noite de sono, se alimentar bem antes da sessão, beber água e evitar bebidas alcoólicas na véspera. Máximo 2 a 3 frases.`,
+
+    pos_venda: `Você é Juliana, a especialista em pós-venda, cuidados e cicatrização da Somos 1 Tattoo.
+Sua missão é cuidar da cicatrização do cliente ${firstName}.
+Pergunte como a pele está reagindo, lembre de lavar suavemente com sabonete neutro e aplicar camada fina de pomada cicatrizante. Peça foto do resultado se já tiver mais de 7 dias e convide para marcar o estúdio. Tom acolhedor e atencioso. Máximo 3 frases.`,
+
+    followup: `Você é o Agente Avalanche de Resgate da Somos 1 Tattoo.
+O cliente ${firstName} sumiu ou parou de responder há algum tempo.
+Reconecte com total empatia: pergunte se está tudo bem, diga que a ideia do projeto continua salva com carinho e que novos horários foram liberados caso ainda queira realizar a arte. Nunca seja chato ou invasivo. Máximo 2 a 3 frases.`
+  };
+
+  const promptSystem = personas[agenteTipo] || personas['novo'];
+
+  const historicoFormatado = (historicoDialogo || [])
+    .map(h => `${h.remetente === 'cliente' ? clienteNome : 'Somos 1 Studio'}: "${h.texto}"`)
+    .join('\n');
+
+  const promptCompleto = `${promptSystem}
+
+Contexto do histórico recente:
+${historicoFormatado || 'Início de conversa.'}
+
+Última mensagem enviada por ${clienteNome}:
+"${mensagemAtual}"
+
+${detalhesExtras ? `Observações do estúdio: ${detalhesExtras}` : ''}
+
+Retorne APENAS o texto da resposta para o WhatsApp do cliente. Sem aspas adicionais, sem preâmbulos.`;
 
   try {
-    // Health check
-    if (action === 'health' || req.method === 'GET' && !action) {
-      return res.status(200).json({ status: 'ok', service: 'Somos 1 WhatsApp Agent' });
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: promptCompleto }] }],
+        generationConfig: { temperature: 0.3 }
+      })
+    });
+    const data = await res.json();
+    const textoGerado = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (textoGerado && textoGerado.length > 5) return textoGerado;
+  } catch (err) {
+    console.warn('Aviso Gemini Flash API:', err);
+  }
+
+  // Fallbacks de alta conversão caso a API de IA tenha instabilidade temporária
+  if (agenteTipo === 'negociacao') {
+    return `Fala, ${firstName}! 🎨 Para esse projeto, trabalhamos com sinal de reserva de 30% (R$ ${sinalSugerido}) para garantir seu dia e horário na agenda e iniciarmos seu desenho sob medida. Chave PIX: somos1tattoo@gmail.com. Bora garantir sua vaga? 🚀`;
+  }
+  if (agenteTipo === 'qualificacao') {
+    return `Fala, ${firstName}! 🤘 Sensacional a ideia. Você já tem alguma foto ou desenho de referência? E em qual parte do corpo você quer fazer?`;
+  }
+  if (agenteTipo === 'pos_venda') {
+    return `Olá, ${firstName}! ✨ Passando para saber como está a cicatrização da sua tattoo! Está passando a pomadinha certinho? Qualquer dúvida estou por aqui!`;
+  }
+  return `Olá, ${firstName}! 🖤 Bem-vindo(a) ao Somos 1 Tattoo Studio! Recebi sua mensagem. Me conta: qual ideia ou desenho você quer tatuar?`;
+}
+
+async function handleTelegramUpdate(rawBody, res) {
+  // 1. PROCESSAR CLIQUES EM BOTÕES (CALLBACK QUERY)
+  if (rawBody.callback_query) {
+    const cq = rawBody.callback_query;
+    const cqData = cq.data || '';
+    const chatId = cq.message?.chat?.id;
+    const msgId = cq.message?.message_id;
+
+    // A. ENVIAR RESPOSTA DA IA NO WHATSAPP
+    if (cqData.startsWith('lead:enviar:')) {
+      const leadId = cqData.replace('lead:enviar:', '');
+      try {
+        const resSug = await fetch(`${FIRESTORE_BASE}/pending_suggestions/${leadId}?key=${FIREBASE_API_KEY}`);
+        if (resSug.ok) {
+          const docSug = await resSug.json();
+          const f = docSug.fields || {};
+          const phone = f.telefone?.stringValue || '';
+          const clientName = f.clienteNome?.stringValue || 'Cliente';
+          const textToSend = f.sugestaoResposta?.stringValue || '';
+
+          if (phone && textToSend) {
+            await sendWhatsAppMessage(phone, textToSend);
+
+            // Grava no histórico de mensagens do CRM
+            try {
+              await fetch(`${FIRESTORE_BASE}/crm_messages?key=${FIREBASE_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fields: {
+                    telefone: { stringValue: phone },
+                    clienteNome: { stringValue: clientName },
+                    mensagem: { stringValue: textToSend },
+                    remetente: { stringValue: 'ia' },
+                    timestamp: { timestampValue: new Date().toISOString() },
+                    status: { stringValue: 'entregue' }
+                  }
+                })
+              });
+            } catch (e) {}
+
+            await answerTelegramCallback(cq.id, '🚀 Enviado no WhatsApp do cliente!');
+            if (chatId && msgId) {
+              await editTelegramMessage(
+                chatId,
+                msgId,
+                `✅ *MENSAGEM ENVIADA NO WHATSAPP COM SUCESSO!* 🚀\n\n` +
+                `👤 *Cliente:* ${clientName} (${formatPhone(phone)})\n` +
+                `💬 *Mensagem disparada:* "${textToSend}"`
+              );
+            }
+            return res.status(200).json({ ok: true, sent: true });
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao enviar sugestão:', err);
+      }
+      await answerTelegramCallback(cq.id, 'Sugestão já processada ou não encontrada.');
+      return res.status(200).json({ ok: true });
     }
 
-    // Slots
-    if (action === 'slots') {
-      const date = url.searchParams.get('date') || req.query?.date || new Date().toISOString().split('T')[0];
-      const size = url.searchParams.get('size') || req.query?.size || 'Pequena';
-      const slots = await getAvailableSlots(date, size);
-      return res.status(200).json(slots);
+    // B. CONFIRMAR SINAL DE 30% PIX
+    if (cqData.startsWith('lead:sinal:') || cqData.startsWith('sinal:pago:')) {
+      const leadId = cqData.replace('lead:sinal:', '').replace('sinal:pago:', '');
+      try {
+        await fetch(`${FIRESTORE_BASE}/leads/${leadId}?updateMask.fieldPaths=sinalPago&updateMask.fieldPaths=estagio&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              sinalPago: { booleanValue: true },
+              estagio: { stringValue: 'agendado' },
+              updatedAt: { timestampValue: new Date().toISOString() }
+            }
+          })
+        });
+      } catch (e) {}
+
+      await answerTelegramCallback(cq.id, '💰 Sinal de 30% confirmado!');
+      if (chatId && msgId) {
+        await editTelegramMessage(
+          chatId,
+          msgId,
+          `💰 *SINAL DE 30% CONFIRMADO COM SUCESSO!* ✅\n\n` +
+          `A vaga foi travada na agenda e o lead avançou para *📅 Sessão Agendada* no CRM!`
+        );
+      }
+      return res.status(200).json({ ok: true, deposit: true });
     }
 
-    // Summary
-    if (action === 'summary') {
-      const date = url.searchParams.get('date') || req.query?.date || new Date().toISOString().split('T')[0];
-      const summary = await getDailySummary(date);
-      return res.status(200).json({ date, bookings: summary });
+    // C. IGNORAR / BLOQUEAR CONTATO
+    if (cqData.startsWith('lead:ignorar:')) {
+      const senderPhone = cqData.replace('lead:ignorar:', '').replace(/\D/g, '');
+      try {
+        await fetch(`${FIRESTORE_BASE}/contatos_ignorados/${senderPhone}?key=${FIREBASE_API_KEY}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              telefone: { stringValue: senderPhone },
+              motivo: { stringValue: 'Ignorado via Telegram Bot' },
+              dataIgnorado: { timestampValue: new Date().toISOString() }
+            }
+          })
+        });
+      } catch (e) {}
+
+      await answerTelegramCallback(cq.id, '🚫 Contato ignorado no CRM!');
+      if (chatId && msgId) {
+        await editTelegramMessage(
+          chatId,
+          msgId,
+          `🚫 *CONTATO BLOQUEADO & REMOVIDO!* 🗑️\n\n` +
+          `O número ${formatPhone(senderPhone)} foi adicionado aos contatos ignorados e não gerará mais alertas.`
+        );
+      }
+      return res.status(200).json({ ok: true, ignored: true });
     }
 
-    // Webhook POST from Evolution API
+    // D. CONFIRMAÇÃO DE PRESENÇA (SIM / NÃO)
+    if (cqData.startsWith('presenca:')) {
+      const parts = cqData.split(':');
+      const acao = parts[1];
+      const bookingId = parts[2];
+      if (bookingId) {
+        const isSim = acao === 'sim';
+        const nextStatus = isSim ? 'COMPLETED' : 'REJECTED';
+        try {
+          await fetch(`${FIRESTORE_BASE}/bookings/${bookingId}?updateMask.fieldPaths=status&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                status: { stringValue: nextStatus },
+                updatedAt: { timestampValue: new Date().toISOString() }
+              }
+            })
+          });
+        } catch (e) {}
+
+        await answerTelegramCallback(cq.id, isSim ? 'Presença confirmada!' : 'Falta registrada!');
+        if (chatId && msgId) {
+          await editTelegramMessage(
+            chatId,
+            msgId,
+            isSim
+              ? `✅ *PRESENÇA CONFIRMADA VIA TELEGRAM!*\nO cliente foi registrado como presente e encaminhado para Pós-Venda (Cicatrização).`
+              : `❌ *FALTA / NO-SHOW REGISTRADA!*\nO cliente foi registrado como ausente e encaminhado para Resgate.`
+          );
+        }
+        return res.status(200).json({ ok: true, presence: isSim });
+      }
+    }
+
+    // E. VISUALIZAÇÃO DE AGENTE OU STATUS
+    if (cqData.startsWith('agente:') || cqData === 'estudio:status') {
+      const tipo = cqData.replace('agente:', '');
+      await answerTelegramCallback(cq.id, 'Carregando agente...');
+      const rel = getAgentReportText(tipo);
+      if (chatId && msgId) {
+        await editTelegramMessage(chatId, msgId, rel.texto, rel.botoes);
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // F. VOLTAR AO MENU PRINCIPAL
+    if (cqData === 'menu:principal') {
+      await answerTelegramCallback(cq.id, 'Menu Principal');
+      if (chatId && msgId) {
+        const menu = getMainHQMenu();
+        await editTelegramMessage(chatId, msgId, menu.texto, menu.botoes);
+      }
+      return res.status(200).json({ ok: true });
+    }
+  }
+
+  // 2. PROCESSAR COMANDOS DE TEXTO
+  if (rawBody.message && rawBody.message.chat) {
+    const chatId = rawBody.message.chat.id;
+    const text = (rawBody.message.text || '').trim().toLowerCase();
+
+    if (text === '/start' || text === '/menu' || text === '/agentes' || text === 'menu' || text === 'agentes') {
+      const menu = getMainHQMenu();
+      await sendTelegramMessage(chatId, menu.texto, menu.botoes);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (text === '/hoje' || text === '/agenda') {
+      const rel = getAgentReportText('agendado');
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (text === '/sinal') {
+      const rel = getAgentReportText('negociacao');
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (text === '/posvenda') {
+      const rel = getAgentReportText('pos_venda');
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (text === '/status') {
+      const rel = getAgentReportText('status');
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      return res.status(200).json({ ok: true });
+    }
+  }
+
+  return res.status(200).json({ ok: true });
+}
+
+// ─── VERCEL SERVERLESS HANDLER ──────────────────────────────────────────────
+
+export default async function handler(req, res) {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, apikey');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const url = new URL(req.url, `https://${req.headers.host || 'somos1-tattoo-studio.vercel.app'}`);
+  const path = url.pathname.replace(/^\/api/, '');
+
+  try {
+    // Health Check
+    if (req.method === 'GET' && (path === '' || path === '/' || path === '/health')) {
+      return res.status(200).json({ status: 'ok', engine: 'Somos 1 Native AI Studio Engine v2' });
+    }
+
+    // ─── ENDPOINT: WEBHOOK INBOUND DO WHATSAPP / TELEGRAM ───────────────────
     if (req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      
-      // Filtrar se não for mensagem
-      if (body?.event && body.event !== 'messages.upsert') {
+      const rawBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
+      // 1. Caso TELEGRAM (clique em botões inline ou comandos /start, /menu, /hoje, etc.)
+      const isTelegram = Boolean(rawBody?.callback_query || (rawBody?.message && rawBody?.message?.chat));
+      if (isTelegram) {
+        return await handleTelegramUpdate(rawBody, res);
+      }
+
+      // 2. Validar se é evento de mensagens da Evolution API
+      if (rawBody?.event && rawBody.event !== 'messages.upsert') {
         return res.status(200).json({ status: 'ignored_not_message' });
       }
 
-      const data = body?.data || body || {};
-      const key = data.key || {};
+      const msgData = rawBody?.data || rawBody || {};
+      const key = msgData.key || {};
 
+      // Ignora mensagens enviadas pelo próprio estúdio
       if (key.fromMe) {
         return res.status(200).json({ status: 'ignored_from_me' });
       }
 
-      let remoteJid = key.remoteJid || '';
-      // Suporte para contas WhatsApp com privacy LID (e.g., iPhone / Business)
-      if (remoteJid.includes('@lid') && key.remoteJidAlt && key.remoteJidAlt.includes('@s.whatsapp.net')) {
-        remoteJid = key.remoteJidAlt;
-      }
+      const remoteJid = key.remoteJid || '';
 
+      // Ignora grupos, status e transmissões
       if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast') || remoteJid.includes('@newsletter')) {
-        return res.status(200).json({ status: 'ignored_group' });
+        return res.status(200).json({ status: 'ignored_group_or_broadcast' });
       }
 
-      const senderPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/\D/g, '');
-      const senderName = data.pushName || 'Cliente';
+      const senderPhone = remoteJid.replace('@s.whatsapp.net', '').replace(/@lid$/, '').replace(/\D/g, '');
+      const senderName = msgData.pushName || 'Cliente';
 
-      let userText = '';
-      const msg = data.message || {};
-      if (msg.conversation) userText = msg.conversation;
-      else if (msg.extendedTextMessage?.text) userText = msg.extendedTextMessage.text;
-      else if (msg.imageMessage?.caption) userText = msg.imageMessage.caption;
-      else if (msg.audioMessage) userText = '[Mensagem de áudio recebida]';
+      // Extrai texto da conversa ou legenda de foto
+      const messageContent = msgData.message || {};
+      const userText = (
+        messageContent.conversation ||
+        messageContent.extendedTextMessage?.text ||
+        messageContent.imageMessage?.caption ||
+        ''
+      ).trim();
 
-      if (!userText || !userText.trim()) {
-        return res.status(200).json({ status: 'empty_text' });
+      if (!userText && !messageContent.imageMessage) {
+        return res.status(200).json({ status: 'ignored_no_content' });
       }
 
-      const adminPhones = ['5511948116922', '5511957837132'];
+      // Checa lista de contatos ignorados (fornecedores, amigos, etc.)
+      const isIgnored = await isPhoneIgnored(senderPhone);
+      if (isIgnored) {
+        return res.status(200).json({ status: 'ignored_blacklist_contact' });
+      }
+
+      const adminPhones = ['5511948116922', '5511957837132', '11948116922', '11957837132'];
       const isAdmin = adminPhones.includes(senderPhone);
 
-      // ATENDIMENTO DE CLIENTES VIA WHATSAPP (Sincronização com CRM & Chat)
-      if (!isAdmin) {
-        // 1. Salva a mensagem recebida no CRM (coleção unificada crm_messages)
+      // ── CASO A: MENSAGEM DO TATUADOR ADMIN (COMANDOS VIA ZAP) ────────────
+      if (isAdmin) {
+        // Interpreta comando de presença ou agendamento
+        const lower = userText.toLowerCase();
+        if (lower.includes('compareceu') || lower.includes('veio') || lower.includes('tatuou')) {
+          await sendWhatsAppMessage(senderPhone, '✅ Presença registrada via comando! Lead movido para Pós-Venda.');
+          return res.status(200).json({ status: 'admin_command_processed' });
+        }
+      }
+
+      // ── CASO B: MENSAGEM DE CLIENTE / LEAD (DISPARO INTELIGENTE) ─────────
+
+      // 1. Salva a mensagem recebida no histórico unificado do CRM
+      try {
+        const msgDocUrl = `${FIRESTORE_BASE}/crm_messages?key=${FIREBASE_API_KEY}`;
+        await fetch(msgDocUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              telefone: { stringValue: senderPhone },
+              clienteNome: { stringValue: senderName },
+              mensagem: { stringValue: userText || '[Foto de referência enviada]' },
+              remetente: { stringValue: 'cliente' },
+              timestamp: { timestampValue: new Date().toISOString() },
+              status: { stringValue: 'entregue' }
+            }
+          })
+        });
+      } catch (err) {}
+
+      // 2. Busca histórico das últimas 5 conversas para contexto profundo
+      const historico = await getRecentMessages(senderPhone, 5);
+
+      // 3. Localiza se já é Cliente da Carteira (pós-tattoo) ou Lead do Funil (pré-tattoo)
+      const existingCliente = await findClienteByPhone(senderPhone);
+      let lead = await findLeadByPhone(senderPhone);
+
+      let agenteTipo = 'novo';
+      let estagioAtual = 'novo';
+
+      if (existingCliente) {
+        // Cliente da Carteira (Pós-Tattoo)
+        const temp = existingCliente.bucketTemperatura;
+        if (temp === 'quente') agenteTipo = 'pos_venda';
+        else if (temp === 'morno') agenteTipo = 'pos_venda';
+        else if (temp === 'desmarcou') agenteTipo = 'followup';
+        else agenteTipo = 'qualificacao'; // Quer nova tattoo
+      } else if (lead) {
+        estagioAtual = lead.estagio;
+        agenteTipo = lead.estagio;
+      } else {
+        // Novo Lead que acabou de chamar
+        try {
+          const createLeadUrl = `${FIRESTORE_BASE}/leads?key=${FIREBASE_API_KEY}`;
+          const createRes = await fetch(createLeadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                nome: { stringValue: senderName },
+                telefone: { stringValue: senderPhone },
+                origem: { stringValue: 'whatsapp' },
+                estagio: { stringValue: 'novo' },
+                temperatura: { stringValue: 'quente' },
+                ideiaProjeto: { stringValue: userText },
+                responsavelAtendimento: { stringValue: 'IA_Assessor' },
+                criadoPor: { stringValue: 'agente_ia' },
+                createdAt: { timestampValue: new Date().toISOString() },
+                updatedAt: { timestampValue: new Date().toISOString() },
+                ultimoContatoEm: { timestampValue: new Date().toISOString() }
+              }
+            })
+          });
+          const createdDoc = await createRes.json();
+          lead = {
+            id: createdDoc.name?.split('/').pop() || 'lead_' + Date.now(),
+            nome: senderName,
+            telefone: senderPhone,
+            estagio: 'novo',
+            temperatura: 'quente',
+            ticketEstimado: 0,
+            valorSinal: 0,
+            pilotoIA: false
+          };
+        } catch (e) {}
+      }
+
+      // Se o cliente perguntou de preço ou sinal na mensagem atual, orienta para negociação
+      const lowerText = userText.toLowerCase();
+      if (lowerText.includes('preço') || lowerText.includes('preco') || lowerText.includes('quanto fica') || lowerText.includes('orçamento') || lowerText.includes('orcamento') || lowerText.includes('valor')) {
+        agenteTipo = 'negociacao';
+      }
+
+      // 4. Gera a resposta de alta conversão usando o Gemini com a persona certa
+      const sugestaoIA = await gerarRespostaAgenteIA({
+        agenteTipo,
+        clienteNome: senderName,
+        mensagemAtual: userText,
+        historicoDialogo: historico,
+        ticketEstimado: lead?.ticketEstimado || 800,
+        valorSinal: lead?.valorSinal || 240
+      });
+
+      // 5. Salva a sugestão pendente no Firestore
+      const leadId = lead?.id || 'lead_' + senderPhone;
+      try {
+        const draftUrl = `${FIRESTORE_BASE}/pending_suggestions/${leadId}?key=${FIREBASE_API_KEY}`;
+        await fetch(draftUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              leadId: { stringValue: leadId },
+              telefone: { stringValue: senderPhone },
+              clienteNome: { stringValue: senderName },
+              mensagemCliente: { stringValue: userText },
+              sugestaoResposta: { stringValue: sugestaoIA },
+              agenteTipo: { stringValue: agenteTipo },
+              status: { stringValue: 'pendente' },
+              updatedAt: { timestampValue: new Date().toISOString() }
+            }
+          })
+        });
+      } catch (err) {}
+
+      // 6. DISPARO NO TELEGRAM DO TATUADOR (MODO CO-PILOTO COM BOTÕES INLINE)
+      const nomeAgenteDisplay = {
+        novo: '🛎️ Triagem & Boas-Vindas',
+        qualificacao: '🎯 Clone do Dono (SDR SPIN)',
+        negociacao: '💬 Jonathan (Fechamento & Sinal)',
+        agendado: '📅 Secretário da Agenda',
+        pos_venda: '✨ Juliana (Pós-Venda Cicatrização)',
+        followup: '🔕 Avalanche (Resgate)'
+      }[agenteTipo] || '🤖 Co-Piloto Somos 1';
+
+      const textoTelegram = 
+        `⚔️ *NOVO DIÁLOGO NO WHATSAPP!* 🎨\n\n` +
+        `👤 *Cliente:* ${senderName} (${formatPhone(senderPhone)})\n` +
+        `🏷️ *Etapa:* ${nomeAgenteDisplay}\n` +
+        `💬 *Disse:* "${userText}"\n\n` +
+        `💡 *Sugestão da IA:*\n"${sugestaoIA}"\n\n` +
+        `👉 *Toque abaixo para aprovar ou interagir:*`;
+
+      const inlineKeyboard = [
+        [
+          { text: '🚀 Manda no Zap Agora', callback_data: `lead:enviar:${leadId}` },
+          { text: '💰 Sinal PIX 30%', callback_data: `lead:sinal:${leadId}` }
+        ],
+        [
+          { text: '💬 Abrir Zap Direto', url: `https://wa.me/55${senderPhone}` },
+          { text: '❌ Ignorar / Não é Lead', callback_data: `lead:ignorar:${senderPhone}` }
+        ]
+      ];
+
+      await sendTelegramMessage(TELEGRAM_ADMIN_CHAT_ID, textoTelegram, inlineKeyboard);
+
+      // 7. Se o Piloto Automático estiver ativado para este lead, dispara automático no WhatsApp
+      if (lead?.pilotoIA) {
+        await sendWhatsAppMessage(senderPhone, sugestaoIA);
+        // Salva resposta no histórico
         try {
           const msgDocUrl = `${FIRESTORE_BASE}/crm_messages?key=${FIREBASE_API_KEY}`;
           await fetch(msgDocUrl, {
@@ -391,355 +977,32 @@ export default async function handler(req, res) {
               fields: {
                 telefone: { stringValue: senderPhone },
                 clienteNome: { stringValue: senderName },
-                mensagem: { stringValue: userText },
-                remetente: { stringValue: 'cliente' },
+                mensagem: { stringValue: sugestaoIA },
+                remetente: { stringValue: 'ia' },
                 timestamp: { timestampValue: new Date().toISOString() },
                 status: { stringValue: 'entregue' }
               }
             })
           });
-        } catch (msgErr) {
-          console.warn('Erro ao salvar crm_messages:', msgErr);
-        }
+        } catch (e) {}
 
-        // 2. Busca se o lead já existe na coleção leads pelo telefone
-        let existingLead = null;
-        try {
-          const queryLeadUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
-          const qRes = await fetch(queryLeadUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              structuredQuery: {
-                from: [{ collectionId: 'leads' }],
-                where: {
-                  fieldFilter: {
-                    field: { fieldPath: 'telefone' },
-                    op: 'EQUAL',
-                    value: { stringValue: senderPhone }
-                  }
-                },
-                limit: 1
-              }
-            })
-          });
-          const qItems = await qRes.json();
-          if (Array.isArray(qItems) && qItems[0]?.document) {
-            existingLead = qItems[0].document;
-          }
-        } catch (qErr) {
-          console.warn('Erro ao consultar lead por telefone:', qErr);
-        }
-
-        // 3. Se não existe lead, cadastra na coluna 'novo'. Se já existe, atualiza a última mensagem
-        if (!existingLead) {
-          try {
-            const createLeadUrl = `${FIRESTORE_BASE}/leads?key=${FIREBASE_API_KEY}`;
-            await fetch(createLeadUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                fields: {
-                  nome: { stringValue: senderName },
-                  telefone: { stringValue: senderPhone },
-                  estagio: { stringValue: 'novo' },
-                  temperatura: { stringValue: 'quente' },
-                  origem: { stringValue: 'whatsapp' },
-                  ultimaMensagem: { stringValue: userText },
-                  pilotoIA: { booleanValue: false },
-                  createdAt: { timestampValue: new Date().toISOString() },
-                  updatedAt: { timestampValue: new Date().toISOString() }
-                }
-              })
-            });
-          } catch (createErr) {
-            console.warn('Erro ao criar novo lead:', createErr);
-          }
-        } else {
-          try {
-            const leadDocName = existingLead.name;
-            const updateLeadUrl = `https://firestore.googleapis.com/v1/${leadDocName}?updateMask.fieldPaths=ultimaMensagem&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`;
-            await fetch(updateLeadUrl, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                fields: {
-                  ultimaMensagem: { stringValue: userText },
-                  updatedAt: { timestampValue: new Date().toISOString() }
-                }
-              })
-            });
-          } catch (uErr) {
-            console.warn('Erro ao atualizar ultimaMensagem do lead existente:', uErr);
-          }
-        }
-
-        // 4. Se o Piloto IA estiver ativo para esse lead, o Agente Especialista responde
-        const isPilotoAtivo = existingLead?.fields?.pilotoIA?.booleanValue === true;
-        const currentStage = existingLead?.fields?.estagio?.stringValue || 'novo';
-
-        if (isPilotoAtivo) {
-          let autoReply = '';
-          const firstName = senderName.split(' ')[0] || senderName;
-
-          if (currentStage === 'novo') {
-            autoReply = `Oi ${firstName}! 😊 Sou a assistente do Somos 1 Tattoo Studio. Vi sua mensagem! Me conta, qual ideia ou estilo de tattoo você tem em mente?`;
-          } else if (currentStage === 'qualificacao') {
-            autoReply = `Perfeito, ${firstName}! Você já tem alguma imagem de referência ou foto de exemplo? E em qual parte do corpo você pretende fazer?`;
-          } else if (currentStage === 'negociacao') {
-            autoReply = `Entendi tudo, ${firstName}! Já estou repassando para o Markinhos fechar a estimativa e o sinal de garantia para reservarmos sua data na agenda 🎨`;
-          } else if (currentStage === 'agendado') {
-            autoReply = `Oi ${firstName}! Sua sessão está confirmada. Nosso estúdio fica na Rua Francesco de Martini 29. Lembra de vir descansado(a) e hidratado(a). Nos vemos lá! 🤘`;
-          } else if (currentStage === 'pos_venda' || currentStage === 'concluido') {
-            autoReply = `Fala ${firstName}! Passando para saber como está a cicatrização da sua tattoo. Qualquer dúvida sobre os cuidados ou a pomada, só me avisar! ✨`;
-          }
-
-          if (autoReply) {
-            await sendWhatsAppMessage(senderPhone, autoReply);
-
-            // Salva a resposta do robô no CRM
-            try {
-              const msgDocUrl = `${FIRESTORE_BASE}/crm_messages?key=${FIREBASE_API_KEY}`;
-              await fetch(msgDocUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  fields: {
-                    telefone: { stringValue: senderPhone },
-                    clienteNome: { stringValue: senderName },
-                    mensagem: { stringValue: autoReply },
-                    remetente: { stringValue: 'ia' },
-                    timestamp: { timestampValue: new Date().toISOString() },
-                    status: { stringValue: 'entregue' }
-                  }
-                })
-              });
-            } catch (rErr) {
-              console.warn('Erro ao salvar resposta da IA:', rErr);
-            }
-          }
-
-          return res.status(200).json({ status: 'client_handled_by_agent', stage: currentStage });
-        }
-
-        // Se piloto estiver desligado, apenas registrou no CRM para atendimento humano
-        return res.status(200).json({ status: 'client_saved_to_crm', message: 'Mensagem registrada no chat do CRM.' });
+        await sendTelegramMessage(
+          TELEGRAM_ADMIN_CHAT_ID,
+          `⚡ *AUTO-PILOTO:* A resposta acima foi disparada automaticamente no WhatsApp de ${senderName}!`
+        );
       }
 
-      const text = userText.toLowerCase();
-
-      const targetDate = parseDate(text) || new Date().toISOString().split('T')[0];
-      const targetTime = parseTime(text);
-      const targetSize = parseSize(text);
-
-      let replyText = '';
-
-      // Confirmação de Presença de Cliente (Comando Admin WhatsApp)
-      // Ex: "o Tiago veio", "Akila compareceu", "fulano faltou", "sim, compareceu", "conclui a sessão da Akila"
-      const isPresencaSim = (text.includes('compareceu') || text.includes('veio') || text.includes('tatuou') || text.includes('conclui') || text.includes('concluído') || text.includes('concluido')) && !text.includes('não') && !text.includes('nao');
-      const isPresencaNao = (text.includes('faltou') || text.includes('não veio') || text.includes('nao veio') || text.includes('não compareceu') || text.includes('nao compareceu') || text.includes('desmarcou') || text.includes('cancelou'));
-
-      if (isAdmin && (isPresencaSim || isPresencaNao)) {
-        const matchName = userText.match(/(?:o|a|cliente|sessão\s+d[oa]|agendamento\s+d[oa])?\s*([A-ZÀ-ÿ][a-zà-ÿ]+)/i);
-        let targetName = matchName && matchName[1] ? matchName[1] : '';
-        if (['Sim', 'Nao', 'Não', 'O', 'A', 'Hoje', 'Ontem', 'Que', 'Como'].includes(targetName)) targetName = '';
-
-        let bookingToConfirm = null;
-        try {
-          const queryUrl = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
-          const qRes = await fetch(queryUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              structuredQuery: {
-                from: [{ collectionId: 'bookings' }],
-                limit: 40
-              }
-            })
-          });
-          const bItems = await qRes.json();
-          const list = (Array.isArray(bItems) ? bItems : []).filter(i => i.document?.fields).map(i => {
-            const f = i.document.fields;
-            return {
-              id: i.document.name.split('/').pop(),
-              name: f.userName?.stringValue || f.clientName?.stringValue || '',
-              date: f.date?.stringValue || '',
-              time: f.time?.stringValue || '',
-              phone: f.userPhone?.stringValue || f.clientPhone?.stringValue || '',
-              status: f.status?.stringValue || ''
-            };
-          });
-
-          if (targetName) {
-            bookingToConfirm = list.find(b => b.name.toLowerCase().includes(targetName.toLowerCase()));
-          }
-          if (!bookingToConfirm) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            bookingToConfirm = list.find(b => b.date <= todayStr && (b.status === 'approved' || b.status === 'deposit_paid'));
-          }
-        } catch (bErr) {
-          console.warn('Erro ao buscar booking para confirmação:', bErr);
-        }
-
-        if (bookingToConfirm) {
-          const newStatus = isPresencaSim ? 'completed' : 'no_show';
-          try {
-            await fetch(`${FIRESTORE_BASE}/bookings/${bookingToConfirm.id}?updateMask.fieldPaths=status&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                fields: {
-                  status: { stringValue: newStatus },
-                  updatedAt: { timestampValue: new Date().toISOString() }
-                }
-              })
-            });
-          } catch (patchErr) {}
-
-          try {
-            const leadStage = isPresencaSim ? 'pos_venda' : 'followup';
-            const leadTemp = isPresencaSim ? 'quente' : 'morno';
-            const lRes = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                structuredQuery: {
-                  from: [{ collectionId: 'leads' }],
-                  where: {
-                    fieldFilter: {
-                      field: { fieldPath: 'nome' },
-                      op: 'EQUAL',
-                      value: { stringValue: bookingToConfirm.name }
-                    }
-                  },
-                  limit: 1
-                }
-              })
-            });
-            const lItems = await lRes.json();
-            if (Array.isArray(lItems) && lItems[0]?.document) {
-              const lId = lItems[0].document.name.split('/').pop();
-              await fetch(`${FIRESTORE_BASE}/leads/${lId}?updateMask.fieldPaths=estagio&updateMask.fieldPaths=temperatura&updateMask.fieldPaths=updatedAt&key=${FIREBASE_API_KEY}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  fields: {
-                    estagio: { stringValue: leadStage },
-                    temperatura: { stringValue: leadTemp },
-                    updatedAt: { timestampValue: new Date().toISOString() }
-                  }
-                })
-              });
-            }
-          } catch (leadSyncErr) {}
-
-          if (isPresencaSim) {
-            replyText = `✅ *Presença Confirmada, Chefe!*\n\n👤 *Cliente:* ${bookingToConfirm.name}\n📅 *Sessão:* ${bookingToConfirm.date} às ${bookingToConfirm.time}\n\nO status foi alterado para *Concluído*, o lead foi movido para *Pós-Venda (Cicatrização / 15 dias)* e o cliente classificado como *🔥 Quente* na Carteira! 🚀`;
-          } else {
-            replyText = `❌ *Falta Registrada, Chefe!*\n\n👤 *Cliente:* ${bookingToConfirm.name}\n📅 *Sessão:* ${bookingToConfirm.date} às ${bookingToConfirm.time}\n\nO status foi alterado para *Faltou*, o lead foi movido para *Follow-up / Resgate* e o cliente marcado como *desmarcou* na Carteira para reativação futura. ⚠️`;
-          }
-        } else {
-          replyText = `⚠️ Chefe, não encontrei nenhum agendamento pendente ${targetName ? `com o nome *${targetName}*` : 'para hoje'}. Verifique no painel ou digite o nome completo do cliente!`;
-        }
-      }
-
-      // A. Resumo da Agenda
-      else if (text.includes('agenda de') || text.includes('como tá a agenda') || text.includes('como esta a agenda') || (text.includes('agenda') && (text.includes('hoje') || text.includes('amanha')))) {
-        const bookings = await getDailySummary(targetDate);
-        const [y, m, d] = targetDate.split('-');
-        const formattedDate = `${d}/${m}/${y}`;
-
-        if (bookings.length === 0) {
-          replyText = `📅 *Agenda para ${formattedDate}:*\n\nNenhum agendamento confirmado para este dia até o momento. A agenda está livre! ✨`;
-        } else {
-          const lines = bookings.map((b, idx) => {
-            const statusBadge = b.status === 'approved' ? '✅' : '⏳';
-            return `${idx + 1}. ${statusBadge} *${b.time}* - ${b.client} (Tattoo ${b.size})`;
-          }).join('\n');
-          replyText = `📅 *Agenda do Somos 1 Studio (${formattedDate}):*\n\n${lines}\n\nTotal de clientes: *${bookings.length}* 🚀`;
-        }
-      }
-
-      // B. Agendar / Reagendar
-      else if ((text.includes('agenda') || text.includes('agendar') || text.includes('marcar') || text.includes('marca') || text.includes('reagenda') || text.includes('remarca') || text.includes('muda') || text.includes('troca')) && targetDate && targetTime) {
-        let clientName = senderName;
-        if (isAdmin) {
-          const matchName = userText.match(/(?:agenda(?:r)?|marca(?:r)?|reagenda(?:r)?|remarca(?:r)?|muda(?:r)?|troca(?:r)?)\s+(?:o|a|de|hor[aá]rio\s+d[oa])?\s*([a-zA-ZÀ-ÿ]+)/i);
-          if (matchName && matchName[1] && !['uma', 'pra', 'para', 'com', 'no', 'na', 'minha'].includes(matchName[1].toLowerCase())) {
-            clientName = matchName[1].charAt(0).toUpperCase() + matchName[1].slice(1);
-          }
-        }
-
-        const isReagendamento = text.includes('reagenda') || text.includes('remarca') || text.includes('muda') || text.includes('troca') || text.includes('altera');
-        const [y, m, d] = targetDate.split('-');
-        const formattedDate = `${d}/${m}/${y}`;
-
-        // Verifica se já existe um agendamento ativo para esse cliente para não duplicar!
-        const existingBooking = await findActiveBookingForClient(clientName, isAdmin ? '' : senderPhone);
-
-        if (existingBooking && (isReagendamento || existingBooking.fields?.date?.stringValue === targetDate)) {
-          // ATUALIZA O AGENDAMENTO EXISTENTE (Sem duplicar!)
-          await updateBookingDateTime(existingBooking.id, targetDate, targetTime);
-
-          if (isAdmin) {
-            replyText = `🔄 *Reagendamento Atualizado com Sucesso!*\n\n👤 *Cliente:* ${clientName}\n📅 *Novo Horário:* ${formattedDate} às *${targetTime}*\n\nO agendamento anterior foi remarcado na agenda sem duplicidade! 🚀`;
-          } else {
-            replyText = `🔄 *Horário Alterado com Sucesso, ${clientName}!* 🖤\n\nSeu agendamento foi atualizado para *${formattedDate} às ${targetTime}*.\n📍 *Local:* Rua Francesco de Martini 29. Até lá! 🤘✨`;
-          }
-        } else {
-          // Cria novo agendamento
-          const price = parsePrice(text);
-          const deposit = parseDeposit(text);
-
-          await createBooking({
-            clientName,
-            clientPhone: isAdmin ? '' : senderPhone,
-            date: targetDate,
-            time: targetTime,
-            size: targetSize,
-            priceEstimated: price,
-            depositPaid: deposit,
-            description: `Tatuagem ${targetSize}${price > 0 ? ` (R$ ${price})` : ''}`,
-            status: isAdmin ? 'approved' : 'pending_approval'
-          });
-
-          if (isAdmin) {
-            replyText = `✅ *Agendamento Confirmado pelo Chefe!*\n\n👤 *Cliente:* ${clientName}\n📅 *Data:* ${formattedDate} às *${targetTime}*\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Valor:* R$ ${price}` : ''}${deposit > 0 ? ` (Sinal: R$ ${deposit})` : ''}\n✍️ *Artista:* Markinhos\n\nJá está gravado no sistema e bloqueado na agenda! 🚀`;
-          } else {
-            replyText = `🎉 *Agendamento Recebido com Sucesso, ${clientName}!* 🖤\n\n📅 *Data:* ${formattedDate}\n⏰ *Horário:* ${targetTime}\n🎨 *Tamanho:* ${targetSize}${price > 0 ? `\n💰 *Estimativa:* R$ ${price}` : ''}\n✍️ *Artista:* Markinhos\n📍 *Local:* Rua Francesco de Martini 29, São Caetano do Sul\n\nSeu horário está pré-reservado. Qualquer dúvida ou imprevisto, é só me chamar por aqui! Te esperamos 🤘✨`;
-          }
-        }
-      }
-
-      // C. Consultar horários
-      else if (text.includes('horário') || text.includes('horario') || text.includes('vaga') || text.includes('livre') || text.includes('disponivel') || text.includes('disponível') || (targetDate && !targetTime && (text.includes('dia') || text.includes('quando')))) {
-        const slotsInfo = await getAvailableSlots(targetDate, targetSize);
-        if (slotsInfo.freeSlots.length > 0) {
-          const slotsDisplay = slotsInfo.freeSlots.slice(0, 6).join('   •   ');
-          replyText = `📅 *Horários Livres para ${slotsInfo.formattedDate}:*\n\n⏰ ${slotsDisplay}\n\nQual horário fica melhor para você? Responda aqui com a hora que preferir (Ex: *"Quero às ${slotsInfo.freeSlots[0]}"*)! 🖤`;
-        } else {
-          replyText = `⚠️ Para o dia *${slotsInfo.formattedDate}*, todos os horários já estão preenchidos! Gostaria de verificar para o próximo dia útil?`;
-        }
-      }
-
-      // D. Conversação padrão
-      else {
-        if (isAdmin) {
-          replyText = `Fala, Markinhos! 🤘 Sou o assistente inteligente da sua agenda.\n\nComandos rápidos que você pode me mandar:\n• *"Agenda o [Nome] amanhã às 14h tattoo média"*\n• *"Como tá a agenda de amanhã?"*\n• *"Bloqueia o dia [data]"*\n\nO que manda agora?`;
-        } else {
-          replyText = `Olá, ${senderName}! 🖤 Bem-vindo(a) ao *Somos 1 Tattoo Studio*!\n\nSou o assistente virtual de agendamentos. Para marcar sua tattoo ou consultar datas disponíveis, me diga:\n\n1. Qual dia você gostaria de vir? (Ex: *"Quais horários tem na sexta?"*)\n2. Ou me diga direto o horário: (Ex: *"Quero agendar amanhã às 15h"*)\n\nComo posso te ajudar hoje? 🤘✨`;
-        }
-      }
-
-      // Enviar resposta no WhatsApp
-      await sendWhatsAppMessage(senderPhone, replyText);
-
-      return res.status(200).json({ status: 'success', repliedTo: senderPhone });
+      return res.status(200).json({
+        status: 'success',
+        leadId,
+        agente: agenteTipo,
+        suggested: sugestaoIA
+      });
     }
 
-    return res.status(404).json({ error: 'Not found' });
+    return res.status(404).json({ error: 'Endpoint não encontrado' });
   } catch (err) {
-    console.error('Handler error:', err);
+    console.error('Fatal agent error:', err);
     return res.status(500).json({ error: err.message });
   }
 }

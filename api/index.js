@@ -1,4 +1,5 @@
 import { agentService } from './agentService.js';
+import agentHandler from './agent.js';
 
 export default async function handler(req, res) {
   // CORS headers
@@ -17,6 +18,11 @@ export default async function handler(req, res) {
 
   const url = new URL(req.url, `https://${req.headers.host || 'galeria-ia-cloudflare.vercel.app'}`);
   const path = url.pathname.replace(/^\/api/, '');
+
+  // ── DELEGAÇÃO PARA O MOTOR SERVERLESS NATIVO DOS 6 AGENTES ──────────────
+  if (path === '/agent/webhook' || path === '/agent' || path === '/webhook' || path === '/webhook-evolution') {
+    return agentHandler(req, res);
+  }
 
   const defaultMetaToken = process.env.META_ACCESS_TOKEN || "EAAU25cua8dMBSlwXBhUVk1OkTTUZCY3Xp3ls370kEzfiyigykKvPCtsnl7Inn3nI1Q5xM4oJZAaqpCZCTZBfLP0mIYhZCWhutUJFZCg6OaIGjRCPfBJid90RHCZAdxzpFiAL95itbIAu8i1q0WG5ppJJpJ9R8vFhgKm5Idzs4otBe4vo6au7m7ZCqjlikmSNK3s07QZAjqQz028LNZCxraufZCrLWmK83tvTGp86n1imklBb3eGmGo6XMoLcZAluwiRiaYrp4Ws54bk00kxMqVZCSo9DIn4TojTqTM4OHCyRM2gZDZD";
   const fbToken = req.cookies?.fb_access_token || req.headers.authorization?.replace('Bearer ', '') || defaultMetaToken;
