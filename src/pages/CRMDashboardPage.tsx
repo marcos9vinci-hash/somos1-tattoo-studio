@@ -11,6 +11,7 @@ import { ChatInterfaceModal } from '../components/crm/ChatInterfaceModal';
 import { LeadModal } from '../components/crm/LeadModal';
 import { ClienteModal } from '../components/crm/ClienteModal';
 import { EstrategiasReativacaoPanel } from '../components/crm/EstrategiasReativacaoPanel';
+import { SimuladorFluxoWhatsAppModal } from '../components/crm/SimuladorFluxoWhatsAppModal';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { telegramService } from '../lib/telegramService';

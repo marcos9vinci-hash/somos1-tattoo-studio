@@ -174,13 +174,19 @@ async function criarTodosOsTopicos(chatId) {
       key: 'miguel',
       name: '🎩 7. Falar com Miguel (Comandos)',
       color: 7322096, // azul
-      msgApresentacao: '🎩 *CANAL DIRETO COM O MIGUEL (SEU ASSESSOR EXECUTIVO)!*\n\nConverse comigo diretamente por aqui em linguagem natural!\nExemplos de comandos:\n• "pode agendar amanhã às 14h com o João, valor 600 e sinal 180"\n• "manda zap pro Carlos avisando que o desenho tá pronto"\n• "o Tiago compareceu"'
+      msgApresentacao: '🎩 *CANAL DIRETO COM O MIGUEL (SEU ASSESSOR EXECUTIVO)!*\n\nConverse comigo diretamente por aqui em linguagem natural!\nExemplos de comandos:\n• "pode agendar amanhã às 14h com o João, valor 600 e sinal 180"\n• "manda zap pro Carlos avisando que o desenho tá pronto"\n• "o Tiago compareceu"\n• "faz o pente fino aí"'
+    },
+    {
+      key: 'fechamento',
+      name: '📊 8. Fechamento Diário & Caixa',
+      color: 9367192, // verde
+      msgApresentacao: '📊 *CANAL DE FECHAMENTO DIÁRIO & AUDITORIA!*\n\nAqui o Miguel envia o fechamento diário do estúdio, auditoria de caixa e pente fino de leads todos os dias.'
     }
   ];
 
   const mapTopicos = {};
 
-  await sendTelegramMessage(chatId, '⚙️ *INICIANDO CRIAÇÃO AUTOMÁTICA DOS 7 TÓPICOS NO GRUPO...*\n_Criando canais dedicados para cada Agente de IA..._');
+  await sendTelegramMessage(chatId, '⚙️ *INICIANDO CRIAÇÃO AUTOMÁTICA DOS 8 TÓPICOS NO GRUPO...*\n_Criando canais dedicados para cada Agente de IA e Fechamento de Caixa..._');
 
   for (const t of TOPICOS_DEFINICAO) {
     const threadId = await createTelegramForumTopic(chatId, t.name, t.color);
@@ -503,6 +509,13 @@ function parseMiguelNaturalText(text) {
     };
   }
 
+  // 5. Pente Fino / Fechamento Diário
+  if (lower.includes('pente fino') || lower.includes('fechamento') || lower.includes('fechar caixa') || lower.includes('auditoria') || lower.includes('resumo') || lower.includes('como tá o estúdio') || lower.includes('como ta o estudio') || lower === '/fechamento') {
+    return {
+      tipo: 'FECHAMENTO_DIARIO'
+    };
+  }
+
   return null;
 }
 
@@ -600,6 +613,59 @@ async function conversarComMiguelAdmin(textoMarcos, chatId, threadId) {
         threadId
       );
       return;
+    }
+
+    // E. Fechamento Diário & Pente Fino
+    if (comandoHeuristico.tipo === 'FECHAMENTO_DIARIO') {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const [bSnap, lSnap] = await Promise.all([
+          getDocs(collection(db, 'bookings')),
+          getDocs(collection(db, 'leads'))
+        ]);
+
+        const allBookings = bSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const allLeads = lSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(l => l.nome && !l.id?.startsWith('_'));
+
+        const hojeBookings = allBookings.filter(b => (b.date || '').split('T')[0] === todayStr);
+        const concluidosHoje = hojeBookings.filter(b => b.status === 'COMPLETED');
+        const faturamentoHoje = concluidosHoje.reduce((acc, b) => acc + Number(b.priceEstimated || 0), 0);
+        const sinaisHoje = hojeBookings.reduce((acc, b) => acc + Number(b.depositPaid || 0), 0);
+
+        const leadsTriagem = allLeads.filter(l => l.estagio === 'novo').length;
+        const leadsQualif = allLeads.filter(l => l.estagio === 'qualificacao').length;
+        const leadsNegoc = allLeads.filter(l => l.estagio === 'negociacao').length;
+        const leadsAgend = allLeads.filter(l => l.estagio === 'agendado').length;
+        const leadsPosVenda = allLeads.filter(l => l.estagio === 'pos_venda').length;
+        const leadsResgate = allLeads.filter(l => l.estagio === 'followup' || l.temperatura === 'frio' || l.temperatura === 'desmarcou').length;
+
+        const relatorio =
+          `📊 *PENTE FINO & FECHAMENTO DO ESTÚDIO — SOMOS 1 TATTOO* 🎨\n` +
+          `🗓️ *Data:* ${todayStr.split('-').reverse().join('/')}\n\n` +
+          `💰 *1. CAIXA & SESSÕES DE HOJE:*\n` +
+          `• Sessões Marcadas Hoje: *${hojeBookings.length}*\n` +
+          `• Concluídas / Tatuadas: *${concluidosHoje.length}*\n` +
+          `• Faturamento das Sessões: *R$ ${faturamentoHoje}*\n` +
+          `• Sinais de 30% Travados: *R$ ${sinaisHoje}*\n` +
+          `• Chave PIX Estúdio: \`somos1tattoo@gmail.com\`\n\n` +
+          `🎯 *2. RAIO-X DOS LEADS NO FUNIL CRM:*\n` +
+          `• 🛎️ Triagem / Novos: *${leadsTriagem}*\n` +
+          `• 🎯 Qualificação (SDR): *${leadsQualif}*\n` +
+          `• 💬 Negociação (Aguardando Sinal): *${leadsNegoc}*\n` +
+          `• 📅 Sessões Agendadas: *${leadsAgend}*\n` +
+          `• ✨ Pós-Venda Cicatrização: *${leadsPosVenda}*\n` +
+          `• 🔕 Resgate Avalanche: *${leadsResgate}*\n\n` +
+          `⚡ *3. PLANO DE AÇÃO DO MIGUEL:*\n` +
+          (leadsNegoc > 0 ? `👉 *${leadsNegoc} cliente(s)* em Negociação aguardando sinal: enviar lembrete com a chave PIX!\n` : '') +
+          (leadsTriagem > 0 ? `👉 *${leadsTriagem} novo(s) lead(s)* em Triagem: responder agora para não esfriar!\n` : '') +
+          (leadsResgate > 0 ? `👉 *${leadsResgate} contato(s)* no Resgate: disparar promoção flash de reativação!\n` : '✅ Todos os contatos do estúdio estão em dia e organizados!\n\n') +
+          `_Para agir em cada etapa, abra o tópico correspondente na barra lateral esquerda!_`;
+
+        await sendTelegramMessage(chatId, relatorio, null, threadId);
+        return;
+      } catch (err) {
+        console.error('Erro no fechamento:', err);
+      }
     }
   }
 
