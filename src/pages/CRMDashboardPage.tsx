@@ -12,6 +12,7 @@ import { LeadModal } from '../components/crm/LeadModal';
 import { ClienteModal } from '../components/crm/ClienteModal';
 import { EstrategiasReativacaoPanel } from '../components/crm/EstrategiasReativacaoPanel';
 import { SimuladorFluxoWhatsAppModal } from '../components/crm/SimuladorFluxoWhatsAppModal';
+import { telegramService } from '../lib/telegramService';
 import {
   Users,
   Sparkles,
@@ -37,7 +38,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Smartphone,
-  X
+  X,
+  Send
 } from 'lucide-react';
 
 type ActiveTab = 'carteira' | 'funil' | 'estrategias';
@@ -160,6 +162,72 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
       setEnviandoZapId(null);
     }
   };
+
+  const [enviandoTelegramId, setEnviandoTelegramId] = useState<string | null>(null);
+
+  const handleEnviarTelegramAdmin = async (sessao: any) => {
+    setEnviandoTelegramId(sessao.id);
+    try {
+      const ok = await telegramService.enviarAlertaPresenca(sessao);
+      if (ok) {
+        showToast('success', `✈️ Pergunta com botões enviada no seu Telegram (@somos1tattoo_bot)!`);
+      } else {
+        showToast('error', `Não foi possível enviar ao Telegram. Verifique se o bot está ativo.`);
+      }
+    } catch (e: any) {
+      showToast('error', `Falha ao enviar Telegram: ${e?.message}`);
+    } finally {
+      setEnviandoTelegramId(null);
+    }
+  };
+
+  // Escuta em tempo real os cliques nos botões inline do Telegram (@somos1tattoo_bot)
+  useEffect(() => {
+    const processados = new Set<string>();
+    const interval = setInterval(async () => {
+      try {
+        const token = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '8824178251:AAFu-yv94YS-XGKHXh1t_Q-EIrThiYLXYC4';
+        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=-5`);
+        const data = await res.json();
+        if (data.ok && data.result) {
+          for (const u of data.result) {
+            if (u.callback_query && u.callback_query.data) {
+              const cq = u.callback_query;
+              if (processados.has(cq.id)) continue;
+              processados.add(cq.id);
+
+              const cqData = cq.data as string;
+              if (cqData.startsWith('presenca:')) {
+                const [, acao, bookingId] = cqData.split(':');
+                if (bookingId) {
+                  await telegramService.responderCallback(cq.id, acao === 'sim' ? 'Presença confirmada!' : 'Falta registrada!');
+                  await crmService.confirmarPresencaBooking(bookingId, acao === 'sim');
+                  if (cq.message?.chat?.id && cq.message?.message_id) {
+                    await telegramService.editarMensagemTexto(
+                      cq.message.chat.id,
+                      cq.message.message_id,
+                      acao === 'sim' 
+                        ? `✅ *PRESENÇA CONFIRMADA VIA TELEGRAM!*\nO cliente foi registrado como presente e encaminhado para Pós-Venda.`
+                        : `❌ *FALTA REGISTRADA VIA TELEGRAM!*\nO cliente foi marcado como No-Show e encaminhado para Resgate.`
+                    );
+                  }
+                  showToast('success', acao === 'sim' ? '✅ Presença confirmada via Telegram!' : '❌ Falta registrada via Telegram.');
+                  await loadData();
+                }
+              } else if (cqData.startsWith('teste:')) {
+                await telegramService.responderCallback(cq.id, '✅ Teste recebido com sucesso no CRM!');
+                showToast('success', `✈️ Clique de teste no Telegram recebido com sucesso!`);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // silencioso
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -645,6 +713,16 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-headline font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
                       >
                         {enviandoZapId === sessao.id ? 'Enviando...' : '📲 Notificar no Zap'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={enviandoTelegramId === sessao.id}
+                        onClick={() => handleEnviarTelegramAdmin(sessao)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 rounded-lg text-xs font-headline font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+                        title="Enviar notificação interativa com botões Sim e Não no seu Telegram (@somos1tattoo_bot)"
+                      >
+                        <Send className="w-3.5 h-3.5 text-sky-400" />
+                        {enviandoTelegramId === sessao.id ? 'Enviando...' : '✈️ Notificar Telegram'}
                       </button>
                     </div>
                   </div>
