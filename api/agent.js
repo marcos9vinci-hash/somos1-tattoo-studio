@@ -797,7 +797,7 @@ export default async function handler(req, res) {
 
   try {
     // Health Check
-    if (req.method === 'GET' && (path === '' || path === '/' || path === '/health')) {
+    if (req.method === 'GET' && (path === '' || path === '/' || path === '/health' || path === '/agent' || path === '/agent/webhook')) {
       return res.status(200).json({ status: 'ok', engine: 'Somos 1 Native AI Studio Engine v3 (Firebase SDK Direct)' });
     }
 
