@@ -109,6 +109,106 @@ async function sendTelegramMessage(chatId, text, inlineKeyboard, threadId) {
   }
 }
 
+async function createTelegramForumTopic(chatId, name, iconColor) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/createForumTopic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        name: name,
+        icon_color: iconColor
+      })
+    });
+    const data = await res.json();
+    if (data.ok && data.result) {
+      return data.result.message_thread_id;
+    }
+    console.error('Erro ao criar tópico no Telegram:', data);
+    return null;
+  } catch (err) {
+    console.error('Erro de rede ao criar tópico:', err);
+    return null;
+  }
+}
+
+async function criarTodosOsTopicos(chatId) {
+  const TOPICOS_DEFINICAO = [
+    {
+      key: 'novo',
+      name: '🛎️ 1. Triagem & Recepção',
+      color: 7322096, // azul
+      msgApresentacao: '🛎️ *BEM-VINDO AO TÓPICO DE TRIAGEM & RECEPÇÃO!*\n\nAqui cairão todos os novos contatos que chamarem no WhatsApp pela primeira vez.\nO agente de recepção acolhe pelo nome e pergunta o estilo ou projeto que o cliente quer tatuar.'
+    },
+    {
+      key: 'qualificacao',
+      name: '🎯 2. SDR & Qualificação',
+      color: 16766590, // amarelo
+      msgApresentacao: '🎯 *BEM-VINDO AO TÓPICO DO CLONE DO DONO (SDR CONSULTIVO)!*\n\nAqui são acompanhados os leads na fase de qualificação artística.\nO agente investiga: tamanho aproximado em cm, local do corpo e referências visuais.'
+    },
+    {
+      key: 'negociacao',
+      name: '💬 3. Negociação & Sinal PIX',
+      color: 9367192, // verde
+      msgApresentacao: '💬 *BEM-VINDO AO TÓPICO DO JONATHAN (FECHAMENTO & SINAL PIX)!*\n\nAqui concentram-se as propostas e fechamentos.\nRegra de Ouro: Proposta com valor do projeto + chave PIX (somos1tattoo@gmail.com) para o Sinal de 30% que trava o horário.'
+    },
+    {
+      key: 'agendado',
+      name: '📅 4. Secretário da Agenda',
+      color: 13338331, // roxo
+      msgApresentacao: '📅 *BEM-VINDO AO TÓPICO DO SECRETÁRIO DA AGENDA (MIGUEL)!*\n\nAqui você acompanha confirmações de sessões, lembretes de véspera para clientes e blindagem anti-furo.'
+    },
+    {
+      key: 'pos_venda',
+      name: '✨ 5. Pós-Venda Cicatrização',
+      color: 16749490, // rosa
+      msgApresentacao: '✨ *BEM-VINDO AO TÓPICO DA JULIANA (PÓS-VENDA & CICATRIZAÇÃO)!*\n\nAqui o foco é encantar o cliente tatuado: protocolo de cuidados na pele (pomada cicatrizante), foto da cicatrização e avaliação 5 estrelas no Google.'
+    },
+    {
+      key: 'followup',
+      name: '🔕 6. Resgate Avalanche',
+      color: 16478047, // laranja
+      msgApresentacao: '🔕 *BEM-VINDO AO TÓPICO DO RESGATE AVALANCHE!*\n\nAqui concentram-se os contatos que sumiram, desmarcaram ou esfriaram.\nO agente reaquece com empatia, horários vagos e novos flashes sem ser invasivo.'
+    },
+    {
+      key: 'miguel',
+      name: '🎩 7. Falar com Miguel (Comandos)',
+      color: 7322096, // azul
+      msgApresentacao: '🎩 *CANAL DIRETO COM O MIGUEL (SEU ASSESSOR EXECUTIVO)!*\n\nConverse comigo diretamente por aqui em linguagem natural!\nExemplos de comandos:\n• "pode agendar amanhã às 14h com o João, valor 600 e sinal 180"\n• "manda zap pro Carlos avisando que o desenho tá pronto"\n• "o Tiago compareceu"'
+    }
+  ];
+
+  const mapTopicos = {};
+
+  await sendTelegramMessage(chatId, '⚙️ *INICIANDO CRIAÇÃO AUTOMÁTICA DOS 7 TÓPICOS NO GRUPO...*\n_Criando canais dedicados para cada Agente de IA..._');
+
+  for (const t of TOPICOS_DEFINICAO) {
+    const threadId = await createTelegramForumTopic(chatId, t.name, t.color);
+    if (threadId) {
+      mapTopicos[t.key] = threadId;
+      await sendTelegramMessage(chatId, t.msgApresentacao, null, threadId);
+    }
+  }
+
+  // Grava mapeamento no Firestore
+  await setDoc(doc(db, 'configuracoes', 'telegram_topics'), {
+    groupId: String(chatId),
+    topics: mapTopicos,
+    ativo: true,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  const finalMsg = 
+    `🎉 *PRONTO, MARKINHOS! TODOS OS 7 TÓPICOS FORAM CRIADOS E CONECTADOS!* 🚀\n\n` +
+    `A partir de agora:\n` +
+    `• Cada notificação do WhatsApp cairá no tópico exato do seu agente responsável.\n` +
+    `• Você pode me dar ordens na janela *🎩 7. Falar com Miguel* ou em qualquer tópico!\n\n` +
+    `_O Quartel General da Somos 1 Tattoo está 100% blindado e operacional._`;
+
+  await sendTelegramMessage(chatId, finalMsg);
+  return mapTopicos;
+}
+
 async function answerTelegramCallback(callbackQueryId, text) {
   try {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
@@ -317,7 +417,7 @@ Retorne APENAS o texto da resposta para o WhatsApp do cliente. Sem aspas adicion
 
 // ─── CONVERSAÇÃO CO-PILOTO COM MIGUEL (COMANDOS NATURAIS DO MARKINHOS) ──────
 
-async function conversarComMiguelAdmin(textoMarcos, chatId) {
+async function conversarComMiguelAdmin(textoMarcos, chatId, threadId) {
   const promptMiguel = `Você é Miguel, o Assessor Executivo Pessoal e Co-Piloto Inteligente do tatuador Markinhos (Somos 1 Tattoo Studio).
 Markinhos está falando com você diretamente pelo Telegram dele.
 Ele pode pedir coisas como:
@@ -407,20 +507,20 @@ Retorne uma resposta JSON com o seguinte formato exato:
           `💰 *Valor:* R$ ${price} | *Sinal:* R$ ${deposit}\n\n` +
           `⚡ A blindagem de lembretes automáticos no WhatsApp e a vaga no CRM já estão ativas!`;
 
-        await sendTelegramMessage(chatId, confirmacao);
+        await sendTelegramMessage(chatId, confirmacao, null, threadId);
         return;
       }
 
       // 2. AÇÃO: DISPARAR WHATSAPP DIRETO
       if (parsed.intencao === 'DISPARAR_ZAP' && parsed.dados?.clienteTelefone && parsed.dados?.mensagemParaCliente) {
         await sendWhatsAppMessage(parsed.dados.clienteTelefone, parsed.dados.mensagemParaCliente);
-        await sendTelegramMessage(chatId, `🚀 *MENSAGEM ENVIADA NO ZAP!* 📲\n\nDisparei para ${parsed.dados.clienteNome || parsed.dados.clienteTelefone}: "${parsed.dados.mensagemParaCliente}"`);
+        await sendTelegramMessage(chatId, `🚀 *MENSAGEM ENVIADA NO ZAP!* 📲\n\nDisparei para ${parsed.dados.clienteNome || parsed.dados.clienteTelefone}: "${parsed.dados.mensagemParaCliente}"`, null, threadId);
         return;
       }
 
       // 3. RESPOSTA CONVERSACIONAL DE MIGUEL
       if (parsed.respostaTelegram) {
-        await sendTelegramMessage(chatId, `🎩 *Miguel:* ${parsed.respostaTelegram}`);
+        await sendTelegramMessage(chatId, `🎩 *Miguel:* ${parsed.respostaTelegram}`, null, threadId);
         return;
       }
     }
@@ -431,7 +531,9 @@ Retorne uma resposta JSON com o seguinte formato exato:
   // Fallback conversacional
   await sendTelegramMessage(
     chatId,
-    `Fala, Markinhos! 🤘 Recebi seu comando: "${textoMarcos}".\n\nSe quiser agendar ou mandar mensagem, você pode me pedir diretamente (ex: "agenda amanha as 15h com o Lucas valor 500") ou usar os botões do */menu*!`
+    `Fala, Markinhos! 🤘 Recebi seu comando: "${textoMarcos}".\n\nSe quiser agendar ou mandar mensagem, você pode me pedir diretamente (ex: "agenda amanha as 15h com o Lucas valor 500") ou usar os botões do */menu*!`,
+    null,
+    threadId
   );
 }
 
@@ -720,63 +822,78 @@ async function handleTelegramUpdate(rawBody, res) {
   // 2. PROCESSAR MENSAGENS DE TEXTO E COMANDOS
   if (rawBody.message && rawBody.message.chat) {
     const chatId = rawBody.message.chat.id;
+    const chatType = rawBody.message.chat.type; // 'private', 'group', 'supergroup'
+    const threadId = rawBody.message.message_thread_id;
     const text = (rawBody.message.text || '').trim();
     const lower = text.toLowerCase();
+
+    // Comandos de Criação Automática de Tópicos do Grupo
+    if (lower === '/criar_topicos' || lower === '/setup' || (lower === '/topicos' && (chatType === 'supergroup' || chatType === 'group'))) {
+      if (chatType === 'supergroup' || chatType === 'group') {
+        await criarTodosOsTopicos(chatId);
+        return res.status(200).json({ ok: true, action: 'topicos_criados' });
+      } else {
+        const explicacao = 
+          `👥 *COMO ATIVAR O GRUPO COM TÓPICOS NO TELEGRAM:* 🎨\n\n` +
+          `O Telegram não permite que NENHUM bot crie o grupo do zero (regra de segurança global do Telegram contra spam de robôs). Mas você cria em 15 segundos no seu celular ou PC:\n\n` +
+          `1️⃣ No seu Telegram, toque em *Novo Grupo* (ex: "Somos 1 Tattoo — Central").\n` +
+          `2️⃣ Adicione este bot: *@somos1tattoo_bot*\n` +
+          `3️⃣ Nas configurações do grupo (Editar Grupo), ATIVE a opção *Tópicos (Fórum)*.\n` +
+          `4️⃣ Promova o bot a *Administrador* com permissão de "Gerenciar Tópicos".\n` +
+          `5️⃣ Digite */criar_topicos* dentro do grupo!\n\n` +
+          `O bot criará automaticamente todos os 7 tópicos, configurará os ícones/cores e conectará cada agente na sua janela! 🚀`;
+        await sendTelegramMessage(chatId, explicacao);
+        return res.status(200).json({ ok: true });
+      }
+    }
 
     // Comandos de Barra / Teclado
     if (lower === '/start' || lower === '/menu' || lower === '/agentes' || lower === 'menu' || lower === 'agentes') {
       const menu = getMainHQMenu();
-      await sendTelegramMessage(chatId, menu.texto, menu.botoes);
+      await sendTelegramMessage(chatId, menu.texto, menu.botoes, threadId);
       return res.status(200).json({ ok: true });
     }
 
     if (lower === '/hoje' || lower === '/agenda') {
       const rel = getAgentReportText('agendado');
-      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes, threadId);
       return res.status(200).json({ ok: true });
     }
 
     if (lower === '/sinal') {
       const rel = getAgentReportText('negociacao');
-      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes, threadId);
       return res.status(200).json({ ok: true });
     }
 
     if (lower === '/posvenda') {
       const rel = getAgentReportText('pos_venda');
-      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes, threadId);
       return res.status(200).json({ ok: true });
     }
 
     if (lower === '/status') {
       const rel = getAgentReportText('status');
-      await sendTelegramMessage(chatId, rel.texto, rel.botoes);
+      await sendTelegramMessage(chatId, rel.texto, rel.botoes, threadId);
       return res.status(200).json({ ok: true });
     }
 
     if (lower === '/topicos') {
       const explicacaoTopicos =
         `👥 *COMO CONECTAR O GRUPO COM TÓPICOS NO TELEGRAM:* 🎨\n\n` +
-        `Você pode criar um grupo exclusivo para a equipe do estúdio com cada agente em sua própria janela:\n\n` +
-        `1️⃣ Crie um grupo no Telegram (ex: *Somos 1 Tattoo — Quartel General*).\n` +
+        `Para cada agente ter sua própria janela separada:\n\n` +
+        `1️⃣ Crie um grupo no Telegram (ex: *Somos 1 Tattoo — Central*).\n` +
         `2️⃣ Nas configurações do grupo, ative a opção *Tópicos (Fórum)*.\n` +
-        `3️⃣ Crie os 6 Tópicos no grupo:\n` +
-        `   • 🛎️ Triagem & Novos Contatos\n` +
-        `   • 🎯 SDR & Qualificação (SPIN)\n` +
-        `   • 💬 Negociação & Sinal PIX (Jonathan)\n` +
-        `   • 📅 Secretário da Agenda (Miguel)\n` +
-        `   • ✨ Pós-Venda & Cicatrização (Juliana)\n` +
-        `   • 🔕 Resgate Avalanche\n` +
-        `   • 🎩 Conversa com Miguel (Comandos)\n\n` +
-        `4️⃣ Adicione o bot *@somos1tattoo_bot* como Administrador do grupo.\n` +
-        `5️⃣ Digite */conectar_grupo* dentro do grupo para registrar!`;
+        `3️⃣ Adicione o bot *@somos1tattoo_bot* como Administrador (com permissão de Gerenciar Tópicos).\n` +
+        `4️⃣ Digite */criar_topicos* dentro do grupo!\n\n` +
+        `O bot cria todos os 7 canais na hora e salva as rotas no sistema!`;
 
-      await sendTelegramMessage(chatId, explicacaoTopicos);
+      await sendTelegramMessage(chatId, explicacaoTopicos, null, threadId);
       return res.status(200).json({ ok: true });
     }
 
     // Se o Markinhos enviou uma mensagem em linguagem natural, aciona o Co-Piloto Miguel
-    await conversarComMiguelAdmin(text, chatId);
+    await conversarComMiguelAdmin(text, chatId, threadId);
     return res.status(200).json({ ok: true, processedBy: 'miguel' });
   }
 
@@ -1019,7 +1136,24 @@ export default async function handler(req, res) {
         ]
       ];
 
-      await sendTelegramMessage(TELEGRAM_ADMIN_CHAT_ID, textoTelegram, inlineKeyboard);
+      // Roteia para o tópico específico do grupo se configurado, ou para o privado do admin
+      let targetChatId = TELEGRAM_ADMIN_CHAT_ID;
+      let targetThreadId = null;
+
+      try {
+        const topicsSnap = await getDoc(doc(db, 'configuracoes', 'telegram_topics'));
+        if (topicsSnap.exists()) {
+          const conf = topicsSnap.data();
+          if (conf.groupId && conf.ativo) {
+            targetChatId = conf.groupId;
+            targetThreadId = conf.topics?.[agenteTipo] || null;
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao obter configuracoes/telegram_topics:', e);
+      }
+
+      await sendTelegramMessage(targetChatId, textoTelegram, inlineKeyboard, targetThreadId);
 
       // 7. Se o Piloto Automático estiver ativado para este lead, dispara automático no WhatsApp
       if (lead?.pilotoIA) {
@@ -1036,8 +1170,10 @@ export default async function handler(req, res) {
         } catch (e) {}
 
         await sendTelegramMessage(
-          TELEGRAM_ADMIN_CHAT_ID,
-          `⚡ *AUTO-PILOTO:* A resposta acima foi disparada automaticamente no WhatsApp de ${senderName}!`
+          targetChatId,
+          `⚡ *AUTO-PILOTO:* A resposta acima foi disparada automaticamente no WhatsApp de ${senderName}!`,
+          null,
+          targetThreadId
         );
       }
 
