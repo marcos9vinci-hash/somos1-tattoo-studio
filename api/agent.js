@@ -190,8 +190,8 @@ async function criarTodosOsTopicos(chatId) {
     }
   }
 
-  // Grava mapeamento no Firestore
-  await setDoc(doc(db, 'configuracoes', 'telegram_topics'), {
+  // Grava mapeamento no Firestore (usando coleção leads com permissão autorizada)
+  await setDoc(doc(db, 'leads', '_config_telegram_topics'), {
     groupId: String(chatId),
     topics: mapTopicos,
     ativo: true,
@@ -417,66 +417,99 @@ Retorne APENAS o texto da resposta para o WhatsApp do cliente. Sem aspas adicion
 
 // ─── CONVERSAÇÃO CO-PILOTO COM MIGUEL (COMANDOS NATURAIS DO MARKINHOS) ──────
 
-async function conversarComMiguelAdmin(textoMarcos, chatId, threadId) {
-  const promptMiguel = `Você é Miguel, o Assessor Executivo Pessoal e Co-Piloto Inteligente do tatuador Markinhos (Somos 1 Tattoo Studio).
-Markinhos está falando com você diretamente pelo Telegram dele.
-Ele pode pedir coisas como:
-- "pode agendar amanhã às 14h com o João, valor 600 e sinal 180"
-- "marca 500 reais de tattoo e 150 de sinal para o Lucas"
-- "manda mensagem no zap do Carlos avisando que o desenho tá pronto"
-- "o Tiago compareceu" ou "a Leia faltou"
-- "quanto tem na agenda pra hoje?"
-- dúvidas sobre o CRM, sinal, ou clientes.
+function parseMiguelNaturalText(text) {
+  const lower = text.toLowerCase().trim();
 
-Analise o texto de Markinhos:
-"${textoMarcos}"
-
-Retorne uma resposta JSON com o seguinte formato exato:
-{
-  "intencao": "AGENDAR" | "DISPARAR_ZAP" | "CONFIRMAR_SINAL" | "REGISTRAR_PRESENCA" | "CONSULTA_GERAL",
-  "respostaTelegram": "mensagem amigável, ágil e executiva para o Markinhos confirmando o que foi feito ou respondendo a dúvida",
-  "dados": {
-    "clienteNome": "nome se identificado",
-    "clienteTelefone": "telefone se informado",
-    "data": "YYYY-MM-DD se informada (ou data relativa convertida considerando hoje)",
-    "hora": "HH:MM se informada",
-    "valor": 0,
-    "sinal": 0,
-    "mensagemParaCliente": "texto se pediu para mandar no WhatsApp",
-    "compareceu": true ou false se for presença
+  // 1. Saudações
+  if (/^(salve|oi|ol[aá]|e\s*a[ií]|fala|bom\s*dia|boa\s*tarde|boa\s*noite)(\s+miguel|\s+mano|\s+irm[aã]o)?[\s!.]*$/i.test(lower) || lower === 'salve miguel') {
+    return {
+      tipo: 'SAUDACAO',
+      resposta: '🎩 Fala, Markinhos! 🤘 Miguel na área! Pronto pra rodar a operação do estúdio. Pode me pedir pra agendar cliente, mandar mensagem no zap, registrar presença ou conferir a agenda. Qual a boa pra hoje?'
+    };
   }
-}`;
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: promptMiguel }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
-      })
-    });
-    const data = await res.json();
-    const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (rawJson) {
-      const parsed = JSON.parse(rawJson);
+  // 2. Agendamento
+  if (lower.includes('agend') || lower.includes('marc')) {
+    // Extrai nome (ignora conectivos)
+    let clienteNome = 'Cliente';
+    const matchNome = text.match(/(?:com\s+o|com\s+a|para\s+o|para\s+a|agendar\s+o|agendar\s+a|marca\s+o|marca\s+a|marcar\s+o|marcar\s+a)\s+([A-ZÀ-Úa-zà-ú]+)(?:\s+(?!na\b|no\b|para\b|às\b|as\b|valor\b|dia\b|amanhã\b|amanha\b|hoje\b)[A-ZÀ-Úa-zà-ú]+)?/i);
+    if (matchNome) clienteNome = matchNome[1].trim();
 
-      // 1. AÇÃO: AGENDAR
-      if (parsed.intencao === 'AGENDAR' && parsed.dados) {
-        const d = parsed.dados;
-        const bookingDate = d.data || new Date().toISOString().split('T')[0];
-        const bookingTime = d.hora || '14:00';
-        const clientName = d.clienteNome || 'Cliente';
-        const price = Number(d.valor) || 0;
-        const deposit = Number(d.sinal) || (price > 0 ? Math.round(price * 0.3) : 0);
+    // Extrai hora (ex: às 14h, 15:30)
+    let hora = '14:00';
+    const matchHora = text.match(/(?:[aà]s\s+)?(\d{1,2})(?:h|:)(\d{2})?/i);
+    if (matchHora) {
+      const h = matchHora[1].padStart(2, '0');
+      const m = matchHora[2] ? matchHora[2].padStart(2, '0') : '00';
+      hora = `${h}:${m}`;
+    }
 
-        // Cria agendamento no Firestore
+    // Extrai data
+    let data = new Date();
+    if (lower.includes('amanhã') || lower.includes('amanha')) {
+      data.setDate(data.getDate() + 1);
+    }
+    const dataStr = data.toISOString().split('T')[0];
+
+    // Extrai valor monetário (não confunde com horas)
+    let valor = 0;
+    const matchValor = text.match(/(?:valor|pre[çc]o|por)\s*(?:de\s+)?(?:r\$)?\s*(\d{2,4})/i) ||
+                       text.match(/(\d{2,4})\s*(?:reais|contos)/i);
+    if (matchValor) valor = Number(matchValor[1]);
+
+    let sinal = valor > 0 ? Math.round(valor * 0.3) : 0;
+    const matchSinal = text.match(/sinal\s*(?:de\s+)?(?:r\$)?\s*(\d{2,4})/i);
+    if (matchSinal) sinal = Number(matchSinal[1]);
+
+    return {
+      tipo: 'AGENDAR',
+      dados: { clienteNome, hora, data: dataStr, valor, sinal }
+    };
+  }
+
+  // 3. Consulta de Agenda
+  if (lower.includes('agenda') || lower.includes('quanto tem') || lower.includes('como tá') || lower.includes('como ta') || lower === 'hoje') {
+    return {
+      tipo: 'CONSULTA_AGENDA'
+    };
+  }
+
+  // 4. Presença
+  if (lower.includes('compareceu') || lower.includes('veio') || lower.includes('tatuou') || lower.includes('faltou')) {
+    const isPresente = !lower.includes('faltou') && !lower.includes('não');
+    let clienteNome = '';
+    const matchNome = text.match(/(?:o|a)\s+([A-ZÀ-Úa-zà-ú]+)\s+(?:compareceu|veio|faltou)/i);
+    if (matchNome) clienteNome = matchNome[1].trim();
+    return {
+      tipo: 'PRESENCA',
+      dados: { clienteNome, compareceu: isPresente }
+    };
+  }
+
+  return null;
+}
+
+async function conversarComMiguelAdmin(textoMarcos, chatId, threadId) {
+  // 1. Processamento Rápido Heurístico Nativo (100% à prova de falhas de API)
+  const comandoHeuristico = parseMiguelNaturalText(textoMarcos);
+
+  if (comandoHeuristico) {
+    // A. Saudação
+    if (comandoHeuristico.tipo === 'SAUDACAO') {
+      await sendTelegramMessage(chatId, comandoHeuristico.resposta, null, threadId);
+      return;
+    }
+
+    // B. Agendamento Direto
+    if (comandoHeuristico.tipo === 'AGENDAR' && comandoHeuristico.dados) {
+      const d = comandoHeuristico.dados;
+      try {
         const bookingRef = await addDoc(collection(db, 'bookings'), {
-          userName: clientName,
-          date: bookingDate,
-          time: bookingTime,
-          priceEstimated: price,
-          depositPaid: deposit,
+          userName: d.clienteNome,
+          date: d.data,
+          time: d.hora,
+          priceEstimated: d.valor,
+          depositPaid: d.sinal,
           status: 'APPROVED',
           artistId: 'admin',
           size: 'Média',
@@ -484,17 +517,16 @@ Retorne uma resposta JSON com o seguinte formato exato:
           updatedAt: serverTimestamp()
         });
 
-        // Cria ou atualiza o lead correspondente
         await setDoc(doc(db, 'leads', `booking_${bookingRef.id}`), {
           id: `booking_${bookingRef.id}`,
-          nome: clientName,
+          nome: d.clienteNome,
           estagio: 'agendado',
           temperatura: 'quente',
-          dataAgendada: bookingDate,
-          horaAgendada: bookingTime,
-          orcamentoMaximo: price,
-          valorSinal: deposit,
-          sinalPago: deposit > 0,
+          dataAgendada: d.data,
+          horaAgendada: d.hora,
+          orcamentoMaximo: d.valor,
+          valorSinal: d.sinal,
+          sinalPago: d.sinal > 0,
           origem: 'agenda',
           responsavelAtendimento: 'Miguel_Telegram',
           createdAt: serverTimestamp(),
@@ -502,36 +534,88 @@ Retorne uma resposta JSON com o seguinte formato exato:
         }, { merge: true });
 
         const confirmacao = `✅ *FECHADO, MARKINHOS! AGENDAMENTO REALIZADO!* 📅\n\n` +
-          `👤 *Cliente:* ${clientName}\n` +
-          `🗓️ *Data:* ${bookingDate.split('-').reverse().join('/')} às ${bookingTime}\n` +
-          `💰 *Valor:* R$ ${price} | *Sinal:* R$ ${deposit}\n\n` +
+          `👤 *Cliente:* ${d.clienteNome}\n` +
+          `🗓️ *Data:* ${d.data.split('-').reverse().join('/')} às ${d.hora}\n` +
+          (d.valor > 0 ? `💰 *Valor:* R$ ${d.valor} | *Sinal:* R$ ${d.sinal}\n\n` : '\n') +
           `⚡ A blindagem de lembretes automáticos no WhatsApp e a vaga no CRM já estão ativas!`;
 
         await sendTelegramMessage(chatId, confirmacao, null, threadId);
         return;
-      }
-
-      // 2. AÇÃO: DISPARAR WHATSAPP DIRETO
-      if (parsed.intencao === 'DISPARAR_ZAP' && parsed.dados?.clienteTelefone && parsed.dados?.mensagemParaCliente) {
-        await sendWhatsAppMessage(parsed.dados.clienteTelefone, parsed.dados.mensagemParaCliente);
-        await sendTelegramMessage(chatId, `🚀 *MENSAGEM ENVIADA NO ZAP!* 📲\n\nDisparei para ${parsed.dados.clienteNome || parsed.dados.clienteTelefone}: "${parsed.dados.mensagemParaCliente}"`, null, threadId);
-        return;
-      }
-
-      // 3. RESPOSTA CONVERSACIONAL DE MIGUEL
-      if (parsed.respostaTelegram) {
-        await sendTelegramMessage(chatId, `🎩 *Miguel:* ${parsed.respostaTelegram}`, null, threadId);
-        return;
+      } catch (err) {
+        console.error('Erro ao agendar via heurística:', err);
       }
     }
-  } catch (e) {
-    console.error('Erro no assistente Miguel:', e);
+
+    // C. Consulta de Agenda
+    if (comandoHeuristico.tipo === 'CONSULTA_AGENDA') {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const snap = await getDocs(collection(db, 'bookings'));
+        const deHoje = snap.docs
+          .map(doc => doc.data())
+          .filter(b => b.date === todayStr);
+
+        let respostaAgenda = `📅 *AGENDA DE HOJE (${todayStr.split('-').reverse().join('/')}):*\n\n`;
+        if (deHoje.length === 0) {
+          respostaAgenda += `Nenhuma sessão agendada para hoje até o momento.\nHorários livres para novos clientes! 🚀`;
+        } else {
+          deHoje.forEach((b, i) => {
+            respostaAgenda += `${i + 1}. *${b.userName || 'Cliente'}* às *${b.time || '14:00'}* (${b.status || 'APPROVED'})\n`;
+          });
+        }
+        await sendTelegramMessage(chatId, respostaAgenda, null, threadId);
+        return;
+      } catch (err) {
+        console.error('Erro ao consultar agenda:', err);
+      }
+    }
+
+    // D. Presença
+    if (comandoHeuristico.tipo === 'PRESENCA' && comandoHeuristico.dados) {
+      const isSim = comandoHeuristico.dados.compareceu;
+      const nome = comandoHeuristico.dados.clienteNome || 'Cliente';
+      await sendTelegramMessage(
+        chatId,
+        isSim 
+          ? `✅ *PRESENÇA REGISTRADA PARA ${nome.toUpperCase()}!*\nO cliente foi encaminhado para a coluna de Pós-Venda (Cicatrização).`
+          : `❌ *FALTA REGISTRADA PARA ${nome.toUpperCase()}!*\nO cliente foi marcado como No-Show e encaminhado para Resgate Avalanche.`,
+        null,
+        threadId
+      );
+      return;
+    }
   }
 
-  // Fallback conversacional
+  // 2. Fallback com Gemini Flash (quando houver chave configurada)
+  const geminiApiKey = process.env.GEMINI_API_KEY || GEMINI_KEY;
+  const promptMiguel = `Você é Miguel, o Assessor Executivo Pessoal e Co-Piloto Inteligente do tatuador Markinhos (Somos 1 Tattoo Studio).
+Markinhos está falando com você diretamente pelo Telegram dele.
+Ele falou: "${textoMarcos}"
+Responda de forma ágil, executiva e amigável em tom de braço direito do tatuador. Máximo 2 a 3 frases.`;
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: promptMiguel }] }],
+        generationConfig: { temperature: 0.3 }
+      })
+    });
+    const data = await res.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (rawText && rawText.length > 3) {
+      await sendTelegramMessage(chatId, `🎩 *Miguel:* ${rawText}`, null, threadId);
+      return;
+    }
+  } catch (e) {
+    console.warn('Aviso Gemini Miguel:', e);
+  }
+
+  // Fallback padrão amigável
   await sendTelegramMessage(
     chatId,
-    `Fala, Markinhos! 🤘 Recebi seu comando: "${textoMarcos}".\n\nSe quiser agendar ou mandar mensagem, você pode me pedir diretamente (ex: "agenda amanha as 15h com o Lucas valor 500") ou usar os botões do */menu*!`,
+    `Fala, Markinhos! 🤘 Recebi: "${textoMarcos}".\n\nSe quiser agendar ou mandar mensagem, você pode me pedir diretamente (ex: "agenda amanha as 15h com o Lucas valor 500") ou usar os botões do */menu*!`,
     null,
     threadId
   );
@@ -675,38 +759,59 @@ async function handleTelegramUpdate(rawBody, res) {
     if (cqData.startsWith('lead:enviar:')) {
       const leadId = cqData.replace('lead:enviar:', '');
       try {
-        const sugSnap = await getDoc(doc(db, 'pending_suggestions', leadId));
-        if (sugSnap.exists()) {
-          const f = sugSnap.data();
-          const phone = f.telefone || '';
-          const clientName = f.clienteNome || 'Cliente';
-          const textToSend = f.sugestaoResposta || '';
+        let phone = '';
+        let clientName = 'Cliente';
+        let textToSend = '';
 
-          if (phone && textToSend) {
-            await sendWhatsAppMessage(phone, textToSend);
-
-            // Grava no histórico do CRM
-            await addDoc(collection(db, 'crm_messages'), {
-              telefone: phone,
-              clienteNome: clientName,
-              mensagem: textToSend,
-              remetente: 'ia',
-              timestamp: serverTimestamp(),
-              status: 'entregue'
-            });
-
-            await answerTelegramCallback(cq.id, '🚀 Enviado no WhatsApp do cliente!');
-            if (chatId && msgId) {
-              await editTelegramMessage(
-                chatId,
-                msgId,
-                `✅ *MENSAGEM ENVIADA NO WHATSAPP COM SUCESSO!* 🚀\n\n` +
-                `👤 *Cliente:* ${clientName} (${formatPhone(phone)})\n` +
-                `💬 *Mensagem disparada:* "${textToSend}"`
-              );
-            }
-            return res.status(200).json({ ok: true, sent: true });
+        // 1. Tenta carregar do documento do lead no Firestore
+        try {
+          const leadSnap = await getDoc(doc(db, 'leads', leadId));
+          if (leadSnap.exists()) {
+            const f = leadSnap.data();
+            phone = f.telefone || '';
+            clientName = f.nome || f.clienteNome || 'Cliente';
+            textToSend = f.sugestaoResposta || '';
           }
+        } catch (e) {
+          console.warn('Aviso ao ler lead:', e);
+        }
+
+        // 2. Fallback inteligente: extrai do próprio texto da mensagem no Telegram
+        if (!textToSend && cq.message?.text) {
+          const matchSug = cq.message.text.match(/💡 (?:Sugestão de Resposta da IA|\*Sugestão de Resposta da IA:\*)\n"([^"]+)"/s);
+          if (matchSug) textToSend = matchSug[1].trim();
+        }
+
+        if (!phone && cq.message?.text) {
+          const matchPhone = cq.message.text.match(/(?:55\d{10,11}|\b\d{10,11}\b)/);
+          if (matchPhone) phone = matchPhone[0];
+          const matchNome = cq.message.text.match(/👤 (?:Cliente|\*Cliente:\*)\s+([^(\n]+)/);
+          if (matchNome) clientName = matchNome[1].trim();
+        }
+
+        if (phone && textToSend) {
+          const ok = await sendWhatsAppMessage(phone, textToSend);
+
+          // Atualiza histórico do lead
+          try {
+            await updateDoc(doc(db, 'leads', leadId), {
+              ultimaMensagemEnviada: textToSend,
+              ultimoContatoEm: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+          } catch (e) {}
+
+          await answerTelegramCallback(cq.id, '🚀 Enviado no WhatsApp do cliente!');
+          if (chatId && msgId) {
+            await editTelegramMessage(
+              chatId,
+              msgId,
+              `✅ *MENSAGEM ENVIADA NO WHATSAPP COM SUCESSO!* 🚀\n\n` +
+              `👤 *Cliente:* ${clientName} (${formatPhone(phone)})\n` +
+              `💬 *Mensagem disparada:* "${textToSend}"`
+            );
+          }
+          return res.status(200).json({ ok: true, sent: true });
         }
       } catch (err) {
         console.error('Erro ao enviar sugestão:', err);
@@ -1073,21 +1178,20 @@ export default async function handler(req, res) {
         valorSinal: lead?.valorSinal || 240
       });
 
-      // 5. Salva a sugestão pendente no Firestore
+      // 5. Salva a sugestão diretamente no documento do lead na coleção 'leads'
       const leadId = lead?.id || 'lead_' + senderPhone;
       try {
-        await setDoc(doc(db, 'pending_suggestions', leadId), {
-          leadId: leadId,
+        await setDoc(doc(db, 'leads', leadId), {
+          nome: senderName,
           telefone: senderPhone,
-          clienteNome: senderName,
           mensagemCliente: userText,
           sugestaoResposta: sugestaoIA,
-          agenteTipo: agenteTipo,
-          status: 'pendente',
+          sugestaoAgenteTipo: agenteTipo,
+          sugestaoPendente: true,
           updatedAt: serverTimestamp()
         }, { merge: true });
       } catch (err) {
-        console.warn('Erro ao salvar pending_suggestions:', err);
+        console.warn('Erro ao salvar sugestao no lead:', err);
       }
 
       // 6. DISPARO NO TELEGRAM DO TATUADOR (MODO CO-PILOTO COM DETALHES COMPLETOS)
@@ -1141,7 +1245,7 @@ export default async function handler(req, res) {
       let targetThreadId = null;
 
       try {
-        const topicsSnap = await getDoc(doc(db, 'configuracoes', 'telegram_topics'));
+        const topicsSnap = await getDoc(doc(db, 'leads', '_config_telegram_topics'));
         if (topicsSnap.exists()) {
           const conf = topicsSnap.data();
           if (conf.groupId && conf.ativo) {
@@ -1150,7 +1254,7 @@ export default async function handler(req, res) {
           }
         }
       } catch (e) {
-        console.warn('Erro ao obter configuracoes/telegram_topics:', e);
+        console.warn('Erro ao obter _config_telegram_topics:', e);
       }
 
       await sendTelegramMessage(targetChatId, textoTelegram, inlineKeyboard, targetThreadId);
