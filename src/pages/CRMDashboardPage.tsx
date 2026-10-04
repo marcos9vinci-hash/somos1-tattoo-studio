@@ -181,7 +181,7 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
     }
   };
 
-  // Escuta em tempo real os cliques nos botões inline do Telegram (@somos1tattoo_bot)
+  // Escuta em tempo real os cliques nos botões inline e comandos do Telegram (@somos1tattoo_bot)
   useEffect(() => {
     const processados = new Set<string>();
     const interval = setInterval(async () => {
@@ -191,21 +191,25 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
         const data = await res.json();
         if (data.ok && data.result) {
           for (const u of data.result) {
+            // 1. PROCESSAR CLIQUES EM BOTÕES (CALLBACK QUERY)
             if (u.callback_query && u.callback_query.data) {
               const cq = u.callback_query;
               if (processados.has(cq.id)) continue;
               processados.add(cq.id);
 
               const cqData = cq.data as string;
+              const chatId = cq.message?.chat?.id;
+              const msgId = cq.message?.message_id;
+
               if (cqData.startsWith('presenca:')) {
                 const [, acao, bookingId] = cqData.split(':');
-                if (bookingId) {
+                if (bookingId && (acao === 'sim' || acao === 'nao')) {
                   await telegramService.responderCallback(cq.id, acao === 'sim' ? 'Presença confirmada!' : 'Falta registrada!');
                   await crmService.confirmarPresencaBooking(bookingId, acao === 'sim');
-                  if (cq.message?.chat?.id && cq.message?.message_id) {
+                  if (chatId && msgId) {
                     await telegramService.editarMensagemTexto(
-                      cq.message.chat.id,
-                      cq.message.message_id,
+                      chatId,
+                      msgId,
                       acao === 'sim' 
                         ? `✅ *PRESENÇA CONFIRMADA VIA TELEGRAM!*\nO cliente foi registrado como presente e encaminhado para Pós-Venda.`
                         : `❌ *FALTA REGISTRADA VIA TELEGRAM!*\nO cliente foi marcado como No-Show e encaminhado para Resgate.`
@@ -213,10 +217,86 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
                   }
                   showToast('success', acao === 'sim' ? '✅ Presença confirmada via Telegram!' : '❌ Falta registrada via Telegram.');
                   await loadData();
+                } else if (acao === 'alerta' && bookingId) {
+                  const sessao = sessoesParaConfirmar.find(s => s.id === bookingId);
+                  if (sessao) {
+                    await telegramService.responderCallback(cq.id, 'Enviando pergunta de presença...');
+                    await telegramService.enviarAlertaPresenca(sessao);
+                  }
+                }
+              } else if (cqData.startsWith('agente:') || cqData === 'estudio:status') {
+                const tipo = cqData.replace('agente:', '');
+                await telegramService.responderCallback(cq.id, 'Carregando agente...');
+                const relatorio = telegramService.montarTextoAgente(tipo, leads, sessoesParaConfirmar, clientes);
+                if (chatId && msgId) {
+                  await telegramService.editarMensagemTexto(chatId, msgId, relatorio.texto, relatorio.botoes);
+                }
+              } else if (cqData === 'menu:principal') {
+                await telegramService.responderCallback(cq.id, 'Painel Principal');
+                if (chatId && msgId) {
+                  const textoMenu = 
+                    '🏢 *QUARTEL GENERAL — SOMOS 1 TATTOO* 🎨\n\n' +
+                    'Fala, *Marcos*! Aqui está o seu painel de controle com os *6 Agentes Especializados* do estúdio.\n\n' +
+                    'Toque em qualquer agente abaixo para consultar a esteira dele ou ver ações pendentes:\n\n' +
+                    '🛎️ *1. Recepção:* Novos contatos & triagem inicial\n' +
+                    '🎯 *2. SDR Consultivo:* Qualificação da ideia & SPIN\n' +
+                    '💬 *3. Jonathan:* Propostas, negociação & Sinal PIX\n' +
+                    '📅 *4. Secretário:* Confirmações & blindagem da agenda\n' +
+                    '✨ *5. Juliana:* Pós-venda, cuidados & cicatrização\n' +
+                    '🔕 *6. Avalanche:* Resgate de quem sumiu ou faltou';
+
+                  const botoesMenu = [
+                    [
+                      { text: '🛎️ 1. Triagem & Recepção', callback_data: 'agente:novo' },
+                      { text: '🎯 2. SDR (Clone Dono)', callback_data: 'agente:qualificacao' }
+                    ],
+                    [
+                      { text: '💬 3. Fechamento & Sinal PIX', callback_data: 'agente:negociacao' },
+                      { text: '📅 4. Secretário da Agenda', callback_data: 'agente:agendado' }
+                    ],
+                    [
+                      { text: '✨ 5. Juliana (Pós-Venda)', callback_data: 'agente:pos_venda' },
+                      { text: '🔕 6. Avalanche (Resgate)', callback_data: 'agente:followup' }
+                    ],
+                    [
+                      { text: '📊 Relatório Geral do Estúdio', callback_data: 'estudio:status' }
+                    ],
+                    [
+                      { text: '🌐 Abrir CRM no Navegador', url: 'https://somos1-tattoo-studio.vercel.app/admin' }
+                    ]
+                  ];
+
+                  await telegramService.editarMensagemTexto(chatId, msgId, textoMenu, botoesMenu);
                 }
               } else if (cqData.startsWith('teste:')) {
                 await telegramService.responderCallback(cq.id, '✅ Teste recebido com sucesso no CRM!');
                 showToast('success', `✈️ Clique de teste no Telegram recebido com sucesso!`);
+              }
+            }
+
+            // 2. PROCESSAR COMANDOS DE TEXTO (/menu, /status, /hoje)
+            if (u.message && u.message.text && u.message.chat) {
+              const msgText = (u.message.text as string).trim().toLowerCase();
+              const updateId = `msg_${u.update_id}`;
+              if (!processados.has(updateId)) {
+                processados.add(updateId);
+                const chatId = String(u.message.chat.id);
+
+                if (msgText === '/menu' || msgText === '/agentes' || msgText === '/start' || msgText === 'menu' || msgText === 'agentes') {
+                  await telegramService.enviarMenuPrincipal(chatId);
+                } else if (msgText === '/hoje' || msgText === '/agenda') {
+                  const rel = telegramService.montarTextoAgente('agendado', leads, sessoesParaConfirmar, clientes);
+                  await telegramService.enviarMensagem(chatId, rel.texto, rel.botoes);
+                } else if (msgText === '/sinal') {
+                  const rel = telegramService.montarTextoAgente('negociacao', leads, sessoesParaConfirmar, clientes);
+                  await telegramService.enviarMensagem(chatId, rel.texto, rel.botoes);
+                } else if (msgText === '/posvenda') {
+                  const rel = telegramService.montarTextoAgente('pos_venda', leads, sessoesParaConfirmar, clientes);
+                  await telegramService.enviarMensagem(chatId, rel.texto, rel.botoes);
+                } else if (msgText === '/status') {
+                  const rel = telegramService.montarTextoAgente('status', leads, sessoesParaConfirmar, clientes);
+                  await telegramService.enviarMensagem(chatId, rel.texto, rel.botoes);
+                }
               }
             }
           }
@@ -227,7 +307,7 @@ export const CRMDashboardPage: React.FC<CRMDashboardPageProps> = ({ onNavigateTo
     }, 4000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [leads, sessoesParaConfirmar, clientes]);
 
   useEffect(() => {
     loadData();
