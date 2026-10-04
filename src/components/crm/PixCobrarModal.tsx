@@ -17,7 +17,8 @@ import {
 import { 
   generatePixCopiaECola, 
   getPixQrCodeImageUrl, 
-  buildPixWhatsAppMessage 
+  buildPixWhatsAppMessage,
+  DEFAULT_STUDIO_PIX
 } from '../../lib/pixQrCodeService';
 import { Lead } from '../../types/crm';
 import { crmService } from '../../lib/crmService';
@@ -45,9 +46,9 @@ export const PixCobrarModal: React.FC<PixCobrarModalProps> = ({
   defaultDescricao = 'Atendimento Tattoo',
   onConfirmedPayment
 }) => {
-  const [chavePix, setChavePix] = useState(() => localStorage.getItem('somos1_pix_chave') || 'somos1tattoo@gmail.com');
-  const [nomeRecebedor, setNomeRecebedor] = useState(() => localStorage.getItem('somos1_pix_nome') || 'SOMOS 1 TATTOO');
-  const [cidade, setCidade] = useState(() => localStorage.getItem('somos1_pix_cidade') || 'SAO PAULO');
+  const [chavePix, setChavePix] = useState(() => localStorage.getItem('somos1_pix_chave') || DEFAULT_STUDIO_PIX.chave);
+  const [nomeRecebedor, setNomeRecebedor] = useState(() => localStorage.getItem('somos1_pix_nome') || DEFAULT_STUDIO_PIX.nomeRecebedor);
+  const [cidade, setCidade] = useState(() => localStorage.getItem('somos1_pix_cidade') || DEFAULT_STUDIO_PIX.cidade);
   const [isEditingKey, setIsEditingKey] = useState(false);
 
   const handleSaveChavePix = () => {

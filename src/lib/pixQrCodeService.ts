@@ -48,13 +48,19 @@ function sanitizeString(str: string, maxLength: number): string {
     .slice(0, maxLength);
 }
 
+export const DEFAULT_STUDIO_PIX = {
+  chave: '860066de-bfce-4faf-afad-29c4e678e4e3',
+  nomeRecebedor: 'MARCOS VINICIUS GOMES',
+  cidade: 'SAO CAETANO D'
+};
+
 /**
  * Gera a string do PIX Copia e Cola Oficial (BR Code)
  */
 export function generatePixCopiaECola({
-  chave = 'somos1tattoo@gmail.com',
-  nomeRecebedor = 'SOMOS 1 TATTOO',
-  cidade = 'SAO PAULO',
+  chave = DEFAULT_STUDIO_PIX.chave,
+  nomeRecebedor = DEFAULT_STUDIO_PIX.nomeRecebedor,
+  cidade = DEFAULT_STUDIO_PIX.cidade,
   valor,
   identificador = '***',
   descricao
