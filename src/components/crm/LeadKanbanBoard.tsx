@@ -24,11 +24,13 @@ import {
   Ban,
   Coins,
   Copy,
-  Check
+  Check,
+  QrCode
 } from 'lucide-react';
 import { STAGE_AGENTS_NAIA } from '../../lib/naiaAgentsConfig';
 import { ColunaAgentConfigModal } from './ColunaAgentConfigModal';
 import { PixReceiptAiModal } from './PixReceiptAiModal';
+import { PixCobrarModal } from './PixCobrarModal';
 
 interface LeadKanbanBoardProps {
   leads: Lead[];
@@ -63,6 +65,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
   const [agentsConfig, setAgentsConfig] = useState<Record<LeadStage, ColunaAIAgentConfig>>(STAGE_AGENTS_NAIA);
   const [selectedAgentForModal, setSelectedAgentForModal] = useState<ColunaAIAgentConfig | null>(null);
   const [selectedLeadForPixReceipt, setSelectedLeadForPixReceipt] = useState<Lead | null>(null);
+  const [selectedLeadForCobrarPix, setSelectedLeadForCobrarPix] = useState<Lead | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
   const [isMouseDown, setIsMouseDown] = useState(false);
@@ -382,23 +385,37 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
 
                             <div className="pt-1 flex items-center gap-1.5 border-t border-purple-500/20">
                               {lead.sinalPago ? (
-                                <span className="w-full text-center py-1 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 flex items-center justify-center gap-1">
-                                  <Check className="w-3 h-3 text-emerald-400" />
-                                  Sinal Pago! (R$ {valorSinal})
-                                </span>
+                                <div className="w-full flex items-center gap-1.5">
+                                  <span className="flex-1 text-center py-1 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 flex items-center justify-center gap-1">
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                    Sinal Pago! (R$ {valorSinal})
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedLeadForCobrarPix(lead);
+                                    }}
+                                    className="py-1 px-2 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-[9.5px] font-bold border border-purple-400/30 flex items-center gap-1 transition-all active:scale-95"
+                                    title="Cobrar restante da tattoo com QR Code no balcão ou WhatsApp"
+                                  >
+                                    <QrCode className="w-3 h-3 text-purple-300" />
+                                    Cobrar Restante
+                                  </button>
+                                </div>
                               ) : (
                                 <>
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleCopiarPixSinal(lead, valorSinal, valorTotal);
+                                      setSelectedLeadForCobrarPix(lead);
                                     }}
-                                    className="py-1 px-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/30 rounded text-[9px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95"
-                                    title="Copiar mensagem com chave PIX para enviar no WhatsApp"
+                                    className="py-1 px-2 bg-gradient-to-r from-purple-600/30 to-emerald-600/30 hover:from-purple-600/50 hover:to-emerald-600/50 text-emerald-200 border border-emerald-400/40 rounded text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 shadow-xs"
+                                    title="Gerar QR Code na tela para o cliente apontar o celular ou enviar no WhatsApp"
                                   >
-                                    <Copy className="w-2.5 h-2.5 text-purple-300" />
-                                    PIX
+                                    <QrCode className="w-3 h-3 text-emerald-400" />
+                                    QR Code
                                   </button>
                                   <button
                                     type="button"
@@ -590,6 +607,32 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
             }
           }
           setSelectedLeadForPixReceipt(null);
+        }}
+      />
+
+      {/* Modal de Cobrança com QR Code PIX e WhatsApp */}
+      <PixCobrarModal
+        isOpen={!!selectedLeadForCobrarPix}
+        onClose={() => setSelectedLeadForCobrarPix(null)}
+        lead={selectedLeadForCobrarPix}
+        onConfirmedPayment={async (valor) => {
+          if (selectedLeadForCobrarPix) {
+            if (onUpdateLead) {
+              await onUpdateLead(selectedLeadForCobrarPix.id, {
+                sinalPago: true,
+                valorSinal: valor,
+                estagio: 'agendado'
+              });
+            } else {
+              await crmService.updateLead(selectedLeadForCobrarPix.id, {
+                sinalPago: true,
+                valorSinal: valor,
+                estagio: 'agendado'
+              });
+              onStageChange(selectedLeadForCobrarPix.id, 'agendado');
+            }
+          }
+          setSelectedLeadForCobrarPix(null);
         }}
       />
     </div>

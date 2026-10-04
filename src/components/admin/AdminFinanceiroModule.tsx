@@ -3,7 +3,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, Users, ArrowUpRight, ArrowDownRight, 
   CheckCircle2, Clock, AlertCircle, RefreshCw, Wallet, ShieldAlert,
   Calendar, CreditCard, ChevronRight, FileSpreadsheet, Plus, Trash2, 
-  Filter, X, Sparkles, Building, Receipt, ArrowUpDown
+  Filter, X, Sparkles, Building, Receipt, ArrowUpDown, QrCode
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -25,6 +25,7 @@ import {
 } from '../../lib/financeService';
 import { FinanceSummary, Commission, ContaPagar, ContaReceber } from '../../lib/financeTypes';
 import { PixReceiptAiModal } from '../crm/PixReceiptAiModal';
+import { PixCobrarModal } from '../crm/PixCobrarModal';
 
 type ActiveTab = 'geral' | 'pagar' | 'receber' | 'comissoes';
 
@@ -44,6 +45,7 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
   const [isModalPagarOpen, setIsModalPagarOpen] = useState(false);
   const [isModalReceberOpen, setIsModalReceberOpen] = useState(false);
   const [scannerTarget, setScannerTarget] = useState<'pagar' | 'receber' | null>(null);
+  const [isCobrarPixOpen, setIsCobrarPixOpen] = useState(false);
 
   // Formulário Nova Conta a Pagar
   const [novoPagar, setNovoPagar] = useState({
@@ -339,6 +341,15 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
 
           {/* Botões Rápidos de Ação */}
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsCobrarPixOpen(true)}
+              className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold font-headline flex items-center gap-1.5 transition-all shadow-md active:scale-95 border border-purple-400/30"
+              title="Gerar QR Code PIX oficial na tela para cobrança presencial ou envio no WhatsApp"
+            >
+              <QrCode className="w-4 h-4 text-amber-300" />
+              Cobrar QR Code PIX
+            </button>
+
             <button
               onClick={() => setIsModalReceberOpen(true)}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold font-headline flex items-center gap-1.5 transition-all shadow-md active:scale-95"
@@ -1302,6 +1313,18 @@ export default function AdminFinanceiroModule({ bookings = [], users = [] }: Adm
         isOpen={!!scannerTarget}
         onClose={() => setScannerTarget(null)}
         onApplyToFinance={handleApplyScannerResult}
+      />
+
+      {/* Modal de Cobrança com QR Code PIX */}
+      <PixCobrarModal
+        isOpen={isCobrarPixOpen}
+        onClose={() => setIsCobrarPixOpen(false)}
+        defaultValor={150}
+        defaultDescricao="Atendimento Tatuagem Somos 1"
+        onConfirmedPayment={() => {
+          loadData();
+          showSuccess("Pagamento PIX recebido e lançado no Caixa!");
+        }}
       />
     </div>
   );
